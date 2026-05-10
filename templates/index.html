@@ -43,6 +43,12 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .fight-log .big { color: #ffd700; font-weight: 700; font-size: 14px; }
 .fight-log .info { color: #4a9eff; }
 .fight-log .round { color: #fff; font-weight: 700; font-size: 14px; text-align: center; }
+.fight-log .fn { color: #ff9a4a; font-weight: 600; }
+.fight-log .act { color: #4aff6a; font-weight: 500; }
+.fight-log .dmg { color: #ff4a4a; font-weight: 700; }
+.fight-log .ko-word { color: #ffd700; font-weight: 900; font-size: 15px; text-shadow: 0 0 8px rgba(255,215,0,0.4); }
+.fight-log .sub-word { color: #4a9eff; font-weight: 900; font-size: 15px; }
+.fight-log .score-num { color: #ffd700; font-weight: 700; }
 .strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .strategy-btn { padding: 7px; background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 6px; cursor: pointer; color: #e0e0e0; font-size: 12px; text-align: left; -webkit-tap-highlight-color: transparent; }
 .strategy-btn:hover { border-color: #e62400; background: #2a1a1a; }
@@ -1212,11 +1218,11 @@ async function replayFightEvents(fightResult) {
     el.className += " " + cls;
 
     if (ev.type === "round_start") {
-      el.textContent = "--- " + ev.text + " ---";
+      el.innerHTML = '<span class="round">--- ' + formatCommentary(ev.text) + ' ---</span>';
     } else if (ev.type === "score_update") {
-      el.textContent = "  Score: " + ev.score;
+      el.innerHTML = "  Score: " + formatCommentary(ev.score);
     } else if (ev.type === "between_round") {
-      el.innerHTML = "<i>" + ev.text.replace(/\n/g, "<br>") + "</i>";
+      el.innerHTML = "<i>" + formatCommentary(ev.text).replace(/\n/g, "<br>") + "</i>";
     } else if (ev.type === "strategy_prompt") {
       el.textContent = "--- BETWEEN ROUND " + ev.round + " ---";
       log.appendChild(el);
@@ -1231,7 +1237,7 @@ async function replayFightEvents(fightResult) {
       showStrategyPrompt(ev);
       return;
     } else {
-      el.textContent = ev.text || "";
+      el.innerHTML = formatCommentary(ev.text || "");
     }
 
     if (el.textContent || el.innerHTML) {
@@ -1482,6 +1488,28 @@ async function fireAgent() {
   const resp = await api("/api/fire_agent", { sid });
   closeModal(null);
   if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); }
+}
+
+function formatCommentary(text) {
+  if (!text) return "";
+  let s = escHtml(text);
+  // Colorize KO/Submission words
+  s = s.replace(/\b(KNOCKOUT!|KO!|Knockout!)\b/g, '<span class="ko-word">$1</span>');
+  s = s.replace(/\b(TAP!|SUBMISSION!|Submission!)\b/g, '<span class="sub-word">$1</span>');
+  // Colorize fighter names (two capitalized words in a row, or name patterns)
+  s = s.replace(/\b([A-Z][a-z]+(?:['][A-Z][a-z]+)?)\s+([A-Z][a-z]+)\b(?!\s*[a-z])/g, (m) => {
+    const skip = ["This","That","There","Here","Round","Score","Fight","Both","The","From","After","With","Into","Over","Under","Before","During","Through","Against","Between"];
+    const parts = m.split(" ");
+    if (skip.includes(parts[0]) || skip.includes(parts[1])) return m;
+    return `<span class="fn">${parts[0]}</span> <span class="fn">${parts[1]}</span>`;
+  });
+  // Colorize action verbs
+  s = s.replace(/\b(lands|drops|hurts|stuns|wobbles|rocks|tags|cracks|drills|unleashes|explodes|presses|swarms|batters|pummels)\b/gi, '<span class="act">$1</span>');
+  // Colorize damage/impact phrases
+  s = s.replace(/\b(heavy damage|significant damage|nasty cut|bad swelling|massive|devastating|brutal|vicious|nasty|savage)\b/gi, '<span class="dmg">$1</span>');
+  // Colorize round scores
+  s = s.replace(/(\d+)[-–](\d+)/g, '<span class="score-num">$1</span>-<span class="score-num">$2</span>');
+  return s;
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
