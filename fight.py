@@ -93,6 +93,10 @@ class Fight:
             "knockdown": False,
             "knockdown_count": 0,
             "recovering": False,
+            "accumulated_damage": 0,
+            "rounds_stamina_burn": [],
+            "rounds_damage_dealt": [],
+            "fatigue_level": 0.0,
         }
 
     def simulate_fight_gen(self, speed: float = 1.0) -> Generator:
@@ -112,37 +116,45 @@ class Fight:
             self.f1_actions_landed = 0
             self.f2_actions_landed = 0
 
-            face_text = f"{self.fighter1.name} vs {self.fighter2.name}"
+            round_phase = "feeling_out"
+            total_actions = random.randint(25, 40)
+
             yield {"type": "round_start", "round": round_num,
                    "text": self.commentary.generate_round_start(round_num, self.fighter1, self.fighter2)}
 
-            num_actions = random.randint(15, 25)
-
-            for action_idx in range(num_actions):
+            for action_idx in range(total_actions):
                 if self.winner:
                     break
 
-                self._simulate_action()
+                phase_progress = action_idx / max(1, total_actions)
+                if phase_progress < 0.15:
+                    round_phase = "feeling_out"
+                elif phase_progress > 0.75:
+                    round_phase = "desperation"
+                else:
+                    round_phase = "exchanges"
+
+                self._simulate_action(phase=round_phase)
 
                 cuts_texts = []
                 swelling_texts = []
                 leg_texts = []
 
                 f1_cuts = self.f1_state.get("cuts", [])
-                if f1_cuts and random.random() < 0.1:
+                if f1_cuts and random.random() < 0.15:
                     cuts_texts.append(self.commentary.generate_cut_commentary(self.fighter1))
                 f2_cuts = self.f2_state.get("cuts", [])
-                if f2_cuts and random.random() < 0.1:
+                if f2_cuts and random.random() < 0.15:
                     cuts_texts.append(self.commentary.generate_cut_commentary(self.fighter2))
 
-                if self.f1_state["swelling"] > 30 and random.random() < 0.08:
+                if self.f1_state["swelling"] > 25 and random.random() < 0.1:
                     swelling_texts.append(self.commentary.generate_swelling_commentary(self.fighter1))
-                if self.f2_state["swelling"] > 30 and random.random() < 0.08:
+                if self.f2_state["swelling"] > 25 and random.random() < 0.1:
                     swelling_texts.append(self.commentary.generate_swelling_commentary(self.fighter2))
 
-                if self.f1_state["leg_damage"] > 30 and random.random() < 0.08:
+                if self.f1_state["leg_damage"] > 25 and random.random() < 0.1:
                     leg_texts.append(self.commentary.generate_leg_damage_commentary(self.fighter1))
-                if self.f2_state["leg_damage"] > 30 and random.random() < 0.08:
+                if self.f2_state["leg_damage"] > 25 and random.random() < 0.1:
                     leg_texts.append(self.commentary.generate_leg_damage_commentary(self.fighter2))
 
                 if self.fight_log:
@@ -157,6 +169,9 @@ class Fight:
                         yield {"type": "damage", "text": st}
                     for lt in leg_texts:
                         yield {"type": "damage", "text": lt}
+
+                if action_idx % 8 == 7 and round_num > 1 and not self.winner:
+                    self._check_ai_mid_round()
 
             if self.winner:
                 if "KO" in self.win_method or "TKO" in self.win_method:
@@ -176,6 +191,18 @@ class Fight:
                     loss_reaction = self.commentary.generate_post_fight_loss(self.loser, self.winner)
                     if loss_reaction:
                         yield {"type": "post_fight_reaction", "text": loss_reaction}
+                return
+
+            doctor_stoppage = self._check_doctor_stoppage()
+            if doctor_stoppage:
+                yield {"type": "action", "text": doctor_stoppage, "round": round_num,
+                       "f1_health": self.f1_state["health"]["head"],
+                       "f2_health": self.f2_state["health"]["head"]}
+                yield {"type": "knockout" if "TKO" in self.win_method else "damage",
+                       "text": f"Doctor stoppage! {self.winner.name} wins by {self.win_method}!",
+                       "winner": self.winner.name, "method": self.win_method, "round": self.current_round}
+                yield {"type": "post_fight",
+                       "text": self.commentary.generate_post_fight(self.winner, self.win_method, self.current_round, False)}
                 return
 
             round_desc = self._describe_round(round_num)
@@ -204,8 +231,17 @@ class Fight:
             score_text = f"{f1_r}-{f2_r}"
             yield {"type": "score_update", "round": round_num, "score": score_text}
 
-            self.f1_state["stamina"] = min(100, self.f1_state["stamina"] + 30)
-            self.f2_state["stamina"] = min(100, self.f2_state["stamina"] + 30)
+            cardio1 = self.fighter1.get_effective_attribute("cardio", self.f1_state["fatigue_level"])
+            cardio2 = self.fighter2.get_effective_attribute("cardio", self.f2_state["fatigue_level"])
+            stamina_recovery1 = int(20 + (cardio1 / 100) * 20)
+            stamina_recovery2 = int(20 + (cardio2 / 100) * 20)
+            self.f1_state["stamina"] = min(100, self.f1_state["stamina"] + stamina_recovery1)
+            self.f2_state["stamina"] = min(100, self.f2_state["stamina"] + stamina_recovery2)
+            self.f1_state["fatigue_level"] = 1.0 - (self.f1_state["stamina"] / 100)
+            self.f2_state["fatigue_level"] = 1.0 - (self.f2_state["stamina"] / 100)
+
+            self.f1_state["rounds_stamina_burn"].append(100 - self.f1_state["stamina"])
+            self.f2_state["rounds_stamina_burn"].append(100 - self.f2_state["stamina"])
 
             self._apply_cutman()
 
@@ -271,16 +307,47 @@ class Fight:
         return f"Total: {self.fighter1.name} {f1_total:.0f} - {self.fighter2.name} {f2_total:.0f}"
 
     def _apply_cutman(self):
-        for state in [self.f1_state, self.f2_state]:
+        for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
             cuts = state.get("cuts", [])
             if cuts:
                 for cut in cuts:
-                    cut["severity"] = max(0.1, cut["severity"] - random.uniform(0.1, 0.3))
+                    if state["accumulated_damage"] > 30:
+                        cut["severity"] = min(1.0, cut["severity"] + random.uniform(0.0, 0.1))
+                    else:
+                        cut["severity"] = max(0.1, cut["severity"] - random.uniform(0.1, 0.2))
                 state["cuts"] = [c for c in cuts if c["severity"] > 0.1]
-            state["swelling"] = max(0, state["swelling"] - random.randint(3, 8))
-            state["leg_damage"] = max(0, state["leg_damage"] - random.randint(2, 5))
+            if state["accumulated_damage"] > 30:
+                state["swelling"] = min(100, state["swelling"] + random.randint(1, 4))
+            else:
+                state["swelling"] = max(0, state["swelling"] - random.randint(1, 5))
+            state["leg_damage"] = max(0, state["leg_damage"] - random.randint(1, 4))
 
-    def _simulate_action(self):
+    def _check_ai_mid_round(self):
+        f1_total = sum(sum(j.scores[r][0] for j in self.judges) for r in range(len(self.judges[0].scores))) if self.judges[0].scores else 0
+        f2_total = sum(sum(j.scores[r][1] for j in self.judges) for r in range(len(self.judges[0].scores))) if self.judges[0].scores else 0
+        round_diffs = [int(sum(j.scores[r][1] - j.scores[r][0] for j in self.judges) / 3.0) for r in range(len(self.judges[0].scores))]
+        new_strat = StrategySystem.pick_ai_strategy(self.fighter2, self.fighter1, round_diffs, self.current_round, self.rounds, self.strategy2.current_strategy)
+        self.strategy2.adjust_strategy(new_strat)
+
+    def _check_doctor_stoppage(self):
+        for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
+            if state["swelling"] > 70 and random.random() < 0.3:
+                self.winner = self.fighter2 if fighter == self.fighter1 else self.fighter1
+                self.loser = fighter
+                self.win_method = "TKO (Doctor Stoppage)"
+                self.win_round = self.current_round
+                return f"The doctor checks {fighter.name}'s badly swollen eye... and waves it off!"
+            if len(state.get("cuts", [])) > 2 and random.random() < 0.2:
+                worst = max(state["cuts"], key=lambda c: c["severity"])
+                if worst["severity"] > 0.7:
+                    self.winner = self.fighter2 if fighter == self.fighter1 else self.fighter1
+                    self.loser = fighter
+                    self.win_method = "TKO (Doctor Stoppage)"
+                    self.win_round = self.current_round
+                    return f"The doctor checks {fighter.name}'s deep gash... the fight is stopped!"
+        return None
+
+    def _simulate_action(self, phase="exchanges"):
         attacker, defender, atk_state, def_state, atk_strategy = (
             (self.fighter1, self.fighter2, self.f1_state, self.f2_state, self.strategy1)
             if random.choice([True, False]) else
@@ -292,13 +359,23 @@ class Fight:
 
         action_weights = atk_strategy.get_action_weights()
         if position == Position.STANDING:
-            if self.current_round > 1 and random.random() < 0.05:
+            if random.random() < 0.08:
                 self._check_cut_progression(atk_state, def_state)
                 self._check_swelling_progression(atk_state, def_state)
                 self._check_leg_damage_effect(defender, def_state)
 
-            if random.random() < action_weights.get("strike", 0.7):
-                self._simulate_strike(attacker, defender, atk_state, def_state, fatigue, atk_strategy)
+            if phase == "feeling_out":
+                strike_chance = action_weights.get("strike", 0.7) * 0.7
+                if random.random() < 0.25:
+                    self.fight_log.append(f"{attacker.name} circles, measuring distance.")
+                    return
+            elif phase == "desperation":
+                strike_chance = action_weights.get("strike", 0.7) * 1.2
+            else:
+                strike_chance = action_weights.get("strike", 0.7)
+
+            if random.random() < strike_chance:
+                self._simulate_strike(attacker, defender, atk_state, def_state, fatigue, atk_strategy, phase)
             elif random.random() < action_weights.get("takedown", 0.15) / (action_weights.get("takedown", 0.15) + action_weights.get("clinch", 0.15) + 0.001):
                 self._simulate_takedown(attacker, defender, fatigue, atk_strategy)
             else:
@@ -343,16 +420,18 @@ class Fight:
             else:
                 self.f2_control_time += 1
 
-        atk_state["stamina"] = max(0, atk_state["stamina"] - random.randint(1, 3))
+        phase_stamina_mod = 0.5 if phase == "feeling_out" else (1.5 if phase == "desperation" else 1.0)
+        base_drain = random.randint(1, 3)
+        atk_state["stamina"] = max(0, atk_state["stamina"] - int(base_drain * phase_stamina_mod))
         if atk_strategy.current_strategy:
             cd = atk_strategy.current_strategy.get("modifiers", {}).get("cardio_drain", 1.0)
             if cd > 1:
-                atk_state["stamina"] = max(0, atk_state["stamina"] - int((cd - 1.0) * 5))
+                atk_state["stamina"] = max(0, atk_state["stamina"] - int((cd - 1.0) * 5 * phase_stamina_mod))
 
     def _get_mod(self, attr: str, strategy: StrategySystem) -> float:
         return strategy.get_modifier_for_attr(attr)
 
-    def _simulate_strike(self, attacker, defender, atk_state, def_state, fatigue, strategy):
+    def _simulate_strike(self, attacker, defender, atk_state, def_state, fatigue, strategy, phase="exchanges"):
         strike_type = random.choice(["jab", "cross", "hook", "uppercut", "kick"])
         target = random.choice(["head", "body", "legs"])
 
@@ -364,14 +443,22 @@ class Fight:
         power_attr = f"{'kick' if 'kick' in strike_type else 'striking'}_power"
         accuracy_attr = f"{'kick' if 'kick' in strike_type else 'striking'}_accuracy"
 
-        power = attacker.get_effective_attribute(power_attr, fatigue) * sp_mod
-        accuracy = attacker.get_effective_attribute(accuracy_attr, fatigue) * sa_mod * hs_mod
+        phase_power_mod = 0.7 if phase == "feeling_out" else (1.3 if phase == "desperation" else 1.0)
+        phase_accuracy_mod = 0.8 if phase == "feeling_out" else (1.1 if phase == "desperation" else 1.0)
+
+        power = attacker.get_effective_attribute(power_attr, fatigue) * sp_mod * phase_power_mod
+        accuracy = attacker.get_effective_attribute(accuracy_attr, fatigue) * sa_mod * hs_mod * phase_accuracy_mod
         durability = defender.get_effective_attribute("durability", 1.0 - (def_state["stamina"] / 100))
 
         if utils.random_roll(1, 100) <= int(accuracy):
             damage = max(1, (power * 0.5) - (durability * 0.3))
             old_head = def_state["health"]["head"]
             def_state["health"][target] = max(0, def_state["health"][target] - damage)
+            def_state["accumulated_damage"] += damage
+            if attacker == self.fighter1:
+                self.f1_state["rounds_damage_dealt"].append(damage)
+            else:
+                self.f2_state["rounds_damage_dealt"].append(damage)
             self.fight_log.append(self.commentary.generate_strike_commentary(attacker, defender, strike_type, target, self.position_system.current_position))
 
             if attacker == self.fighter1:
@@ -474,6 +561,7 @@ class Fight:
         durability = defender.get_effective_attribute("durability", 1.0 - (def_state["stamina"] / 100))
         damage = max(1, (power * 0.4) - (durability * 0.2))
         def_state["health"][target] = max(0, def_state["health"][target] - damage)
+        def_state["accumulated_damage"] += damage
 
         if target == "head" and random.random() < 0.03:
             def_state.setdefault("cuts", []).append({"severity": random.uniform(0.3, 0.6)})
@@ -503,6 +591,7 @@ class Fight:
 
         damage = max(1, (power * 0.3 * top_bonus) - (durability * 0.15))
         def_state["health"][target] = max(0, def_state["health"][target] - damage)
+        def_state["accumulated_damage"] += damage
         text = self.commentary.generate_strike_commentary(attacker, defender, strike_type, target, Position.GROUND_TOP)
         self.fight_log.append(text)
 
