@@ -126,7 +126,10 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 <div class="header">
   <div class="container">
     <h1>MMA LIFE SIMULATOR</h1>
-    <div class="sub" id="headerStatus">Initializing...</div>
+    <div class="flex-row" style="justify-content:space-between">
+      <div class="sub" id="headerStatus">Initializing...</div>
+      <button class="btn btn-ghost btn-small" onclick="forceRefresh()" style="font-size:10px;padding:3px 8px" title="Refresh state from server">&#x21bb;</button>
+    </div>
   </div>
 </div>
 
@@ -642,6 +645,14 @@ function updateAllUI() {
   updateNewsFeed();
 }
 
+async function forceRefresh() {
+  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
+  if (resp && resp.fighter) state = resp;
+  if (state && state.strategies) STRATS = state.strategies;
+  updateAllUI();
+  toast("Refreshed", "success");
+}
+
 function updateNextAction() {
   const card = qs("#nextActionCard");
   const f = state.fighter;
@@ -672,8 +683,6 @@ function updateNextAction() {
 let newsCache = [];
 
 async function refreshHomeTab() {
-  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
-  if (resp && resp.fighter) state = resp;
   if (state && state.strategies) STRATS = state.strategies;
   try {
     const nr = await api("/api/news");
@@ -905,8 +914,6 @@ async function doSetDrill(dayIdx, drillName) {
 }
 
 async function refreshGymTab() {
-  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
-  if (resp && resp.fighter) state = resp;
   if (state && state.strategies) STRATS = state.strategies;
   updateGymTab();
 }
@@ -945,10 +952,8 @@ async function endCamp() {
 }
 
 async function showStartTraining() {
-  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
-  if (resp && resp.training) state = resp;
-  const t = state.training;
-  if (!t || !t.available_drills) {
+  const t = state ? state.training : null;
+  if (!t || !t.available_drills || t.available_drills.length === 0) {
     toast("No drills available", "error");
     return;
   }
@@ -982,8 +987,6 @@ async function stopTraining() {
 // --- FIGHT ---
 
 async function refreshFightTab() {
-  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
-  if (resp && resp.fighter) state = resp;
   if (state && state.strategies) STRATS = state.strategies;
   if (state && state.has_fight) {
     qs("#fightPre").classList.add("hidden");
@@ -1340,8 +1343,6 @@ function endFightSession() {
 // --- CAREER ---
 
 async function refreshCareerTab() {
-  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
-  if (resp && resp.fighter) state = resp;
   if (state && state.strategies) STRATS = state.strategies;
   const f = state.fighter;
   const p = state.promotion;
@@ -1411,8 +1412,6 @@ async function refreshCareerTab() {
 // --- FINANCE ---
 
 async function refreshFinanceTab() {
-  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
-  if (resp && resp.fighter) state = resp;
   if (state && state.strategies) STRATS = state.strategies;
   const fin = state.finance;
   if (!fin) return;
