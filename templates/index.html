@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MMA Life Simulator</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; }
+.container { max-width: 960px; margin: 0 auto; padding: 10px; }
+.hidden { display: none !important; }
+.btn { display: inline-block; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s; -webkit-tap-highlight-color: transparent; }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: #e62400; color: #fff; }
+.btn-primary:hover { background: #ff2e00; }
+.btn-secondary { background: #2a2a3a; color: #e0e0e0; }
+.btn-secondary:hover { background: #3a3a4a; }
+.btn-small { padding: 5px 12px; font-size: 12px; }
+.btn-success { background: #1a8a3a; color: #fff; }
+.btn-danger { background: #8a1a1a; color: #fff; }
+.btn-gold { background: #b8860b; color: #fff; }
+.btn-gold:hover { background: #daa520; }
+.btn-ghost { background: transparent; color: #888; border: 1px solid #333; }
+.btn-ghost:hover { border-color: #e62400; color: #e62400; }
+.card { background: #14141f; border-radius: 8px; padding: 14px; margin-bottom: 8px; border: 1px solid #2a2a3a; }
+.card-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.card-sub { font-size: 12px; color: #888; margin-bottom: 6px; }
+.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid #1a1a2a; }
+.stat-row:last-child { border-bottom: none; }
+.stat-label { color: #888; font-size: 13px; }
+.stat-value { color: #fff; font-weight: 600; font-size: 13px; }
+.header { background: #14141f; border-bottom: 2px solid #e62400; padding: 10px 0; margin-bottom: 12px; }
+.header h1 { font-size: 17px; color: #e62400; }
+.header .sub { font-size: 11px; color: #888; }
+.tabs { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 10px; }
+.tab { padding: 7px 12px; background: #1a1a2a; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 12px; font-weight: 600; color: #888; border: 1px solid #2a2a3a; border-bottom: none; -webkit-tap-highlight-color: transparent; user-select: none; }
+.tab.active { background: #14141f; color: #e62400; border-color: #e62400; }
+.scroll { max-height: 70vh; overflow-y: auto; }
+.screen-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 12px; text-align: center; }
+.fight-log { background: #07070c; border: 1px solid #2a2a3a; border-radius: 6px; padding: 10px; height: 360px; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.fight-log .action { color: #ccc; }
+.fight-log .damage { color: #e62400; font-style: italic; }
+.fight-log .big { color: #ffd700; font-weight: 700; font-size: 14px; }
+.fight-log .info { color: #4a9eff; }
+.fight-log .round { color: #fff; font-weight: 700; font-size: 14px; text-align: center; }
+.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.strategy-btn { padding: 7px; background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 6px; cursor: pointer; color: #e0e0e0; font-size: 12px; text-align: left; -webkit-tap-highlight-color: transparent; }
+.strategy-btn:hover { border-color: #e62400; background: #2a1a1a; }
+.strategy-btn.selected { border-color: #e62400; background: #3a2020; }
+.strategy-btn.small { font-size: 11px; padding: 5px 8px; }
+.opponent-card { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #1a1a2a; border-radius: 6px; margin-bottom: 5px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.opponent-card:hover { background: #2a2a3a; }
+.opponent-card:active { background: #3a3a4a; }
+.opponent-card .name { font-weight: 700; font-size: 13px; }
+.opponent-card .record { color: #888; font-size: 12px; }
+.opponent-card .diff { font-size: 11px; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.diff-easy { background: #1a4a2a; color: #4aff6a; }
+.diff-medium { background: #4a4a1a; color: #ffd700; }
+.diff-hard { background: #4a1a1a; color: #ff4a4a; }
+.diff-pick { background: #2a2a4a; color: #4a9eff; }
+select, input { background: #1a1a2a; color: #e0e0e0; border: 1px solid #2a2a3a; padding: 7px 10px; border-radius: 6px; font-size: 13px; width: 100%; }
+select option { background: #1a1a2a; }
+label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin-top: 6px; }
+.fade-in { animation: fadeIn .25s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: #14141f; border: 1px solid #2a2a3a; border-radius: 12px; padding: 20px; max-width: 560px; width: 92%; max-height: 85vh; overflow-y: auto; }
+.modal h2 { color: #fff; margin-bottom: 10px; font-size: 16px; }
+.modal h3 { color: #e62400; font-size: 14px; margin: 8px 0 4px; }
+.list-item { padding: 7px 10px; background: #1a1a2a; border-radius: 6px; margin-bottom: 4px; cursor: pointer; font-size: 13px; -webkit-tap-highlight-color: transparent; }
+.list-item:hover { background: #2a2a3a; }
+.list-item:active { background: #3a3a4a; }
+.attr-bar { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+.attr-bar .label { width: 140px; font-size: 12px; color: #aaa; text-align: right; flex-shrink: 0; }
+.attr-bar .track { flex: 1; height: 14px; background: #1a1a2a; border-radius: 7px; overflow: hidden; position: relative; }
+.attr-bar .fill { height: 100%; border-radius: 7px; transition: width .3s; }
+.attr-bar .fill.phys { background: linear-gradient(90deg, #4a9eff, #e62400); }
+.attr-bar .fill.ment { background: linear-gradient(90deg, #8a4aff, #ff6a4a); }
+.attr-bar .val { width: 30px; font-size: 11px; color: #fff; text-align: right; flex-shrink: 0; }
+.speed-btn { padding: 4px 10px; font-size: 11px; background: #1a1a2a; border: 1px solid #333; border-radius: 4px; color: #888; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.speed-btn.active { border-color: #e62400; color: #e62400; background: #2a1515; }
+.speed-btn:hover { border-color: #e62400; }
+.schedule-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 8px 0; }
+.sched-day { text-align: center; padding: 6px 2px; background: #1a1a2a; border-radius: 4px; font-size: 11px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sched-day:active { background: #2a2a3a; }
+.sched-day.today { border: 1px solid #e62400; }
+.sched-day .day-name { color: #888; font-size: 10px; }
+.sched-day .day-drill { color: #fff; font-size: 10px; margin-top: 2px; }
+.sched-day .day-drill.rest { color: #4a9eff; }
+.speed-row { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.compare-col { background: #1a1a2a; border-radius: 6px; padding: 10px; }
+.compare-col h4 { color: #e62400; font-size: 13px; margin-bottom: 6px; }
+.flex-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.tag-win { background: #1a4a2a; color: #4aff6a; }
+.tag-loss { background: #4a1a1a; color: #ff4a4a; }
+.tag-promo { background: #2a2a4a; color: #4a9eff; }
+.tag-champ { background: #4a4a1a; color: #ffd700; }
+.toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.toast { background: #1a1a2a; border: 1px solid #e62400; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; animation: toastIn .3s ease, toastOut .3s ease 2.7s; max-width: 90vw; text-align: center; pointer-events: auto; }
+.toast.success { border-color: #4aff6a; }
+.toast.error { border-color: #ff4a4a; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+.next-action { background: linear-gradient(135deg, #1a2a1a, #14141f); border: 1px solid #4aff6a; border-radius: 8px; padding: 12px; margin-bottom: 8px; text-align: center; }
+.next-action .action-label { color: #4aff6a; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.next-action .action-text { color: #fff; font-size: 14px; font-weight: 600; margin-top: 4px; }
+@media (max-width: 600px) {
+  .strategy-grid { grid-template-columns: 1fr; }
+  .tabs { font-size: 10px; }
+  .tab { padding: 5px 8px; flex: 1; text-align: center; }
+  .compare-grid { grid-template-columns: 1fr; }
+  .attr-bar .label { width: 100px; }
+  .schedule-grid { grid-template-columns: repeat(7, 1fr); font-size: 10px; }
+  .header h1 { font-size: 14px; }
+  .container { padding: 6px; }
+  .card { padding: 10px; }
+  .screen-title { font-size: 17px; }
+  .fight-log { height: 280px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="container">
+    <h1>MMA LIFE SIMULATOR</h1>
+    <div class="sub" id="headerStatus">Initializing...</div>
+  </div>
+</div>
+
+<div class="container" id="app">
+  <div id="screen-create">
+    <div class="screen-title">CREATE YOUR FIGHTER</div>
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label>Fighter Name</label>
+          <input id="fName" value="">
+        </div>
+        <div>
+          <label>Age</label>
+          <select id="fAge">
+            <option value="18">18</option><option value="19">19</option><option value="20">20</option>
+            <option value="21">21</option><option value="22">22</option><option value="23">23</option>
+            <option value="24">24</option><option value="25" selected>25</option>
+            <option value="26">26</option><option value="27">27</option><option value="28">28</option>
+            <option value="29">29</option><option value="30">30</option>
+            <option value="31">31</option><option value="32">32</option><option value="33">33</option>
+            <option value="34">34</option><option value="35">35</option>
+          </select>
+        </div>
+        <div>
+          <label>Weight Class</label>
+          <select id="fWeightClass">
+            <option value="0">Flyweight (125)</option><option value="1">Bantamweight (135)</option>
+            <option value="2">Featherweight (145)</option><option value="3" selected>Lightweight (155)</option>
+            <option value="4">Welterweight (170)</option><option value="5">Middleweight (185)</option>
+            <option value="6">Light Heavyweight (205)</option><option value="7">Heavyweight (265)</option>
+          </select>
+        </div>
+        <div>
+          <label>Background</label>
+          <select id="fBackground">
+            <option value="mma" selected>MMA (All-Rounder)</option>
+            <option value="wrestling">Wrestling</option>
+            <option value="bjj">Brazilian Jiu-Jitsu</option>
+            <option value="muay_thai">Muay Thai</option>
+            <option value="boxing">Boxing</option>
+            <option value="judo">Judo</option>
+            <option value="taekwondo">Taekwondo</option>
+            <option value="karate">Karate</option>
+            <option value="sambo">Sambo</option>
+            <option value="kickboxing">Kickboxing</option>
+            <option value="capoeira">Capoeira</option>
+          </select>
+        </div>
+        <div>
+          <label>Nationality</label>
+          <select id="fNationality"></select>
+        </div>
+        <div>
+          <label>Home Region</label>
+          <select id="fRegion"></select>
+        </div>
+      </div>
+
+      <label style="margin-top:10px">Trait (starting bonus)</label>
+      <div id="traitGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px"></div>
+
+      <label style="margin-top:8px">Personality</label>
+      <div id="personalityGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px"></div>
+
+      <div style="margin-top:12px;text-align:center">
+        <button class="btn btn-primary" onclick="createFighter()" id="createBtn" style="font-size:16px;padding:12px 40px">START CAREER</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-game" class="hidden">
+    <div class="tabs" id="mainTabs">
+      <div class="tab active" data-tab="home" onclick="switchTab('home')">Home</div>
+      <div class="tab" data-tab="gym" onclick="switchTab('gym')">Gym</div>
+      <div class="tab" data-tab="fight" onclick="switchTab('fight')">Fight</div>
+      <div class="tab" data-tab="career" onclick="switchTab('career')">Career</div>
+      <div class="tab" data-tab="finance" onclick="switchTab('finance')">Finance</div>
+    </div>
+
+    <div id="tab-home" class="tab-content fade-in">
+      <div class="card">
+        <div class="flex-between">
+          <div><span class="stat-label">Record</span> <span class="stat-value" id="hRecord" style="font-size:18px">0-0-0</span></div>
+          <div><span class="tag tag-promo" id="hPromoTag">Regional</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rank</span><br><span class="stat-value" id="hRank" style="font-size:16px">#--</span></div>
+          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rating</span><br><span class="stat-value" id="hRating" style="font-size:16px">--</span></div>
+          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Net Worth</span><br><span class="stat-value" id="hNet" style="font-size:14px">$0</span></div>
+        </div>
+        <div class="stat-row"><span class="stat-label">Streak</span><span class="stat-value" id="hStreak">--</span></div>
+        <div class="stat-row"><span class="stat-label">Next Fight</span><span class="stat-value" id="hNextFight">Not booked</span></div>
+        <div class="stat-row"><span class="stat-label">Injuries</span><span class="stat-value" id="hInjuries">None</span></div>
+        <div class="stat-row"><span class="stat-label">Gym</span><span class="stat-value" id="hGym">None</span></div>
+        <div class="stat-row" id="hFatigueRow" style="display:none"><span class="stat-label">Fatigue</span><span class="stat-value" id="hFatigue">0%</span></div>
+      </div>
+
+      <div id="nextActionCard" class="hidden next-action"></div>
+
+      <div class="card" id="advanceCard">
+        <div class="card-title" id="advanceTitle">Today: <span id="todayDay">Monday</span></div>
+        <div id="todayPreview" style="font-size:12px;color:#888;margin-bottom:6px"></div>
+        <div class="flex-row">
+          <button class="btn btn-primary" onclick="advanceDay()" id="btnAdvanceDay" style="font-size:15px;padding:12px 28px">ADVANCE DAY</button>
+          <button class="btn btn-ghost btn-small" onclick="advanceSkip(7)">+1 Week</button>
+          <button class="btn btn-ghost btn-small" onclick="advanceSkip(30)">+1 Month</button>
+        </div>
+        <div id="dayResult" class="hidden" style="margin-top:8px;font-size:13px"></div>
+      </div>
+
+      <div id="promoOffer" class="hidden card" style="border-color:#b8860b">
+        <div class="card-title" style="color:#ffd700">Promotion Offer!</div>
+        <div id="promoOfferText"></div>
+        <button class="btn btn-gold btn-small" style="margin-top:6px" onclick="acceptPromotion()">Accept</button>
+      </div>
+
+      <div class="card" id="newsFeed">
+        <div class="card-title">MMA World News</div>
+        <div id="newsList" style="max-height:300px;overflow-y:auto;font-size:12px"></div>
+      </div>
+    </div>
+
+    <div id="tab-gym" class="tab-content hidden fade-in">
+      <div class="card">
+        <div class="card-title">Gym: <span id="gymName">None</span></div>
+        <div id="gymInfo" class="stat-row" style="display:block;border:none;color:#888;font-size:12px"></div>
+        <div style="margin-top:6px">
+          <button class="btn btn-secondary btn-small" onclick="showGymList()">Change Gym</button>
+          <span id="gymStatus" style="margin-left:8px;font-size:12px;color:#888"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Training</div>
+        <div id="trainingStatus"></div>
+        <div id="fatigueBar" class="hidden" style="margin:6px 0;height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden">
+          <div id="fatigueFill" style="height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        </div>
+        <div id="trainingActions">
+          <button class="btn btn-primary btn-small hidden" id="btnStartTraining" onclick="showStartTraining()">Start Training</button>
+          <button class="btn btn-primary btn-small hidden" id="btnStartCamp" onclick="showStartCamp()">Start Camp</button>
+          <button class="btn btn-danger btn-small hidden" id="btnStopTraining" onclick="stopTraining()">Stop Training</button>
+          <button class="btn btn-secondary btn-small hidden" id="btnEndCamp" onclick="endCamp()">End Camp</button>
+        </div>
+      </div>
+
+      <div class="card" id="gymFightersCard" style="display:none">
+        <div class="card-title">Training Partners <span id="gymFighterCount" style="font-size:11px;color:#888;font-weight:400"></span></div>
+        <div id="gymFighterList" style="max-height:180px;overflow-y:auto;font-size:12px"></div>
+      </div>
+
+      <div class="card" id="scheduleCard">
+        <div class="card-title">Weekly Schedule</div>
+        <div id="scheduleGrid" class="schedule-grid"></div>
+        <div style="font-size:11px;color:#888;margin-top:4px">Click a day to change the drill. Rest days auto-recover fatigue.</div>
+      </div>
+
+      <div id="trainResult" class="hidden card" style="border-color:#2a4a2a"></div>
+    </div>
+
+    <div id="tab-fight" class="tab-content hidden fade-in">
+      <div id="fightPre" class="card">
+        <div class="card-title">Available Opponents</div>
+        <div id="opponentList"></div>
+        <div id="noOpponents" class="hidden" style="color:#888;font-size:13px;text-align:center;padding:12px">No available opponents right now. Advance time to find fights.</div>
+      </div>
+
+      <div id="fightReady" class="hidden card">
+        <div class="card-title">Fight Week</div>
+        <div id="fightMatchup"></div>
+        <div style="margin-top:8px">
+          <label>Choose Your Strategy:</label>
+          <div id="stratSelect" class="strategy-grid"></div>
+          <button class="btn btn-primary" id="btnStartFight" style="margin-top:8px" onclick="startFight()">START FIGHT</button>
+        </div>
+      </div>
+
+      <div id="fightLive" class="hidden">
+        <div class="card">
+          <div class="flex-between">
+            <div class="card-title" style="margin-bottom:0">LIVE FIGHT</div>
+            <div class="speed-row" id="speedControls">
+              <span style="font-size:11px;color:#888">Speed:</span>
+              <button class="speed-btn active" data-speed="1" onclick="setSpeed(1)">1x</button>
+              <button class="speed-btn" data-speed="2" onclick="setSpeed(2)">2x</button>
+              <button class="speed-btn" data-speed="4" onclick="setSpeed(4)">4x</button>
+              <button class="speed-btn" data-speed="0" onclick="setSpeed(0)">Skip</button>
+            </div>
+          </div>
+          <div id="fightHeader" style="font-size:12px;color:#888;margin-bottom:4px"></div>
+        </div>
+        <div class="fight-log" id="fightLog"></div>
+        <div id="fightStratPrompt" class="hidden card" style="margin-top:6px">
+          <div class="card-title" id="stratPromptTitle">Between Rounds — Adjust Strategy?</div>
+          <div id="stratPromptGrid" class="strategy-grid"></div>
+        </div>
+        <div id="fightResult" class="hidden card" style="margin-top:6px"></div>
+      </div>
+    </div>
+
+    <div id="tab-career" class="tab-content hidden fade-in">
+      <div class="card">
+        <div class="card-title">Record &amp; Ranking</div>
+        <div class="stat-row"><span class="stat-label">Record</span><span class="stat-value" id="cRecord">0-0-0</span></div>
+        <div class="stat-row"><span class="stat-label">By KO</span><span class="stat-value" id="cKOs">0</span></div>
+        <div class="stat-row"><span class="stat-label">By Submission</span><span class="stat-value" id="cSubs">0</span></div>
+        <div class="stat-row"><span class="stat-label">Current Rank</span><span class="stat-value" id="cRank">#--</span></div>
+        <div class="stat-row"><span class="stat-label">Peak Rank</span><span class="stat-value" id="cPeak">#--</span></div>
+        <div class="stat-row"><span class="stat-label">Promotion</span><span class="stat-value" id="cPromo">--</span></div>
+        <div class="stat-row"><span class="stat-label">Champion</span><span class="stat-value" id="cChampion" style="color:#ffd700">No</span></div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between"><div class="card-title">Contract</div><div id="contractChampTag"></div></div>
+        <div class="stat-row"><span class="stat-label">Base Pay</span><span class="stat-value" id="cBasePay">$--</span></div>
+        <div class="stat-row"><span class="stat-label">Win Bonus</span><span class="stat-value" id="cWinBonus">$--</span></div>
+        <div class="stat-row"><span class="stat-label">Fights Left</span><span class="stat-value" id="cFightsLeft">--</span></div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between"><div class="card-title">Physical Attributes</div><span style="font-size:11px;color:#888">Rating: <span id="cRating">--</span></span></div>
+        <div id="physAttrs"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Mental Attributes</div>
+        <div id="mentAttrs"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Fighter Info</div>
+        <div class="stat-row"><span class="stat-label">Nationality</span><span class="stat-value" id="cNation">--</span></div>
+        <div class="stat-row"><span class="stat-label">Region</span><span class="stat-value" id="cRegion">--</span></div>
+        <div class="stat-row"><span class="stat-label">Height / Reach</span><span class="stat-value" id="cHeight">--</span></div>
+        <div class="stat-row"><span class="stat-label">Age</span><span class="stat-value" id="cAge">--</span></div>
+        <div class="stat-row"><span class="stat-label">Trait</span><span class="stat-value" id="cTrait">--</span></div>
+        <div class="stat-row"><span class="stat-label">Personality</span><span class="stat-value" id="cPersonality">--</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Career</div>
+        <div class="stat-row"><span class="stat-label">Title Defenses</span><span class="stat-value" id="cTitles">0</span></div>
+        <div class="stat-row"><span class="stat-label">Career Earnings</span><span class="stat-value" id="cEarnings">$0</span></div>
+        <div class="stat-row"><span class="stat-label">Rivalries</span><span class="stat-value" id="cRivalries">0</span></div>
+      </div>
+    </div>
+
+    <div id="tab-finance" class="tab-content hidden fade-in">
+      <div class="card"><div class="card-title">Financial Overview</div>
+        <div class="stat-row"><span class="stat-label">Net Worth</span><span class="stat-value" id="fNet">$0</span></div>
+        <div class="stat-row"><span class="stat-label">Agent</span><span class="stat-value" id="fAgent">None</span></div>
+        <div class="stat-row"><span class="stat-label">Gym Dues</span><span class="stat-value" id="fGymCost">$0/mo</span></div>
+        <div class="stat-row"><span class="stat-label">Sponsorship</span><span class="stat-value" id="fSponsor">$0/mo</span></div>
+        <div class="stat-row"><span class="stat-label">Monthly Living</span><span class="stat-value">$1,000/mo</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<script>
+const BASE = "";
+let sid = "sess_" + Math.random().toString(36).slice(2);
+let state = null;
+let selectedStrategy = "aggressive_striking";
+let STRATS = [];
+let fightSpeed = 1;
+let fightReplaying = false;
+let fightPaused = false;
+
+async function api(path, data = {}) {
+  const url = path.startsWith("/") ? `${BASE}${path}` : `${BASE}/${path}`;
+  const opts = { method: "GET", headers: { "Accept": "application/json" } };
+  if (data && Object.keys(data).length) {
+    opts.method = "POST";
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(data);
+  }
+  const resp = await fetch(url, opts);
+  return resp.json();
+}
+
+function qs(s) { return document.querySelector(s); }
+function qsa(s) { return document.querySelectorAll(s); }
+
+function toast(msg, type) {
+  const c = qs("#toastContainer");
+  const el = document.createElement("div");
+  el.className = "toast" + (type === "error" ? " error" : type === "success" ? " success" : "");
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+function switchTab(tab) {
+  qsa(".tab-content").forEach(e => e.classList.add("hidden"));
+  qsa(".tab").forEach(e => e.classList.remove("active"));
+  const tc = qs(`#tab-${tab}`);
+  if (tc) tc.classList.remove("hidden");
+  const tb = qs(`[data-tab="${tab}"]`);
+  if (tb) tb.classList.add("active");
+  if (tab === "home") refreshHomeTab();
+  else if (tab === "gym") refreshGymTab();
+  else if (tab === "fight") refreshFightTab();
+  else if (tab === "career") refreshCareerTab();
+  else if (tab === "finance") refreshFinanceTab();
+}
+
+function showModal(html) { qs("#modalContent").innerHTML = html; qs("#modalOverlay").classList.remove("hidden"); }
+function closeModal(e) { if (!e || e.target === qs("#modalOverlay")) qs("#modalOverlay").classList.add("hidden"); }
+
+async function init() {
+  const resp = await api("/api/init");
+  if (resp.ready) {
+    qs("#headerStatus").textContent = `World loaded: ${resp.promotions.regional}R / ${resp.promotions.national}N / ${resp.promotions.world}W fighters`;
+    initCreateForm();
+  }
+}
+
+function initCreateForm() {
+  const natSel = qs("#fNationality");
+  natSel.innerHTML = "";
+  const NATIONALITIES = ["American","Brazilian","Russian","Japanese","British","Canadian","French","Dutch","Australian","Polish","Korean","Mexican","Chinese","Swedish","Irish","Nigerian","New Zealander","German","Italian","Spanish","Ukrainian","Cuban","Jamaican","South African","Swiss","Belgian","Norwegian","Finnish","Danish","Icelandic"];
+  NATIONALITIES.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; natSel.appendChild(o); });
+  natSel.value = "American";
+  updateRegions();
+  natSel.onchange = updateRegions;
+
+  const tGrid = qs("#traitGrid");
+  const TRAITS = [
+    {id:"heavy_hands",name:"Heavy Hands",desc:"+5 striking power"},
+    {id:"iron_chin",name:"Iron Chin",desc:"+5 durability"},
+    {id:"cardio_king",name:"Cardio King",desc:"+5 cardio"},
+    {id:"mat_wizard",name:"Mat Wizard",desc:"+5 wrestling defense"},
+    {id:"sniper",name:"Sniper",desc:"+5 accuracy"},
+    {id:"natural_athlete",name:"Natural Athlete",desc:"+3 all physical"},
+    {id:"iron_will",name:"Iron Will",desc:"+5 mental toughness"},
+    {id:"fast_hands",name:"Fast Hands",desc:"+5 hand speed"},
+  ];
+  tGrid.innerHTML = "";
+  TRAITS.forEach(t => {
+    const btn = document.createElement("div");
+    btn.className = "strategy-btn";
+    btn.innerHTML = `<strong>${t.name}</strong><br><small>${t.desc}</small>`;
+    btn.onclick = () => {
+      tGrid.querySelectorAll(".strategy-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      btn.dataset.trait = t.id;
+    };
+    btn.dataset.trait = t.id;
+    tGrid.appendChild(btn);
+  });
+
+  const pGrid = qs("#personalityGrid");
+  const PERSONALITIES = [
+    {id:"charismatic",name:"Charismatic",desc:"Natural charisma"},
+    {id:"intimidating",name:"Intimidating",desc:"Strikes fear"},
+    {id:"humble",name:"Humble",desc:"Respected"},
+    {id:"cocky",name:"Cocky",desc:"Loves spotlight"},
+    {id:"quiet",name:"Quiet",desc:"Lets fighting talk"},
+    {id:"savage",name:"Savage",desc:"No mercy"},
+  ];
+  pGrid.innerHTML = "";
+  PERSONALITIES.forEach(p => {
+    const btn = document.createElement("div");
+    btn.className = "strategy-btn";
+    btn.innerHTML = `<strong>${p.name}</strong><br><small>${p.desc}</small>`;
+    btn.dataset.pers = p.id;
+    btn.onclick = () => {
+      pGrid.querySelectorAll(".strategy-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+    };
+    pGrid.appendChild(btn);
+  });
+  pGrid.firstChild && (pGrid.firstChild.className += " selected");
+
+  const firsts = ["James","John","Mike","Chris","Dave","Alex","Max","Ray","Jake","Cole","Kai","Zion","Rex","Ash","Blake","Drew","Kurt","Ross","Sean","Wade","Marcus","Adrian","Erik","Andre","Tyler"];
+  const lasts = ["Smith","Jones","Miller","Garcia","Lee","Kim","Brown","Davis","Wilson","Taylor","Anderson","Thomas","Jackson","White","Harris","Martin","Thompson","Moore","Allen","King","Walker","Wright","Hill","Green","Adams"];
+  const nicks = ["The Viper","Iron","Destroyer","Phoenix","Nightmare","Predator","Beast","Dragon","Renegade","Warrior","Samurai","Gladiator","Hurricane","Avalanche","Titan","Fury","Hammer","Blitz","Storm","Shadow"];
+  qs("#fName").value = firsts[Math.floor(Math.random()*firsts.length)] + ' "' + nicks[Math.floor(Math.random()*nicks.length)] + '" ' + lasts[Math.floor(Math.random()*lasts.length)];
+}
+
+function updateRegions() {
+  const nat = qs("#fNationality").value;
+  const REGIONS = {
+    "American":["California","Texas","New York","Florida","Ohio","Colorado","Nevada","Arizona"],
+    "Brazilian":["Rio de Janeiro","Sao Paulo","Bahia","Minas Gerais","Ceara"],
+    "Russian":["Moscow","St. Petersburg","Dagestan","Chechnya","Siberia"],
+    "Japanese":["Tokyo","Osaka","Yokohama","Nagoya","Okinawa"],
+    "British":["London","Manchester","Liverpool","Birmingham","Scotland"],
+    "Canadian":["Ontario","Quebec","British Columbia","Alberta","Nova Scotia"],
+    "French":["Paris","Lyon","Marseille","Bordeaux","Toulouse"],
+    "Dutch":["Amsterdam","Rotterdam","Utrecht","The Hague","Eindhoven"],
+    "Australian":["Sydney","Melbourne","Brisbane","Perth","Gold Coast"],
+    "Polish":["Warsaw","Krakow","Gdansk","Wroclaw","Poznan"],
+    "Korean":["Seoul","Busan","Incheon","Daegu","Ulsan"],
+    "Mexican":["Mexico City","Guadalajara","Monterrey","Tijuana","Puebla"],
+    "Chinese":["Beijing","Shanghai","Shenzhen","Guangzhou","Chengdu"],
+    "Swedish":["Stockholm","Gothenburg","Malmo","Uppsala","Linkoping"],
+    "Irish":["Dublin","Cork","Galway","Limerick","Belfast"],
+    "Nigerian":["Lagos","Abuja","Port Harcourt","Ibadan","Kano"],
+    "New Zealander":["Auckland","Wellington","Christchurch","Hamilton","Tauranga"],
+    "German":["Berlin","Munich","Hamburg","Cologne","Frankfurt"],
+    "Italian":["Rome","Milan","Naples","Turin","Florence"],
+    "Spanish":["Madrid","Barcelona","Valencia","Seville","Bilbao"],
+    "Ukrainian":["Kyiv","Kharkiv","Odessa","Dnipro","Lviv"],
+    "Cuban":["Havana","Santiago","Camaguey","Holguin","Santa Clara"],
+    "Jamaican":["Kingston","Montego Bay","Ocho Rios","Negril","Spanish Town"],
+    "South African":["Johannesburg","Cape Town","Durban","Pretoria","Port Elizabeth"],
+    "Swiss":["Zurich","Geneva","Basel","Bern","Lausanne"],
+    "Belgian":["Brussels","Antwerp","Ghent","Bruges","Liege"],
+    "Norwegian":["Oslo","Bergen","Trondheim","Stavanger","Tromso"],
+    "Finnish":["Helsinki","Espoo","Tampere","Turku","Oulu"],
+    "Danish":["Copenhagen","Aarhus","Odense","Aalborg","Esbjerg"],
+    "Icelandic":["Reykjavik","Kopavogur","Hafnarfjordur","Akureyri","Gardabaer"]
+  };
+  const rSel = qs("#fRegion");
+  rSel.innerHTML = "";
+  const regions = REGIONS[nat] || ["Capital"];
+  regions.forEach(r => { const o = document.createElement("option"); o.value = r; o.textContent = r; rSel.appendChild(o); });
+}
+
+init();
+
+async function createFighter() {
+  const name = qs("#fName").value.trim() || "";
+  const age = parseInt(qs("#fAge").value);
+  const bg = qs("#fBackground").value;
+  const wc = parseInt(qs("#fWeightClass").value);
+  const nationality = qs("#fNationality").value;
+  const region = qs("#fRegion").value;
+  const traitBtn = qs("#traitGrid .selected");
+  const trait_id = traitBtn ? traitBtn.dataset.trait : null;
+  const persBtn = qs("#personalityGrid .selected");
+  const personality_id = persBtn ? persBtn.dataset.pers || "humble" : "humble";
+
+  const btn = qs("#createBtn");
+  btn.textContent = "Creating...";
+  btn.disabled = true;
+  const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id });
+  btn.textContent = "START CAREER";
+  btn.disabled = false;
+  if (resp.success) {
+    state = resp.state;
+    if (state.strategies) STRATS = state.strategies;
+    qs("#screen-create").classList.add("hidden");
+    qs("#screen-game").classList.remove("hidden");
+    updateAllUI();
+    toast("Fighter created! Welcome to the pros.", "success");
+  } else {
+    toast("Error: " + (resp.error || "Unknown"), "error");
+  }
+}
+
+function updateAllUI() {
+  if (!state || !state.fighter) return;
+  const f = state.fighter;
+  const p = state.promotion;
+  const t = state.training;
+  const fin = state.finance;
+  const car = state.career;
+  const fb = state.fight_booking;
+
+  qs("#headerStatus").textContent = `${f.name} | ${f.record} | #${f.rank} | ${p ? p.name : "FA"}`;
+
+  qs("#hRecord").textContent = f.record;
+  qs("#hRank").textContent = `#${f.rank}`;
+  qs("#hPromoTag").textContent = p ? p.tier : "FA";
+  qs("#hPromoTag").style.background = p && p.tier === "World" ? "#4a4a1a" : (p && p.tier === "National" ? "#2a2a4a" : "#2a3a2a");
+  qs("#hNet").textContent = `$${(f.net_worth || 0).toLocaleString()}`;
+  qs("#hRating").textContent = f.rating;
+  const streak = f.win_streak > 0 ? `W${f.win_streak}` : (f.loss_streak > 0 ? `L${f.loss_streak}` : "0");
+  qs("#hStreak").textContent = streak;
+  qs("#hInjuries").textContent = (f.injuries&&f.injuries.length) ? f.injuries.map(i=>i.type).join(", ") : "None";
+  qs("#hGym").textContent = fin ? fin.gym : "None";
+
+  if (t && t.in_training) {
+    qs("#hFatigueRow").style.display = "";
+    const ft = t.fatigue || 0;
+    const ftColor = ft > 70 ? "#ff4a4a" : (ft > 40 ? "#ffd700" : "#4aff6a");
+    qs("#hFatigue").innerHTML = `<span style="color:${ftColor};font-weight:600">${ft}%</span>`;
+  } else {
+    qs("#hFatigueRow").style.display = "none";
+  }
+
+  if (fb) {
+    qs("#hNextFight").textContent = `vs ${fb.opponent.name} (${fb.days_until}d)`;
+  } else {
+    qs("#hNextFight").textContent = "Not booked";
+  }
+
+  if (t && t.schedule) {
+    qs("#todayDay").textContent = t.schedule.current_day || "Monday";
+    const drill = t.schedule.schedule ? t.schedule.schedule[t.schedule.current_day] : null;
+    if (drill && drill !== "Rest") {
+      qs("#todayPreview").textContent = "Training: " + drill;
+    } else if (t.schedule.schedule && Object.values(t.schedule.schedule).some(d => d && d !== "Rest")) {
+      qs("#todayPreview").textContent = "Rest day (fatigue recovery)";
+    } else if (t.in_camp) {
+      qs("#todayPreview").textContent = "Rest day (fatigue recovery)";
+    } else {
+      qs("#todayPreview").textContent = "Set up training in the Gym tab.";
+    }
+  } else {
+    qs("#todayPreview").textContent = "Set up training in the Gym tab.";
+  }
+
+  updateNextAction();
+  updatePromoOffer();
+  updateGymTab();
+  updateScheduleGrid();
+  updateNewsFeed();
+}
+
+function updateNextAction() {
+  const card = qs("#nextActionCard");
+  const f = state.fighter;
+  const t = state.training;
+  const fb = state.fight_booking;
+  let html = "";
+
+  if (fb && fb.days_until <= 0 && !state.fight_completed) {
+    html = '<div class="action-label">Next Action</div><div class="action-text">FIGHT DAY! Go to Fight tab</div>';
+  } else if (fb && fb.days_until > 0) {
+    html = `<div class="action-label">Next Action</div><div class="action-text">Fight in ${fb.days_until} days — keep training!</div>`;
+  } else if (t && t.in_camp) {
+    html = '<div class="action-label">Next Action</div><div class="action-text">Training camp active — advance days to train</div>';
+  } else if (t && t.in_training) {
+    html = '<div class="action-label">Next Action</div><div class="action-text">Base training active — advance days to train</div>';
+  } else {
+    html = '<div class="action-label">Next Action</div><div class="action-text">Start training, join a camp, or book a fight</div>';
+  }
+
+  if (html) {
+    card.innerHTML = html;
+    card.classList.remove("hidden");
+  } else {
+    card.classList.add("hidden");
+  }
+}
+
+let newsCache = [];
+
+async function refreshHomeTab() {
+  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
+  if (resp && resp.fighter) state = resp;
+  if (state && state.strategies) STRATS = state.strategies;
+  try {
+    const nr = await api("/api/news");
+    if (nr && nr.news) newsCache = nr.news;
+  } catch(e) {}
+  updateAllUI();
+}
+
+async function advanceDay() {
+  const btn = qs("#btnAdvanceDay");
+  btn.textContent = "Advancing...";
+  btn.disabled = true;
+  const resp = await api("/api/advance_day", { sid });
+  btn.textContent = "ADVANCE DAY";
+  btn.disabled = false;
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    try {
+      const nr = await api("/api/news");
+      if (nr && nr.news) newsCache = nr.news;
+    } catch(e) {}
+    updateAllUI();
+    const r = resp.day_result;
+    const div = qs("#dayResult");
+    div.classList.remove("hidden");
+    if ((r.status === "training" || r.status === "in_camp") && r.gains) {
+      let g = Object.entries(r.gains).filter(([k,v]) => v > 0).map(([k,v]) => k.replace(/_/g," ")+" +"+v.toFixed(1));
+      div.innerHTML = `<span style="color:#4aff6a">${r.day}</span>: ${g.join(", ") || "No gains"}`;
+      if (r.injury) div.innerHTML += ` <span style="color:#e62400">| INJURY: ${r.injury.type}</span>`;
+      if (r.camp_over) div.innerHTML += ` <span style="color:#ffd700">| CAMP COMPLETE: ${escHtml(r.camp_name || '')}</span>`;
+    } else if (r.status === "rest") {
+      div.innerHTML = `<span style="color:#4a9eff">${r.day}</span>: Rest day — fatigue recovering`;
+    } else if (r.status === "idle") {
+      div.innerHTML = `<span style="color:#888">${r.day}</span>: Not training — go to the Gym tab to start`;
+    }
+    if (resp.fight_today) {
+      div.innerHTML += '<br><span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>';
+      setTimeout(() => { switchTab("fight"); }, 500);
+    }
+  } else {
+    toast(resp.error || "Failed to advance day", "error");
+  }
+}
+
+async function advanceSkip(days) {
+  const resp = await api("/api/advance_time", { sid, days });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    try {
+      const nr = await api("/api/news");
+      if (nr && nr.news) newsCache = nr.news;
+    } catch(e) {}
+    updateAllUI();
+    if (resp.fight_today) {
+      const div = qs("#dayResult");
+      div.classList.remove("hidden");
+      div.innerHTML = '<span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>';
+      setTimeout(() => { switchTab("fight"); }, 500);
+    }
+  } else {
+    toast(resp.error || "Failed to advance time", "error");
+  }
+}
+
+// --- PROMOTION OFFER ---
+
+function updatePromoOffer() {
+  const card = qs("#promoOffer");
+  if (!state.career || !state.career.promotion_offer) {
+    card.classList.add("hidden");
+    return;
+  }
+  const offer = state.career.promotion_offer;
+  card.classList.remove("hidden");
+  qs("#promoOfferText").innerHTML = `You've been offered a contract with <strong>${offer.name}</strong> (${offer.tier})!`;
+}
+
+async function acceptPromotion() {
+  const resp = await api("/api/accept_promotion", { sid });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateAllUI();
+    toast("Promotion accepted!", "success");
+  } else {
+    toast(resp.error || "Failed", "error");
+  }
+}
+
+// --- GYM / TRAINING ---
+
+function updateGymTab() {
+  if (!state) return;
+  const t = state.training;
+  const fin = state.finance;
+  qs("#gymName").textContent = fin ? fin.gym : "None";
+  qs("#gymInfo").textContent = "Default gym — train to improve your attributes";
+
+  const ga = state.gym_atmosphere;
+  const gc = qs("#gymFightersCard");
+  const gl = qs("#gymFighterList");
+  if (ga && ga.fighters && ga.fighters.length) {
+    gc.style.display = "";
+    qs("#gymFighterCount").textContent = `(${ga.count} fighters)`;
+    let html = "";
+    ga.fighters.slice(0, 10).forEach(fg => {
+      html += `<div style="padding:3px 0;border-bottom:1px solid #1a1a2a">
+        <span style="color:#e0e0e0">${escHtml(fg.name)}</span>
+        <span style="color:#888;font-size:11px"> ${fg.record} | #${fg.rank} | ${fg.weight_class}</span>
+      </div>`;
+    });
+    gl.innerHTML = html;
+  } else {
+    gc.style.display = "none";
+  }
+
+  qs("#btnStartTraining").classList.add("hidden");
+  qs("#btnStartCamp").classList.add("hidden");
+  qs("#btnStopTraining").classList.add("hidden");
+  qs("#btnEndCamp").classList.add("hidden");
+  qs("#fatigueBar").classList.add("hidden");
+
+  if (t) {
+    const fatigue = t.fatigue || 0;
+    if (t.in_training) {
+      qs("#fatigueBar").classList.remove("hidden");
+      const fill = qs("#fatigueFill");
+      fill.style.width = fatigue + "%";
+      if (fatigue > 70) fill.style.background = "#ff4a4a";
+      else if (fatigue > 40) fill.style.background = "#ffd700";
+      else fill.style.background = "#4aff6a";
+
+      if (t.in_camp) {
+        qs("#trainingStatus").innerHTML = `<span style="color:#4aff6a">Camp: ${escHtml(t.camp_name)}</span> &mdash; ${escHtml(t.drill_name)} | Day ${t.days_trained}/${t.camp_weeks*7} | Fatigue: ${fatigue}%`;
+        qs("#btnEndCamp").classList.remove("hidden");
+        qs("#btnStopTraining").classList.remove("hidden");
+      } else {
+        qs("#trainingStatus").innerHTML = `<span style="color:#4a9eff">Base Training</span> &mdash; ${escHtml(t.drill_name)} | Fatigue: ${fatigue}%`;
+        qs("#btnStopTraining").classList.remove("hidden");
+        qs("#btnStartCamp").classList.remove("hidden");
+      }
+    } else {
+      qs("#trainingStatus").innerHTML = `<span style="color:#888">Not training</span>`;
+      qs("#btnStartTraining").classList.remove("hidden");
+      qs("#btnStartCamp").classList.remove("hidden");
+    }
+  } else {
+    qs("#trainingStatus").innerHTML = `<span style="color:#888">Not training</span>`;
+    qs("#btnStartTraining").classList.remove("hidden");
+  }
+  updateScheduleGrid();
+}
+
+function updateScheduleGrid() {
+  const grid = qs("#scheduleGrid");
+  if (!grid) return;
+  const t = state && state.training;
+  if (!t || !t.schedule || !t.schedule.schedule) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px">Start training to set a weekly schedule</div>';
+    return;
+  }
+  const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  const current = t.schedule.current_day;
+  grid.innerHTML = "";
+  days.forEach((d, i) => {
+    const drill = t.schedule.schedule[d] || "Rest";
+    const isToday = d === current;
+    const div = document.createElement("div");
+    div.className = "sched-day" + (isToday ? " today" : "");
+    div.title = "Click to change drill";
+    div.innerHTML = `<div class="day-name">${d.slice(0,3)}</div><div class="day-drill${drill==='Rest'?' rest':''}">${drill==='Rest'?'Rest':drill.replace(/Drills/,'').trim()}</div>`;
+    div.onclick = () => showDrillPicker(i, drill);
+    grid.appendChild(div);
+  });
+}
+
+function updateNewsFeed() {
+  const list = qs("#newsList");
+  if (!list) return;
+  if (!newsCache || newsCache.length === 0) {
+    list.innerHTML = '<div style="color:#888;text-align:center;padding:8px">No recent news</div>';
+    return;
+  }
+  let html = "";
+  newsCache.forEach(n => {
+    const sevColor = n.severity === "major" ? "#ffd700" : (n.severity === "upset" ? "#ff6a4a" : "#888");
+    html += `<div style="padding:6px 0;border-bottom:1px solid #1a1a2a">
+      <div style="color:${sevColor};font-weight:600;font-size:12px">${escHtml(n.headline)}</div>
+      <div style="color:#999;font-size:11px">${escHtml(n.body)}</div>
+    </div>`;
+  });
+  list.innerHTML = html;
+}
+
+function escHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+async function showDrillPicker(dayIdx, currentDrill) {
+  const t = state.training;
+  if (!t || !t.available_drills) return;
+  let html = `<div class="card-title">Select Drill for ${["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][dayIdx]}</div>`;
+  html += `<div style="font-size:12px;color:#888;margin-bottom:8px">Current: ${currentDrill === 'Rest' ? 'Rest' : escHtml(currentDrill)}</div>`;
+  html += `<div class="list-item" onclick="doSetDrill(${dayIdx}, null)" style="${currentDrill==='Rest'||!currentDrill?'border-color:#4a9eff':''}"><strong>Rest</strong> <small style="color:#4a9eff">Fatigue recovery</small></div>`;
+  t.available_drills.forEach(d => {
+    const isActive = d.name === currentDrill;
+    const safeName = escHtml(d.name);
+    const bonusHtml = d.gym_bonus > 0 ? ` <span style="color:#4aff6a">+${d.gym_bonus}% gym bonus</span>` : "";
+    html += `<div class="list-item" onclick="doSetDrill(${dayIdx}, '${safeName}')" style="${isActive?'border-color:#e62400':''}">
+      <strong>${isActive ? '▶ ' : ''}${safeName}</strong> <small>${d.duration}d, ${d.type}${bonusHtml}<br>Affects: ${escHtml(d.attrs.join(", "))}</small></div>`;
+  });
+  html += `<div style="margin-top:8px;text-align:center"><button class="btn btn-secondary btn-small" onclick="closeModal(null)">Close</button></div>`;
+  showModal(html);
+}
+
+async function doSetDrill(dayIdx, drillName) {
+  const resp = await api("/api/set_schedule", { sid, day_idx: dayIdx, drill_name: drillName });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateScheduleGrid();
+    closeModal(null);
+  } else {
+    toast(resp.error || "Failed", "error");
+  }
+}
+
+async function refreshGymTab() {
+  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
+  if (resp && resp.fighter) state = resp;
+  if (state && state.strategies) STRATS = state.strategies;
+  updateGymTab();
+}
+
+async function showStartCamp() {
+  const resp = await api("/api/camps");
+  let html = '<div class="card-title" style="font-size:16px">Select Training Camp</div><div style="font-size:12px;color:#888;margin-bottom:8px">Camps cost money but boost your skills. Weekly schedule auto-filled.</div>';
+  resp.camps.forEach((c, ci) => {
+    html += `<div style="margin-bottom:10px;padding:10px;background:#1a1a2a;border-radius:6px">
+      <strong>${escHtml(c.name)}</strong> <span style="color:#888">(${c.weeks}w, $${c.cost.toLocaleString()})</span><br>
+      <select id="drillSel${ci}" style="margin-top:4px">`;
+    c.drills.forEach((d, di) => {
+      html += `<option value="${di}">${escHtml(d.name)} (${d.duration}d, ${d.type})</option>`;
+    });
+    html += '</select><br>';
+    html += '<select id="intSel' + ci + '" style="margin-top:4px;width:auto;display:inline-block">';
+    html += '<option value="light">Light</option><option value="moderate" selected>Moderate</option><option value="intense">Intense</option>';
+    html += '</select> ';
+    html += `<button class="btn btn-small btn-primary" onclick="startCamp(${ci})">Start Camp</button></div>`;
+  });
+  showModal(html);
+}
+
+async function startCamp(campIdx) {
+  const drillIdx = parseInt(qs("#drillSel" + campIdx).value);
+  const intensity = qs("#intSel" + campIdx).value;
+  const resp = await api("/api/start_camp", { sid, camp_idx: campIdx, drill_idx: drillIdx, intensity });
+  closeModal(null);
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Camp started!", "success"); }
+  else toast(resp.error || "Failed", "error");
+}
+
+async function endCamp() {
+  const resp = await api("/api/end_camp", { sid });
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Camp ended — base training continues", "success"); }
+}
+
+async function showStartTraining() {
+  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
+  if (resp && resp.training) state = resp;
+  const t = state.training;
+  if (!t || !t.available_drills) {
+    toast("No drills available", "error");
+    return;
+  }
+  let html = '<div class="card-title" style="font-size:16px">Start Base Training</div><div style="font-size:12px;color:#888;margin-bottom:8px">Free, no camp cost. Slower gains than camp, but keeps you active.</div>';
+  html += '<select id="trainDrillSel" style="margin-bottom:6px">';
+  t.available_drills.forEach((d, di) => {
+    html += `<option value="${di}">${escHtml(d.name)} (${d.duration}d, ${d.type})</option>`;
+  });
+  html += '</select><br>';
+  html += '<select id="trainIntSel" style="margin-bottom:6px;width:auto;display:inline-block">';
+  html += '<option value="light">Light</option><option value="moderate" selected>Moderate</option><option value="intense">Intense</option>';
+  html += '</select> ';
+  html += `<button class="btn btn-primary btn-small" onclick="startTraining()">Start Training</button>`;
+  showModal(html);
+}
+
+async function startTraining() {
+  const drillIdx = parseInt(qs("#trainDrillSel").value);
+  const intensity = qs("#trainIntSel").value;
+  const resp = await api("/api/start_training", { sid, drill_idx: drillIdx, intensity });
+  closeModal(null);
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Training started!", "success"); }
+  else toast(resp.error || "Failed", "error");
+}
+
+async function stopTraining() {
+  const resp = await api("/api/stop_training", { sid });
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Training stopped", "success"); }
+}
+
+// --- FIGHT ---
+
+async function refreshFightTab() {
+  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
+  if (resp && resp.fighter) state = resp;
+  if (state && state.strategies) STRATS = state.strategies;
+  if (state && state.has_fight) {
+    qs("#fightPre").classList.add("hidden");
+    qs("#fightReady").classList.remove("hidden");
+    qs("#fightLive").classList.add("hidden");
+    const fb = state.fight_booking;
+    if (fb) {
+      const canFight = fb.days_until <= 0;
+      qs("#fightMatchup").innerHTML = `<strong>${escHtml(state.fighter.name)}</strong> vs <strong>${escHtml(fb.opponent.name)}</strong><br>
+        <span style="color:#888">${escHtml(fb.opponent.record)} | #${fb.opponent.rank}${canFight ? ' | <span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>' : ` | ${fb.days_until} days until fight`}</span>`;
+      qs("#btnStartFight").style.display = canFight ? "inline-block" : "none";
+      if (!canFight) {
+        qs("#stratSelect").innerHTML = `<div style="text-align:center;padding:12px;color:#888">The fight hasn't arrived yet. Keep training!<br>Advance time in the Home tab.</div>`;
+      } else {
+        loadStrategySelect("stratSelect");
+      }
+    }
+  } else {
+    qs("#fightPre").classList.remove("hidden");
+    qs("#fightReady").classList.add("hidden");
+    qs("#fightLive").classList.add("hidden");
+    loadOpponents();
+  }
+}
+
+async function loadOpponents() {
+  const resp = await api("/api/opponents?sid=" + encodeURIComponent(sid));
+  const list = qs("#opponentList");
+  const none = qs("#noOpponents");
+  list.innerHTML = "";
+  if (!resp.opponents || !resp.opponents.length) {
+    none.classList.remove("hidden");
+    return;
+  }
+  none.classList.add("hidden");
+  resp.opponents.forEach(o => {
+    const diffClass = o.difficulty.includes("step up") || o.difficulty.includes("tough") ? "diff-hard" :
+                      o.difficulty.includes("should win") ? "diff-easy" :
+                      o.difficulty.includes("pick em") ? "diff-pick" : "diff-medium";
+    const st = o.win_streak > 0 ? `W${o.win_streak}` : (o.loss_streak > 0 ? `L${Math.abs(o.loss_streak)}` : "");
+    const div = document.createElement("div");
+    div.className = "opponent-card";
+    div.innerHTML = `<div><span class="name">${escHtml(o.name)}</span> <span class="record">${escHtml(o.record)} (#${o.rank})</span><br>
+      <small>${escHtml(o.nationality || '--')} | ${escHtml(o.archetype)} | Rating: ${o.rating}</small></div>
+      <div style="text-align:right"><span class="diff ${diffClass}">${escHtml(o.difficulty)}</span><br><small>${st}</small></div>`;
+    div.onclick = () => showComparison(o);
+    list.appendChild(div);
+  });
+}
+
+function showComparison(o) {
+  const f = state.fighter;
+  const physLabels = ["striking_power","striking_accuracy","hand_speed","kick_power","kick_accuracy","kick_speed","takedown_power","takedown_accuracy","wrestling_defense","clinch_control","clinch_escapes","clinch_strikes","clinch_throws","top_control","bottom_control","submission_offense","submission_defense","cardio","durability","athleticism"];
+  const mentLabels = ["mental_toughness","fight_iq","heart","discipline","charisma","aggression","composure","adaptability"];
+
+  let html = `<div class="card-title" style="font-size:16px">Matchmaking: ${escHtml(f.name)} vs ${escHtml(o.name)}</div>`;
+
+  html += `<div class="compare-grid">
+    <div class="compare-col"><h4>${escHtml(f.name)}</h4>
+      <div class="stat-row"><span class="stat-label">Record</span><span class="stat-value">${escHtml(f.record)}</span></div>
+      <div class="stat-row"><span class="stat-label">Rank</span><span class="stat-value" style="color:${f.rank < o.rank ? '#4aff6a' : '#e62400'}">#${f.rank}</span></div>
+      <div class="stat-row"><span class="stat-label">Rating</span><span class="stat-value">${f.rating}</span></div>
+      <div class="stat-row"><span class="stat-label">Height</span><span class="stat-value">${f.height}"</span></div>
+      <div class="stat-row"><span class="stat-label">Reach</span><span class="stat-value">${f.reach}"</span></div>
+      <div class="stat-row"><span class="stat-label">Age</span><span class="stat-value">${f.age}</span></div>
+      <div class="stat-row"><span class="stat-label">KOs</span><span class="stat-value">${f.knockouts||0}</span></div>
+      <div class="stat-row"><span class="stat-label">Subs</span><span class="stat-value">${f.submissions||0}</span></div>
+      <div class="stat-row"><span class="stat-label">Win Streak</span><span class="stat-value">${f.win_streak||0}</span></div>
+    </div>
+    <div class="compare-col"><h4>${escHtml(o.name)}</h4>
+      <div class="stat-row"><span class="stat-label">Record</span><span class="stat-value">${escHtml(o.record)}</span></div>
+      <div class="stat-row"><span class="stat-label">Rank</span><span class="stat-value" style="color:${o.rank < f.rank ? '#4aff6a' : '#e62400'}">#${o.rank}</span></div>
+      <div class="stat-row"><span class="stat-label">Rating</span><span class="stat-value">${o.rating}</span></div>
+      <div class="stat-row"><span class="stat-label">Height</span><span class="stat-value">${o.height}"</span></div>
+      <div class="stat-row"><span class="stat-label">Reach</span><span class="stat-value">${o.reach}"</span></div>
+      <div class="stat-row"><span class="stat-label">Age</span><span class="stat-value">${o.age}</span></div>
+      <div class="stat-row"><span class="stat-label">KOs</span><span class="stat-value">${o.knockouts}</span></div>
+      <div class="stat-row"><span class="stat-label">Subs</span><span class="stat-value">${o.submissions}</span></div>
+      <div class="stat-row"><span class="stat-label">Win Streak</span><span class="stat-value">${o.win_streak||0}</span></div>
+    </div>
+  </div>`;
+
+  html += `<div style="margin-top:8px"><div class="card-title" style="font-size:13px">All Attributes</div>`;
+  html += `<div style="max-height:300px;overflow-y:auto">`;
+  [...physLabels, ...mentLabels].forEach(attr => {
+    const myVal = f.attributes ? f.attributes[attr] || 50 : 50;
+    const opVal = o.attributes ? o.attributes[attr] || 50 : 50;
+    const color = myVal > opVal ? "#4aff6a" : (myVal < opVal ? "#e62400" : "#888");
+    const barPctMy = Math.min(100, myVal);
+    const barPctOp = Math.min(100, opVal);
+    html += `<div style="display:flex;align-items:center;gap:4px;margin:3px 0">
+      <span style="width:130px;font-size:11px;color:#aaa;text-align:right;flex-shrink:0">${escHtml(attr.replace(/_/g,' '))}</span>
+      <div style="flex:1;height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden">
+        <div style="float:left;height:100%;width:${barPctMy}%;background:linear-gradient(90deg,#4a9eff,#e62400);border-radius:4px"></div>
+      </div>
+      <span style="width:70px;font-size:10px;color:${color};text-align:center">${myVal.toFixed(0)} vs ${opVal.toFixed(0)}</span>
+      <div style="flex:1;height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden">
+        <div style="float:right;height:100%;width:${barPctOp}%;background:linear-gradient(90deg,#e62400,#4a9eff);border-radius:4px"></div>
+      </div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  const st = o.win_streak > 0 ? `W${o.win_streak}` : (o.loss_streak > 0 ? `L${Math.abs(o.loss_streak)}` : "");
+  const streakHtml = st ? `<span style="color:${o.win_streak > 0 ? '#4aff6a' : '#e62400'};font-weight:700">${st}</span>` : "";
+
+  html += `<div style="margin-top:10px;padding:8px;background:#1a1a2a;border-radius:6px;font-size:12px">
+    <div class="flex-row" style="justify-content:center">
+      <span class="tag ${o.difficulty.includes('step up') || o.difficulty.includes('tough') ? 'diff-hard' : o.difficulty.includes('should win') ? 'diff-easy' : o.difficulty.includes('pick em') ? 'diff-pick' : 'diff-medium'}">${escHtml(o.difficulty)}</span>
+      ${streakHtml}
+      <span>${escHtml(o.nationality)} | ${escHtml(o.archetype)}</span>
+    </div>`;
+
+  loadFightOfferDetails(o, html);
+}
+
+async function loadFightOfferDetails(o, baseHtml) {
+  let html = baseHtml;
+  try {
+    const resp = await api("/api/fight_offer", { sid, opponent: o.name });
+    if (resp.success && resp.offer) {
+      const of = resp.offer;
+      if (of.contract_pay) {
+        html += `<div style="margin-top:6px;padding:6px;background:#0a0a15;border-radius:4px">
+          <strong>Fight Purse:</strong> Base: $${of.contract_pay.base_pay.toLocaleString()} + Win Bonus: $${of.contract_pay.win_bonus.toLocaleString()}
+          <span style="color:#ffd700"> = $${of.contract_pay.total.toLocaleString()} if you win</span></div>`;
+      }
+      if (of.rivalry) {
+        html += `<div style="margin-top:4px"><span class="tag tag-champ">RIVALRY</span> Intensity: ${(of.rivalry.intensity*100).toFixed(0)}% | Fights: ${of.rivalry.fights}${of.rivalry.trilogy ? ' | TRILOGY!' : ''}</div>`;
+      }
+      if (of.fight_history && of.fight_history.length >= 2) {
+        const myHist = of.fight_history[0];
+        const opHist = of.fight_history[1];
+        html += `<div style="margin-top:4px;display:flex;gap:12px;justify-content:center;font-size:11px">
+          <span>Recent: ${myHist.recent.join(" ")}</span>
+          <span style="color:#888">|</span>
+          <span>${escHtml(opHist.name)} recent: ${opHist.recent.join(" ")}</span>
+        </div>`;
+      }
+    }
+  } catch(e) {}
+
+  html += `</div>
+  <div style="margin-top:12px">
+    <label>Fight in (weeks):</label>
+    <select id="bookWeeks" style="width:auto;display:inline-block;margin-bottom:8px">
+      <option value="4">4 weeks</option>
+      <option value="6">6 weeks</option>
+      <option value="8" selected>8 weeks</option>
+      <option value="12">12 weeks</option>
+    </select>
+  </div>
+  <div style="text-align:center">
+    <button class="btn btn-primary" onclick="closeModal(null);bookFight('${escHtml(o.name)}')">Book This Fight</button>
+    <button class="btn btn-secondary" onclick="closeModal(null)" style="margin-left:6px">Cancel</button></div>`;
+  showModal(html);
+}
+
+async function bookFight(opponentName) {
+  const weeksSel = qs("#bookWeeks");
+  const weeks = weeksSel ? parseInt(weeksSel.value) : 8;
+  const resp = await api("/api/book_fight", { sid, opponent: opponentName, weeks });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    refreshFightTab();
+    toast("Fight booked!", "success");
+  } else {
+    toast(resp.error || "Failed to book fight", "error");
+  }
+}
+
+function loadStrategySelect(containerId) {
+  const container = qs(`#${containerId}`);
+  if (!container) return;
+  container.innerHTML = "";
+  STRATS.forEach(s => {
+    const btn = document.createElement("div");
+    btn.className = "strategy-btn";
+    btn.innerHTML = `<strong>${escHtml(s.name)}</strong><br><small>${escHtml(s.description)}</small>`;
+    btn.onclick = () => {
+      container.querySelectorAll(".strategy-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      selectedStrategy = s.id;
+    };
+    container.appendChild(btn);
+  });
+}
+
+function setSpeed(s) {
+  fightSpeed = s;
+  qsa(".speed-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.speed) === s));
+}
+
+async function startFight() {
+  const resp = await api("/api/start_fight", { sid, strategy: selectedStrategy });
+  if (!resp.success) { toast(resp.error || "Failed", "error"); return; }
+  qs("#fightReady").classList.add("hidden");
+  qs("#fightPre").classList.add("hidden");
+  qs("#fightLive").classList.remove("hidden");
+  qs("#fightLog").innerHTML = "";
+  qs("#fightStratPrompt").classList.add("hidden");
+  qs("#fightResult").classList.add("hidden");
+  qs("#fightHeader").textContent = `${state.fighter.name} vs ${resp.opponent} | ${state.fight_booking.is_title ? "TITLE FIGHT" : "3 Rounds"}`;
+  fightReplaying = true;
+  await replayFightEvents(resp.fight_result);
+}
+
+async function replayFightEvents(fightResult) {
+  const log = qs("#fightLog");
+  const events = fightResult.events || [];
+  for (let i = 0; i < events.length; i++) {
+    if (!fightReplaying) break;
+    const ev = events[i];
+
+    const el = document.createElement("div");
+    el.className = "fade-in";
+    let cls = "action";
+    if (ev.type === "damage") cls = "damage";
+    else if (ev.type === "knockout" || ev.type === "submission" || ev.type === "decision" || ev.type === "post_fight") cls = "big";
+    else if (ev.type === "pre_fight" || ev.type === "walkout" || ev.type === "score_update" || ev.type === "between_round") cls = "info";
+    else if (ev.type === "round_start" || ev.type === "round_end") cls = "round";
+    el.className += " " + cls;
+
+    if (ev.type === "round_start") {
+      el.textContent = "--- " + ev.text + " ---";
+    } else if (ev.type === "score_update") {
+      el.textContent = "  Score: " + ev.score;
+    } else if (ev.type === "between_round") {
+      el.innerHTML = "<i>" + ev.text.replace(/\n/g, "<br>") + "</i>";
+    } else if (ev.type === "strategy_prompt") {
+      el.textContent = "--- BETWEEN ROUND " + ev.round + " ---";
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+      if (fightSpeed === 0) {
+        const scoreDetail = ev.score_detail || "";
+        qs("#stratPromptTitle").textContent = `Between Round ${ev.round} — ${scoreDetail}`;
+        showStrategyPrompt(ev);
+        return;
+      }
+      fightPaused = true;
+      showStrategyPrompt(ev);
+      return;
+    } else {
+      el.textContent = ev.text || "";
+    }
+
+    if (el.textContent || el.innerHTML) {
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    if (fightSpeed > 0) {
+      let delay = 400;
+      if (ev.type === "round_start" || ev.type === "round_end") delay = 1000;
+      else if (ev.type === "knockout" || ev.type === "submission") delay = 2000;
+      else if (ev.type === "decision") delay = 1500;
+      else if (ev.type === "damage") delay = 500;
+      else if (ev.type === "action") delay = 600;
+      else if (ev.type === "pre_fight" || ev.type === "walkout") delay = 1500;
+      else if (ev.type === "between_round") delay = 2000;
+      else if (ev.type === "score_update") delay = 300;
+      await sleep(delay / fightSpeed);
+    }
+  }
+
+  if (fightResult.status === "complete" && fightReplaying) {
+    qs("#fightStratPrompt").classList.add("hidden");
+    await completeFight();
+  }
+}
+
+async function showStrategyPrompt(data) {
+  const container = qs("#stratPromptGrid");
+  const prompt = qs("#fightStratPrompt");
+  container.innerHTML = "";
+  prompt.classList.remove("hidden");
+  const scoreDetail = data.score_detail || "";
+  qs("#stratPromptTitle").textContent = `Between Round ${data.round} — ${scoreDetail}`;
+  STRATS.forEach(s => {
+    const btn = document.createElement("div");
+    btn.className = "strategy-btn small";
+    btn.innerHTML = `<strong>${escHtml(s.name)}</strong><br><small>${escHtml(s.description)}</small>`;
+    btn.onclick = async () => {
+      prompt.classList.add("hidden");
+      await submitStrategy(s.id);
+    };
+    container.appendChild(btn);
+  });
+  const keep = document.createElement("div");
+  keep.className = "strategy-btn small";
+  keep.innerHTML = "<strong>Keep Current Strategy</strong>";
+  keep.onclick = async () => {
+    prompt.classList.add("hidden");
+    await submitStrategy(null);
+  };
+  container.appendChild(keep);
+}
+
+async function submitStrategy(stratId) {
+  const resp = await api("/api/fight_action", { sid, strategy: stratId });
+  if (resp.success) {
+    fightPaused = false;
+    await replayFightEvents(resp.fight_result);
+  }
+}
+
+async function completeFight() {
+  const resp = await api("/api/complete_fight", { sid });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateAllUI();
+    const resultDiv = qs("#fightResult");
+    resultDiv.classList.remove("hidden");
+    const f = state.fighter;
+    let extraHtml = "";
+
+    const milestones = resp.milestones || [];
+    if (milestones.length) {
+      extraHtml += `<div style="margin-top:8px;padding:8px;background:#1a2a1a;border-radius:6px;font-size:12px">
+        <span style="color:#ffd700;font-weight:600">Milestones Unlocked:</span>`;
+      milestones.forEach(m => { extraHtml += `<div style="color:#4aff6a;margin-top:2px">★ ${escHtml(m)}</div>`; });
+      extraHtml += `</div>`;
+    }
+
+    const bonuses = resp.bonuses;
+    if (bonuses) {
+      extraHtml += `<div style="margin-top:8px;padding:8px;background:#2a2a1a;border-radius:6px;font-size:12px">
+        <span style="color:#ffd700;font-weight:600">Post-Fight Bonuses</span>`;
+      if (bonuses.fight_of_night) extraHtml += `<div style="color:#daa520;margin-top:2px">🏆 Fight of the Night: ${escHtml(bonuses.fight_of_night)}</div>`;
+      if (bonuses.perf_of_night) extraHtml += `<div style="color:#daa520;margin-top:2px">💥 Performance of the Night: ${escHtml(bonuses.perf_of_night)}</div>`;
+      extraHtml += `</div>`;
+    }
+
+    resultDiv.innerHTML = `<div class="card-title" style="font-size:18px;color:${resp.won ? '#4aff6a' : '#e62400'}">${resp.won ? "VICTORY!" : "DEFEAT"}</div>
+      <div>New Record: ${f.record} | Rank: #${f.rank}</div>
+      ${extraHtml}
+      <div style="margin-top:8px"><button class="btn btn-primary" onclick="endFightSession()">Continue</button></div>`;
+    fightReplaying = false;
+  }
+}
+
+function endFightSession() {
+  fightReplaying = false;
+  qs("#fightLive").classList.add("hidden");
+  qs("#fightPre").classList.remove("hidden");
+  qs("#fightLog").innerHTML = "";
+  qs("#fightResult").classList.add("hidden");
+  qs("#fightStratPrompt").classList.add("hidden");
+  switchTab("home");
+}
+
+// --- CAREER ---
+
+async function refreshCareerTab() {
+  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
+  if (resp && resp.fighter) state = resp;
+  if (state && state.strategies) STRATS = state.strategies;
+  const f = state.fighter;
+  const p = state.promotion;
+  const car = state.career;
+  const con = state.contract;
+
+  qs("#cRecord").textContent = f.record;
+  qs("#cKOs").textContent = f.knockouts || 0;
+  qs("#cSubs").textContent = f.submissions || 0;
+  qs("#cRank").textContent = `#${f.rank}`;
+  qs("#cPeak").textContent = `#${f.peak_rank}`;
+  qs("#cPromo").textContent = p ? `${escHtml(p.name)} (${p.tier})` : "Free Agent";
+  qs("#cChampion").textContent = p && p.champion && p.champion === f.name ? "Yes" : "No";
+  qs("#cChampion").style.color = p && p.champion && p.champion === f.name ? "#ffd700" : "#fff";
+  qs("#cAge").textContent = f.age;
+  qs("#cNation").textContent = f.nationality || "--";
+  qs("#cRegion").textContent = f.home_region || "--";
+  qs("#cHeight").textContent = `${f.height}" / ${f.reach}"`;
+  const traitName = state.traits ? (state.traits.find(t => t.id === f.trait_id) || {}).name || "None" : "None";
+  const persName = state.personalities ? (state.personalities.find(p => p.id === f.personality_id) || {}).name || "Humble" : "Humble";
+  qs("#cTrait").textContent = traitName;
+  qs("#cPersonality").textContent = persName;
+  qs("#cRating").textContent = f.rating;
+
+  if (con) {
+    qs("#cBasePay").textContent = `$${con.base_pay.toLocaleString()}`;
+    qs("#cWinBonus").textContent = `$${con.win_bonus.toLocaleString()}`;
+    qs("#cFightsLeft").textContent = con.fights_remaining;
+    qs("#contractChampTag").innerHTML = con.is_champion ? '<span class="tag tag-champ">CHAMPION</span>' : "";
+  } else {
+    qs("#cBasePay").textContent = "$--";
+    qs("#cWinBonus").textContent = "$--";
+    qs("#cFightsLeft").textContent = "--";
+    qs("#contractChampTag").innerHTML = "";
+  }
+
+  if (car) {
+    qs("#cTitles").textContent = car.title_defenses;
+    qs("#cEarnings").textContent = `$${(car.earnings || 0).toLocaleString()}`;
+    qs("#cRivalries").textContent = car.rivalries;
+  }
+
+  const physLabels = ["striking_power","striking_accuracy","hand_speed","kick_power","kick_accuracy","kick_speed","takedown_power","takedown_accuracy","wrestling_defense","clinch_control","clinch_escapes","clinch_strikes","clinch_throws","top_control","bottom_control","submission_offense","submission_defense","cardio","durability","athleticism"];
+  const mentLabels = ["mental_toughness","fight_iq","heart","discipline","charisma","aggression","composure","adaptability"];
+
+  let physHtml = "";
+  physLabels.forEach(attr => {
+    const val = f.attributes ? f.attributes[attr] || 50 : 50;
+    const pct = Math.min(100, Math.max(0, val));
+    physHtml += `<div class="attr-bar"><span class="label">${escHtml(attr.replace(/_/g,' '))}</span>
+      <div class="track"><div class="fill phys" style="width:${pct}%"></div></div>
+      <span class="val">${val.toFixed(0)}</span></div>`;
+  });
+  qs("#physAttrs").innerHTML = physHtml;
+
+  let mentHtml = "";
+  mentLabels.forEach(attr => {
+    const val = f.attributes ? f.attributes[attr] || 50 : 50;
+    const pct = Math.min(100, Math.max(0, val));
+    mentHtml += `<div class="attr-bar"><span class="label">${escHtml(attr.replace(/_/g,' '))}</span>
+      <div class="track"><div class="fill ment" style="width:${pct}%"></div></div>
+      <span class="val">${val.toFixed(0)}</span></div>`;
+  });
+  qs("#mentAttrs").innerHTML = mentHtml;
+}
+
+// --- FINANCE ---
+
+async function refreshFinanceTab() {
+  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
+  if (resp && resp.fighter) state = resp;
+  if (state && state.strategies) STRATS = state.strategies;
+  const fin = state.finance;
+  if (!fin) return;
+  qs("#fNet").textContent = `$${(fin.net_worth || 0).toLocaleString()}`;
+  qs("#fAgent").textContent = fin.agent || "None";
+  const gymCost = fin.gym !== "None" ? 500 : 0;
+  qs("#fGymCost").textContent = `$${gymCost}/mo`;
+  qs("#fSponsor").textContent = `$${(fin.sponsorship || 0).toLocaleString()}/mo`;
+}
+
+// --- GYM / AGENT MODALS ---
+
+async function showGymList() {
+  const f = state ? state.fighter : null;
+  if (f && state.finance && state.finance.gym !== "None") {
+    showModal(`<div class="card-title">Current Gym: ${escHtml(state.finance.gym)}</div>
+      <button class="btn btn-danger" onclick="leaveGym()">Leave Gym</button>
+      <button class="btn btn-secondary" onclick="closeModal(null)" style="margin-left:6px">Cancel</button>`);
+    return;
+  }
+  const resp = await api("/api/gyms");
+  let html = '<div class="card-title">Available Gyms</div><div style="font-size:12px;color:#888;margin-bottom:6px">Monthly fees apply</div>';
+  resp.gyms.forEach(g => {
+    html += `<div class="list-item" onclick="joinGym('${escHtml(g.name)}')">
+      <strong>${escHtml(g.name)}</strong> — $${g.monthly_fee}/mo<br><small>${escHtml(g.specialties.join(", "))} | Bonus: +${(g.coach_bonus*100).toFixed(0)}%</small></div>`;
+  });
+  showModal(html);
+}
+
+async function joinGym(name) {
+  const resp = await api("/api/join_gym", { sid, gym: name });
+  closeModal(null);
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); }
+  else toast(resp.error || "Failed", "error");
+}
+
+async function leaveGym() {
+  const resp = await api("/api/leave_gym", { sid });
+  closeModal(null);
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); }
+}
+
+async function showAgentList() {
+  const f = state ? state.fighter : null;
+  if (f && state.finance && state.finance.agent !== "None") {
+    showModal(`<div class="card-title">Current Agent: ${escHtml(state.finance.agent)}</div>
+      <button class="btn btn-danger" onclick="fireAgent()">Fire Agent</button>
+      <button class="btn btn-secondary" onclick="closeModal(null)" style="margin-left:6px">Cancel</button>`);
+    return;
+  }
+  const resp = await api("/api/agents");
+  let html = '<div class="card-title">Available Agents</div>';
+  resp.agents.forEach(a => {
+    html += `<div class="list-item" onclick="hireAgent('${escHtml(a.name)}')">
+      <strong>${escHtml(a.name)}</strong> — ${(a.cut*100).toFixed(0)}% cut, +${(a.negotiation_bonus*100).toFixed(0)}% contracts<br><small>${escHtml(a.perks)}</small></div>`;
+  });
+  showModal(html);
+}
+
+async function hireAgent(name) {
+  const resp = await api("/api/hire_agent", { sid, agent: name });
+  closeModal(null);
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); }
+  else toast(resp.error || "Failed", "error");
+}
+
+async function fireAgent() {
+  const resp = await api("/api/fire_agent", { sid });
+  closeModal(null);
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); }
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>

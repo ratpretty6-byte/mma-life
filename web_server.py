@@ -192,8 +192,6 @@ def _get_training_state(session):
     available_drills = []
     if t.current_camp:
         drills = t.current_camp.available_drills
-    elif not t.in_training:
-        drills = []
     else:
         drills = ALL_DRILLS
     for d in drills:
@@ -791,8 +789,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not training:
                     self.json_resp({"error": "Not initialized"})
                     return
-                if not training.in_training:
-                    self.json_resp({"error": "No active training"})
+                if not training.week_started:
+                    self.json_resp({"error": "Start training or a camp first to set up a schedule"})
                     return
                 training.set_day_drill(day_idx, drill_name)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
