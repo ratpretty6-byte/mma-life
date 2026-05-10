@@ -43,6 +43,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .fight-log .big { color: #ffd700; font-weight: 700; font-size: 14px; }
 .fight-log .info { color: #4a9eff; }
 .fight-log .round { color: #fff; font-weight: 700; font-size: 14px; text-align: center; }
+.fight-log .round-summary { color: #b0b0ff; font-style: italic; font-size: 12px; text-align: center; }
 .fight-log .fn { color: #ff9a4a; font-weight: 600; }
 .fight-log .act { color: #4aff6a; font-weight: 500; }
 .fight-log .dmg { color: #ff4a4a; font-weight: 700; }
@@ -1215,6 +1216,7 @@ async function replayFightEvents(fightResult) {
     else if (ev.type === "knockout" || ev.type === "submission" || ev.type === "decision" || ev.type === "post_fight") cls = "big";
     else if (ev.type === "pre_fight" || ev.type === "walkout" || ev.type === "score_update" || ev.type === "between_round") cls = "info";
     else if (ev.type === "round_start" || ev.type === "round_end") cls = "round";
+    else if (ev.type === "round_summary") cls = "round-summary";
     el.className += " " + cls;
 
     if (ev.type === "round_start") {
@@ -1255,6 +1257,7 @@ async function replayFightEvents(fightResult) {
       else if (ev.type === "pre_fight" || ev.type === "walkout") delay = 1500;
       else if (ev.type === "between_round") delay = 2000;
       else if (ev.type === "score_update") delay = 300;
+      else if (ev.type === "round_summary") delay = 1200;
       await sleep(delay / fightSpeed);
     }
   }

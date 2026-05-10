@@ -149,6 +149,12 @@ class CommentaryEngine:
                 "{attacker} is finding a home for that {strike_type}!",
                 "Beautiful {strike_type} from {attacker}, {defender} has no answer right now!",
                 "{attacker} with a hard {strike_type}! That had some heat behind it!",
+                "{attacker} slips the counter and cracks {defender} with a {strike_type}!",
+                "{defender} is on skates after that {strike_type} from {attacker}!",
+                "{attacker} feints and rips a {strike_type} to the {target}! Clean connection!",
+                "THAT WAS CLEAN! {attacker} with a picture-perfect {strike_type}!",
+                "{attacker} is unloading! Another {strike_type} gets through {defender}'s guard!",
+                "{defender} shells up but {attacker} finds a gap with that {strike_type}!",
             ],
             "clinch": [
                 "{attacker} lands a knee to {defender}'s {target} from the clinch!",
@@ -159,6 +165,9 @@ class CommentaryEngine:
                 "{attacker} with a brutal elbow from the clinch! {defender} is bloody!",
                 "Knees in bunches from {attacker}! {defender} is wilting against the cage!",
                 "{attacker} uses the clinch to land a devastating {strike_type}!",
+                "{attacker} is relentless in the clinch, walking {defender} down with strikes!",
+                "Crushing {strike_type} from {attacker} in the phone booth! {defender} is hurt!",
+                "{attacker} out-muscles {defender} in the clinch and lands a nasty {strike_type}!",
             ],
             "ground": [
                 "{attacker} lands a hammerfist on {defender}'s {target} from top position!",
@@ -169,6 +178,10 @@ class CommentaryEngine:
                 "Heavy ground strikes from {attacker}! {defender} is just covering up!",
                 "{attacker} with a crushing elbow from side control!",
                 "{defender} is doing a good job limiting damage from the bottom.",
+                "{attacker} is mauling {defender} on the ground! Those shots are heavy!",
+                "{attacker} slices through the guard with a {strike_type}!",
+                "{defender}'s face is getting marked up from the ground and pound!",
+                "{attacker} transitions and lands a {strike_type} from a new angle!",
             ]
         }
 
@@ -181,6 +194,9 @@ class CommentaryEngine:
                 "{attacker} drives through {defender} and puts them on the canvas!",
                 "{attacker} times the takedown perfectly and gets the fight to the ground!",
                 "A beautiful level change from {attacker} and {defender} is on their back!",
+                "{attacker} uses {defender}'s momentum against them and scores the takedown!",
+                "Slam dunk takedown! {attacker} lifts {defender} and deposits them on the mat!",
+                "Trip takedown from {attacker}! {defender} is off balance and goes down!",
             ],
             "fail": [
                 "{defender} stuffs the takedown attempt from {attacker}!",
@@ -189,6 +205,8 @@ class CommentaryEngine:
                 "{attacker} is stuffed against the cage by {defender}'s superior wrestling!",
                 "{defender} shrugs off the takedown attempt like it was nothing!",
                 "{attacker} shoots from too far out and {defender} easily stuffs it.",
+                "{defender} reads the shot and stuffs it with a beautiful sprawl!",
+                "{attacker} shoots but {defender} counters with a whizzer and stays on the feet!",
             ]
         }
 
@@ -269,11 +287,25 @@ class CommentaryEngine:
                 "Round {round_num} is underway, {fighter1} takes the center immediately.",
                 "Here we go with round {round_num}! Both fighters meet in the center!",
                 "The referee waves them in for round {round_num}! Let's go!",
+                "Round {round_num} begins! {fighter1} comes forward, {fighter2} circles!",
+                "Here comes round {round_num}! Both fighters look ready to go to war!",
             ],
             "end": [
                 "The round ends, {description}.",
                 "Round {round_num} is over, {description}.",
                 "That's the end of round {round_num}! {description}",
+                "The horn sounds! {round_num} rounds in the books! {description}",
+            ],
+            "summary": [
+                "Close round, neither fighter able to establish dominance.",
+                "{fighter1} out-landed {fighter2} in that round with cleaner shots.",
+                "{fighter2} did their best work in the clinch and on the ground.",
+                "{fighter1} controlled the range and paced the round well.",
+                "{fighter2} landed the heavier shots and did more damage.",
+                "That was all {fighter1} — volume and pressure won the round.",
+                "{fighter2} had their moments but couldn't sustain the output.",
+                "A dominant round for {fighter1}, landing at will and stuffing takedowns.",
+                "{fighter2} swarmed at the end but it might be too little, too late.",
             ]
         }
 
@@ -281,6 +313,7 @@ class CommentaryEngine:
             "Welcome to tonight's main event! {fighter1} ({rec1}) vs {fighter2} ({rec2})!",
             "We're ready for the fight of the night! {fighter1} ({rec1}) takes on {fighter2} ({rec2})!",
             "Ladies and gentlemen, this is the moment we've been waiting for! {fighter1} ({rec1}) vs {fighter2} ({rec2})!",
+            "The atmosphere is electric as {fighter1} ({rec1}) and {fighter2} ({rec2}) prepare to go to war!",
         ]
 
         self.walkout_templates = [
@@ -288,6 +321,7 @@ class CommentaryEngine:
             "Here comes {fighter}, {description}. The crowd's reaction is electric!",
             "{fighter} is walking to the octagon now, {description}.",
             "The crowd roars as {fighter} enters the arena, {description}.",
+            "{fighter} strides confidently to the cage, {description}.",
         ]
 
         self.between_round_templates = [
@@ -295,6 +329,9 @@ class CommentaryEngine:
             "The corner tells {fighter} they need to make adjustments. '{advice}'",
             "{fighter} gets instructions from the corner: '{advice}'",
             "Between rounds, {fighter}'s team works on them. '{advice}'",
+            "The coaches are giving {fighter} specific instructions: '{advice}'",
+            "{fighter} is being told to stay composed: '{advice}'",
+            "The stool talk with {fighter}: '{advice}'",
         ]
 
         self.cut_commentary = [
@@ -302,18 +339,28 @@ class CommentaryEngine:
             "The doctor is going to want to check that cut on {fighter}!",
             "{fighter} is leaking blood from a nasty gash!",
             "The cut on {fighter} is getting worse, that could be a problem!",
+            "{fighter}'s face is a crimson mask! That cut is pouring blood!",
+            "The blood is streaming down {fighter}'s face, making it hard to see!",
+            "{fighter} wipes the blood away but it keeps coming!",
+            "A deep gash has opened up on {fighter}! The ref might take a look!",
         ]
 
         self.swelling_commentary = [
             "{fighter}'s eye is swelling shut! That's going to affect their vision!",
             "The damage is showing on {fighter}'s face, that eye is closing up!",
             "Significant swelling around {fighter}'s eye!",
+            "{fighter}'s orbital area is ballooning up from the accumulated damage!",
+            "The swelling around {fighter}'s eye is getting worse each round!",
+            "{fighter} blinks repeatedly, trying to clear the swelling from their vision!",
         ]
 
         self.leg_damage_commentary = [
             "{fighter}'s lead leg is chewed up from those kicks!",
             "{fighter} is limping slightly, those leg kicks are taking effect!",
             "The leg of {fighter} is bruised and marked up from the constant kicks!",
+            "{fighter} is putting less weight on that lead leg now! Those kicks are paying off!",
+            "The leg kicks are adding up! {fighter}'s mobility is compromised!",
+            "{fighter} checks a kick but their leg is already too damaged to fully block it!",
         ]
 
         self.post_fight_templates = {
@@ -321,16 +368,22 @@ class CommentaryEngine:
                 "After three hard rounds, the judges score the bout... {score_detail}",
                 "We go to the scorecards! {score_detail}",
                 "The judges have seen enough and it goes to the scorecards: {score_detail}",
+                "This one goes to the judges! {score_detail}",
+                "The scorecards are in! {score_detail}",
             ],
             "ko": [
                 "WHAT A FINISH! {winner} wins by {method} in round {round}!",
                 "That's all she wrote! {winner} with a {method} in round {round}!",
                 "{winner} gets the {method} victory! An incredible performance!",
+                "DEVASTATING! {winner} puts {loser} away with a {method} in round {round}!",
+                "LIGHTS OUT! {winner} with a {method} for the ages in round {round}!",
             ],
             "submission": [
                 "{winner} gets the tap! Submission victory via {method} in round {round}!",
                 "Incredible grappling from {winner}! {method} in round {round}!",
                 "{winner} forces the tap! That's a {method} victory!",
+                "{winner} sinks it in and {loser} has no choice! {method} in round {round}!",
+                "WHAT A SUBMISSION! {winner} with the {method}! {loser} had to tap!",
             ],
         }
 
@@ -460,6 +513,12 @@ class CommentaryEngine:
         template = random.choice(self.recovery_templates)
         return template.format(fighter=fighter.name)
 
+    def generate_round_summary(self, fighter1: Fighter, fighter2: Fighter) -> str:
+        template = random.choice(self.round_templates.get("summary", [""]))
+        if not template:
+            return ""
+        return template.format(fighter1=fighter1.name, fighter2=fighter2.name)
+
     def generate_round_start(self, round_num: int, fighter1: Fighter, fighter2: Fighter) -> str:
         template = random.choice(self.round_templates["start"])
         return template.format(round_num=round_num, fighter1=fighter1.name, fighter2=fighter2.name)
@@ -501,6 +560,9 @@ class CommentaryEngine:
                 f"You need a finish! Go get it!",
                 f"This is it! Leave it all in the cage!",
                 f"Go for broke! You're down on the cards!",
+                f"You're behind! Hunt for the finish — takedown, knockout, anything!",
+                f"Desperate times! Empty the gas tank, this round is everything!",
+                f"Champions find a way! Go out there and take it!",
             ]
         else:
             advice_pool = [
@@ -511,6 +573,13 @@ class CommentaryEngine:
                 f"Watch for his power shot, stay focused!",
                 f"He's slowing down, pick up the pace!",
                 f"Let your hands go, you're the better fighter!",
+                f"Stay behind the jab, establish your range!",
+                f"Mix in the takedown to keep him guessing!",
+                f"Body work! Break him down to the body!",
+                f"Patience, it's your round. Pick your shots!",
+                f"He's loading up, make him miss and counter!",
+                f"Pressure him! Don't let him breathe for a second!",
+                f"Feint and find the opening, he's starting to read you.",
             ]
 
         advice = random.choice(advice_pool)
@@ -532,19 +601,20 @@ class CommentaryEngine:
         template = random.choice(self.leg_damage_commentary)
         return template.format(fighter=fighter.name)
 
-    def generate_post_fight(self, winner: Fighter, method: str, round_num: int = None, is_decision: bool = False) -> str:
+    def generate_post_fight(self, winner: Fighter, method: str, round_num: int = None, is_decision: bool = False, loser: Fighter = None) -> str:
         if not winner:
             return "The fight goes to the scorecards... It's a DRAW!"
+        loser_name = loser.name if loser else "their opponent"
         if is_decision:
             template = random.choice(self.post_fight_templates["decision"])
             score_detail = f"{winner.name} gets the nod"
             return template.format(score_detail=score_detail)
         elif "KO" in method or "TKO" in method:
             template = random.choice(self.post_fight_templates["ko"])
-            return template.format(winner=winner.name, method=method, round=round_num)
+            return template.format(winner=winner.name, loser=loser_name, method=method, round=round_num)
         else:
             template = random.choice(self.post_fight_templates["submission"])
-            return template.format(winner=winner.name, method=method, round=round_num)
+            return template.format(winner=winner.name, loser=loser_name, method=method, round=round_num)
 
     def generate_post_fight_reaction(self, winner: Fighter, loser: Fighter) -> Optional[str]:
         return self._get_personality_reaction(winner, loser, won=True)
