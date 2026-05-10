@@ -6,7 +6,7 @@ import traceback
 import random
 import copy
 from datetime import datetime, timedelta
-from threading import Lock
+from threading import Lock, Thread
 
 from fighter import Fighter
 from training import TrainingSystem, TrainingCamp, DAYS_OF_WEEK
@@ -61,15 +61,27 @@ def get_or_create_session(session_id):
         gs["sessions"][session_id] = {}
     return gs["sessions"][session_id]
 
+_world_sim_running = False
+
 def run_world_sim(game_date, es):
-    ws = gs.get("world_sim")
-    if ws and game_date:
-        results = ws.simulate_month(game_date, es)
-        if results:
-            news_list = gs.setdefault("world_news", [])
-            news_list.extend(results)
-            if len(news_list) > 200:
-                news_list[:] = news_list[-200:]
+    global _world_sim_running
+    if _world_sim_running:
+        return
+    _world_sim_running = True
+    try:
+        ws = gs.get("world_sim")
+        if ws and game_date:
+            results = ws.simulate_month(game_date, es)
+            if results:
+                news_list = gs.setdefault("world_news", [])
+                news_list.extend(results)
+                if len(news_list) > 200:
+                    news_list[:] = news_list[-200:]
+    finally:
+        _world_sim_running = False
+
+def run_world_sim_async(game_date, es):
+    Thread(target=run_world_sim, args=(game_date, es), daemon=True).start()
 
 def get_state_dict(session):
     f = session.get("fighter")
@@ -465,7 +477,7 @@ class Handler(BaseHTTPRequestHandler):
                         f.monthly_aging(game_date)
                     if finance:
                         finance.process_monthly(game_date)
-                    run_world_sim(game_date, es)
+                    run_world_sim_async(game_date, es)
 
                 fight_today = False
                 if fb and fb.date and game_date and game_date >= fb.date:
@@ -589,9 +601,6 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if session.get("fight_completed"):
                     self.json_resp({"error": "This fight has already been completed"})
-                    return
-                if session.get("fight_started"):
-                    self.json_resp({"error": "Fight has already been started once. Complete it first."})
                     return
                 opponent = fb.fighter2 if fb.fighter1 == f else fb.fighter1
                 is_title = fb.is_title_fight
@@ -766,7 +775,7 @@ class Handler(BaseHTTPRequestHandler):
                             f.monthly_aging(game_date)
                         if finance:
                             finance.process_monthly(game_date)
-                        run_world_sim(game_date, es)
+                        run_world_sim_async(game_date, es)
 
                     if fb and fb.date and game_date and game_date >= fb.date:
                         if not session.get("fight_completed"):
