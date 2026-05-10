@@ -605,6 +605,8 @@ function updateAllUI() {
   const car = state.career;
   const fb = state.fight_booking;
   const gd = state.game_date;
+  _f1Name = escHtml(f.name);
+  _f2Name = fb && fb.opponent ? escHtml(fb.opponent.name) : "";
 
   qs("#headerStatus").textContent = `${f.name} | ${f.record} | #${f.rank} | ${p ? p.name : "FA"}`;
 
@@ -1288,16 +1290,16 @@ async function replayFightEvents(fightResult) {
     }
 
     if (fightSpeed > 0) {
-      let delay = 400;
-      if (ev.type === "round_start" || ev.type === "round_end") delay = 1000;
-      else if (ev.type === "knockout" || ev.type === "submission") delay = 2000;
-      else if (ev.type === "decision") delay = 1500;
-      else if (ev.type === "damage") delay = 500;
-      else if (ev.type === "action") delay = 600;
-      else if (ev.type === "pre_fight" || ev.type === "walkout") delay = 1500;
-      else if (ev.type === "between_round") delay = 2000;
-      else if (ev.type === "score_update") delay = 300;
-      else if (ev.type === "round_summary") delay = 1200;
+      let delay = 2000;
+      if (ev.type === "round_start" || ev.type === "round_end") delay = 3000;
+      else if (ev.type === "knockout" || ev.type === "submission") delay = 5000;
+      else if (ev.type === "decision") delay = 4000;
+      else if (ev.type === "damage") delay = 3000;
+      else if (ev.type === "action") delay = 3500;
+      else if (ev.type === "pre_fight" || ev.type === "walkout") delay = 4000;
+      else if (ev.type === "between_round") delay = 5000;
+      else if (ev.type === "score_update") delay = 1500;
+      else if (ev.type === "round_summary") delay = 3500;
       await sleep(delay / fightSpeed);
     }
   }
@@ -1533,25 +1535,32 @@ async function fireAgent() {
   if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); }
 }
 
+let _f1Name = "";
+let _f2Name = "";
+
 function formatCommentary(text) {
   if (!text) return "";
   let s = escHtml(text);
-  // Colorize KO/Submission words
+  const names = [];
+  if (_f1Name) names.push(_f1Name);
+  if (_f2Name) names.push(_f2Name);
+  names.sort((a, b) => b.length - a.length);
+  const placeholders = {};
+  names.forEach((n, i) => {
+    const ph = `\x00FN${i}\x00`;
+    placeholders[ph] = n;
+    s = s.replaceAll(n, ph);
+  });
   s = s.replace(/\b(KNOCKOUT!|KO!|Knockout!)\b/g, '<span class="ko-word">$1</span>');
   s = s.replace(/\b(TAP!|SUBMISSION!|Submission!)\b/g, '<span class="sub-word">$1</span>');
-  // Colorize fighter names (two capitalized words in a row, or name patterns)
-  s = s.replace(/\b([A-Z][a-z]+(?:['][A-Z][a-z]+)?)\s+([A-Z][a-z]+)\b(?!\s*[a-z])/g, (m) => {
-    const skip = ["This","That","There","Here","Round","Score","Fight","Both","The","From","After","With","Into","Over","Under","Before","During","Through","Against","Between"];
-    const parts = m.split(" ");
-    if (skip.includes(parts[0]) || skip.includes(parts[1])) return m;
-    return `<span class="fn">${parts[0]}</span> <span class="fn">${parts[1]}</span>`;
-  });
-  // Colorize action verbs
-  s = s.replace(/\b(lands|drops|hurts|stuns|wobbles|rocks|tags|cracks|drills|unleashes|explodes|presses|swarms|batters|pummels)\b/gi, '<span class="act">$1</span>');
-  // Colorize damage/impact phrases
-  s = s.replace(/\b(heavy damage|significant damage|nasty cut|bad swelling|massive|devastating|brutal|vicious|nasty|savage)\b/gi, '<span class="dmg">$1</span>');
-  // Colorize round scores
+  s = s.replace(/\b(lands|drops|hurts|stuns|wobbles|rocks|tags|cracks|drills|unleashes|explodes|presses|swarms|batters|pummels|hammers|rips|bangs|clips|nails|punches|kicks|knees|elbows|unloads|unleashes|cracks|thuds|blasts|lights up|tees off|lets loose|uncorks)\b/gi, '<span class="act">$1</span>');
+  s = s.replace(/\b(heavy damage|significant damage|nasty cut|bad swelling|massive|devastating|brutal|vicious|nasty|savage|horrific|gruesome|explosive|tremendous|sickening|wicked|nasty|ugly)\b/gi, '<span class="dmg">$1</span>');
   s = s.replace(/(\d+)[-–](\d+)/g, '<span class="score-num">$1</span>-<span class="score-num">$2</span>');
+  s = s.replace(/\b(gets back up|scrambles to feet|back to standing|stands back up|works back up|explodes up)\b/gi, '<span class="info">$1</span>');
+  s = s.replace(/\b(shoots|sprawls|stuff|level change|double leg|single leg|takedown|taken down)\b/gi, '<span class="act">$1</span>');
+  for (const [ph, n] of Object.entries(placeholders)) {
+    s = s.replaceAll(ph, `<span class="fn">${n}</span>`);
+  }
   return s;
 }
 

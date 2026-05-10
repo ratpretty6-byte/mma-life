@@ -358,66 +358,23 @@ class Fight:
         )
 
         fatigue = 1.0 - (atk_state["stamina"] / 100)
-        position = self.position_system.current_position
-
+        pos = self.position_system.current_position
+        self.position_system.position_time += 1
         action_weights = atk_strategy.get_action_weights()
-        if position == Position.STANDING:
-            if random.random() < 0.08:
-                self._check_cut_progression(atk_state, def_state)
-                self._check_swelling_progression(atk_state, def_state)
-                self._check_leg_damage_effect(defender, def_state)
 
-            if phase == "feeling_out":
-                strike_chance = action_weights.get("strike", 0.7) * 0.7
-                if random.random() < 0.25:
-                    self.fight_log.append(f"{attacker.name} circles, measuring distance.")
-                    return
-            elif phase == "desperation":
-                strike_chance = action_weights.get("strike", 0.7) * 1.2
-            else:
-                strike_chance = action_weights.get("strike", 0.7)
+        if random.random() < 0.08:
+            self._check_cut_progression(atk_state, def_state)
+            self._check_swelling_progression(atk_state, def_state)
+            self._check_leg_damage_effect(defender, def_state)
 
-            if random.random() < strike_chance:
-                self._simulate_strike(attacker, defender, atk_state, def_state, fatigue, atk_strategy, phase)
-            elif random.random() < action_weights.get("takedown", 0.15) / (action_weights.get("takedown", 0.15) + action_weights.get("clinch", 0.15) + 0.001):
-                self._simulate_takedown(attacker, defender, fatigue, atk_strategy)
-            else:
-                self._simulate_clinch_attempt(attacker, defender, fatigue, atk_strategy)
-        elif position == Position.CLINCH:
-            if random.random() < 0.6:
-                self._simulate_clinch_strike(attacker, defender, atk_state, def_state, fatigue, atk_strategy)
-            else:
-                self._simulate_clinch_break(attacker, defender, fatigue, atk_strategy)
-        elif position == Position.GROUND_TOP:
-            top = self.position_system.top_fighter
-            if top == self.fighter1:
-                actual_attacker, actual_defender = self.fighter1, self.fighter2
-                actual_atk_state, actual_def_state = self.f1_state, self.f2_state
-                actual_strategy = self.strategy1
-            else:
-                actual_attacker, actual_defender = self.fighter2, self.fighter1
-                actual_atk_state, actual_def_state = self.f2_state, self.f1_state
-                actual_strategy = self.strategy2
-            sub_chance = action_weights.get("submission", 0.3) if actual_strategy.current_strategy else 0.3
-            if random.random() < sub_chance:
-                self._simulate_submission_attempt(actual_attacker, actual_defender, fatigue, actual_strategy)
-            else:
-                self._simulate_ground_strike(actual_attacker, actual_defender, actual_atk_state, actual_def_state, fatigue, actual_strategy)
-        elif position == Position.GROUND_BOTTOM:
-            bottom = self.position_system.top_fighter
-            if bottom == self.fighter1:
-                actual_bottom = self.fighter2
-                actual_top = self.fighter1
-            else:
-                actual_bottom = self.fighter1
-                actual_top = self.fighter2
-            bottom_strategy = self.strategy2 if actual_bottom == self.fighter2 else self.strategy1
-            if random.random() < 0.5:
-                self._simulate_sweep(actual_bottom, actual_top, fatigue, bottom_strategy)
-            else:
-                self._simulate_ground_stand_up(actual_bottom, actual_top, fatigue, bottom_strategy)
+        if Position.is_standing(pos):
+            self._simulate_standing_action(attacker, defender, atk_state, def_state, fatigue, atk_strategy, phase, pos, action_weights)
+        elif pos == Position.CLINCH:
+            self._simulate_clinch_action(attacker, defender, atk_state, def_state, fatigue, atk_strategy, action_weights)
+        elif Position.is_ground(pos):
+            self._simulate_ground_action(fatigue, action_weights)
 
-        if position in (Position.GROUND_TOP, Position.GROUND_BOTTOM):
+        if Position.is_ground(pos):
             if self.position_system.top_fighter == self.fighter1:
                 self.f1_control_time += 1
             else:
@@ -431,12 +388,145 @@ class Fight:
             if cd > 1:
                 atk_state["stamina"] = max(0, atk_state["stamina"] - int((cd - 1.0) * 5 * phase_stamina_mod))
 
+    def _simulate_standing_action(self, attacker, defender, atk_state, def_state, fatigue, strategy, phase, pos, action_weights):
+        if pos == Position.DISTANCE:
+            if phase == "feeling_out" and random.random() < 0.3:
+                self.fight_log.append(f"{attacker.name} circles at range, feinting and measuring.")
+                return
+            close_chance = action_weights.get("strike", 0.7) * 0.6 + (1.5 if phase == "desperation" else 1.0)
+            if random.random() < close_chance * 0.5:
+                if self.position_system.close_distance(attacker, defender, fatigue):
+                    self.fight_log.append(self.commentary.generate_range_commentary(attacker, defender, "close"))
+                    return
+                else:
+                    kick_roll = random.random()
+                    if kick_roll < 0.4:
+                        self._simulate_strike(attacker, defender, atk_state, def_state, fatigue, strategy, phase, pos)
+                    elif kick_roll < 0.6:
+                        self._simulate_takedown(attacker, defender, fatigue, strategy)
+                    else:
+                        self.fight_log.append(f"{attacker.name} circles, looking for an opening.")
+                    return
+            else:
+                self.fight_log.append(f"{attacker.name} maintains distance, circling.")
+                return
+        elif pos == Position.POCKET:
+            if phase == "feeling_out" and random.random() < 0.15:
+                self.fight_log.append(f"{attacker.name} paws with a jab, measuring range.")
+                return
+            strike_chance = action_weights.get("strike", 0.7)
+            if phase == "feeling_out":
+                strike_chance *= 0.8
+            elif phase == "desperation":
+                strike_chance *= 1.2
+            r = random.random()
+            if r < strike_chance:
+                self._simulate_strike(attacker, defender, atk_state, def_state, fatigue, strategy, phase, pos)
+            elif r < strike_chance + action_weights.get("takedown", 0.15):
+                if random.random() < 0.3 and phase != "feeling_out":
+                    self.fight_log.append(f"{attacker.name} fakes a takedown and {defender.name} reacts!")
+                self._simulate_takedown(attacker, defender, fatigue, strategy)
+            else:
+                if random.random() < 0.3:
+                    if self.position_system.retreat_to_distance(attacker, defender, fatigue):
+                        self.fight_log.append(self.commentary.generate_range_commentary(attacker, defender, "retreat"))
+                    else:
+                        self.fight_log.append(f"{attacker.name} tries to back out but {defender.name} stays in the pocket.")
+                else:
+                    self._simulate_clinch_attempt(attacker, defender, fatigue, strategy)
+
+    def _simulate_clinch_action(self, attacker, defender, atk_state, def_state, fatigue, strategy, action_weights):
+        r = random.random()
+        clinch_strike_chance = 0.55
+        if r < clinch_strike_chance:
+            self._simulate_clinch_strike(attacker, defender, atk_state, def_state, fatigue, strategy)
+        elif r < clinch_strike_chance + 0.2:
+            if self.position_system.takedown_from_clinch(attacker, defender, fatigue):
+                self.fight_log.append(self.commentary.generate_ground_transition_commentary(
+                    "takedown_into_guard", attacker=attacker.name, defender=defender.name))
+            else:
+                self.fight_log.append(f"{attacker.name} tries to drag {defender.name} down but can't finish.")
+        else:
+            self._simulate_clinch_break(attacker, defender, fatigue, strategy)
+
+    def _simulate_ground_action(self, fatigue, action_weights):
+        pos = self.position_system.current_position
+        top = self.position_system.top_fighter
+        bottom = self.position_system.bottom_fighter
+        if top == self.fighter1:
+            top_state, bottom_state = self.f1_state, self.f2_state
+            top_strategy = self.strategy1
+            bottom_strategy = self.strategy2
+        else:
+            top_state, bottom_state = self.f2_state, self.f1_state
+            top_strategy = self.strategy2
+            bottom_strategy = self.strategy1
+        pt = self.position_system.position_time
+        if random.random() < 0.5:
+            self._process_ground_top_action(top, bottom, top_state, bottom_state, fatigue, top_strategy, action_weights, pos, pt)
+        else:
+            self._process_ground_bottom_action(top, bottom, top_state, bottom_state, fatigue, bottom_strategy, pos, pt)
+
+    def _process_ground_top_action(self, top, bottom, top_state, bottom_state, fatigue, strategy, action_weights, pos, pt):
+        if pos == Position.GROUND_GUARD and pt > 4 and random.random() < 0.35:
+            if self.position_system.pass_guard(top, bottom, fatigue):
+                self.fight_log.append(self.commentary.generate_ground_transition_commentary("pass_guard", fighter=top.name, opponent=bottom.name))
+                return
+        elif pos == Position.GROUND_SIDE:
+            if pt > 3:
+                if random.random() < 0.3 and self.position_system.advance_to_mount(top, bottom, fatigue):
+                    self.fight_log.append(self.commentary.generate_ground_transition_commentary("mount", fighter=top.name, opponent=bottom.name))
+                    return
+                elif random.random() < 0.15 and self.position_system.take_back(top, bottom, fatigue):
+                    self.fight_log.append(self.commentary.generate_ground_transition_commentary("back_take", fighter=top.name, opponent=bottom.name))
+                    return
+        elif pos == Position.GROUND_MOUNT:
+            if pt > 3 and random.random() < 0.15 and self.position_system.take_back(top, bottom, fatigue):
+                self.fight_log.append(self.commentary.generate_ground_transition_commentary("back_take", fighter=top.name, opponent=bottom.name))
+                return
+        sub_chance = action_weights.get("submission", 0.3) * (1.5 if pos == Position.GROUND_BACK else 1.0)
+        if random.random() < sub_chance:
+            self._simulate_submission_attempt(top, bottom, fatigue, strategy, pos)
+        else:
+            self._simulate_ground_strike(top, bottom, top_state, bottom_state, fatigue, strategy, pos)
+
+    def _process_ground_bottom_action(self, top, bottom, top_state, bottom_state, fatigue, strategy, pos, pt):
+        pos_bonus = 1.0 if pos == Position.GROUND_GUARD else (0.7 if pos == Position.GROUND_SIDE else 0.4)
+        if pos == Position.GROUND_GUARD and pt > 3 and random.random() < 0.25:
+            can_submit = True
+            if can_submit and random.random() < 0.4:
+                self._simulate_submission_attempt(bottom, top, fatigue, strategy, pos)
+                return
+        if random.random() < 0.4 * pos_bonus:
+            if self.position_system.sweep_from_bottom(bottom, top, fatigue):
+                self.fight_log.append(self.commentary.generate_ground_transition_commentary("sweep", bottom=bottom.name, top=top.name))
+            else:
+                self.fight_log.append(f"{bottom.name} tries to sweep but {top.name} defends.")
+        else:
+            if self.position_system.stand_up_from_bottom(bottom, top, fatigue):
+                self.fight_log.append(self.commentary.generate_ground_transition_commentary("stand_up", fighter=bottom.name))
+            else:
+                self.fight_log.append(f"{bottom.name} tries to stand but {top.name} keeps them down.")
+
     def _get_mod(self, attr: str, strategy: StrategySystem) -> float:
         return strategy.get_modifier_for_attr(attr)
 
-    def _simulate_strike(self, attacker, defender, atk_state, def_state, fatigue, strategy, phase="exchanges"):
-        strike_type = random.choice(["jab", "cross", "hook", "uppercut", "kick"])
-        target = random.choice(["head", "body", "legs"])
+    def _simulate_strike(self, attacker, defender, atk_state, def_state, fatigue, strategy, phase="exchanges", pos=Position.POCKET):
+        if pos == Position.DISTANCE:
+            strike_type = random.choice(["kick"])
+            target = random.choice(["legs", "body", "head"])
+        elif pos == Position.POCKET:
+            strike_type = random.choice(["jab", "cross", "hook", "uppercut", "kick"])
+            target = random.choice(["head", "body", "legs"])
+        elif pos == Position.CLINCH:
+            strike_type = random.choice(["knee", "elbow"])
+            target = random.choice(["head", "body"])
+        elif pos in (Position.GROUND_GUARD, Position.GROUND_SIDE, Position.GROUND_MOUNT, Position.GROUND_BACK):
+            strike_type = random.choice(["hammerfist", "elbow", "punch"])
+            target = random.choice(["head", "body"])
+        else:
+            strike_type = random.choice(["jab", "cross", "hook", "uppercut", "kick"])
+            target = random.choice(["head", "body", "legs"])
 
         modifiers = strategy.get_modifiers()
         sp_mod = modifiers.get("striking_power", 1.0)
@@ -569,7 +659,7 @@ class Fight:
         if target == "head" and random.random() < 0.03:
             def_state.setdefault("cuts", []).append({"severity": random.uniform(0.3, 0.6)})
 
-        text = self.commentary.generate_strike_commentary(attacker, defender, strike_type, target, Position.CLINCH)
+        text = self.commentary.generate_strike_commentary(attacker, defender, strike_type, target, self.position_system.current_position)
         self.fight_log.append(text)
 
         if attacker == self.fighter1:
@@ -583,19 +673,23 @@ class Fight:
             text = self.commentary.generate_clinch_commentary(attacker, defender, "break")
             self.fight_log.append(text)
 
-    def _simulate_ground_strike(self, attacker, defender, atk_state, def_state, fatigue, strategy):
+    def _simulate_ground_strike(self, attacker, defender, atk_state, def_state, fatigue, strategy, pos=Position.GROUND_GUARD):
         strike_type = random.choice(["hammerfist", "elbow", "punch"])
         target = random.choice(["head", "body"])
         sp_mod = self._get_mod("striking_power", strategy)
         power = attacker.get_effective_attribute("striking_power", fatigue) * sp_mod
         durability = defender.get_effective_attribute("durability", 1.0 - (def_state["stamina"] / 100))
         tc_mod = self._get_mod("top_control", strategy)
+        pos_power = {Position.GROUND_GUARD: 0.25, Position.GROUND_SIDE: 0.35, Position.GROUND_MOUNT: 0.5, Position.GROUND_BACK: 0.4}
+        pos_bonus = pos_power.get(pos, 0.3)
         top_bonus = 1.0 + (tc_mod - 1.0) * 0.5
 
-        damage = max(1, (power * 0.3 * top_bonus) - (durability * 0.15))
+        damage = max(1, (power * pos_bonus * top_bonus) - (durability * 0.15))
+        if pos == Position.GROUND_MOUNT:
+            damage *= 1.3
         def_state["health"][target] = max(0, def_state["health"][target] - damage)
         def_state["accumulated_damage"] += damage
-        text = self.commentary.generate_strike_commentary(attacker, defender, strike_type, target, Position.GROUND_TOP)
+        text = self.commentary.generate_strike_commentary(attacker, defender, strike_type, target, pos)
         self.fight_log.append(text)
 
         if attacker == self.fighter1:
@@ -610,8 +704,27 @@ class Fight:
             self.win_round = self.current_round
             self.fight_log.append(f"The referee steps in! {defender.name} can't defend themselves!")
 
-    def _simulate_submission_attempt(self, attacker, defender, fatigue, strategy):
-        submission = random.choice(["armbar", "rear_naked_choke", "triangle", "guillotine", "kimura", "d'arce"])
+    def _get_available_subs(self, pos, attacker_is_top=True):
+        guard_subs_top = ["kimura", "d'arce"]
+        guard_subs_bottom = ["triangle", "armbar", "guillotine"]
+        side_subs = ["kimura", "d'arce", "armbar"]
+        mount_subs = ["armbar", "mounted triangle"]
+        back_subs = ["rear_naked_choke"]
+        if pos == Position.GROUND_GUARD:
+            return guard_subs_top if attacker_is_top else guard_subs_bottom
+        elif pos == Position.GROUND_SIDE:
+            return side_subs
+        elif pos == Position.GROUND_MOUNT:
+            return mount_subs
+        elif pos == Position.GROUND_BACK:
+            return back_subs
+        return ["armbar"]
+
+    def _simulate_submission_attempt(self, attacker, defender, fatigue, strategy, pos=Position.GROUND_GUARD):
+        top = self.position_system.top_fighter
+        attacker_is_top = (attacker == top)
+        available = self._get_available_subs(pos, attacker_is_top)
+        submission = random.choice(available)
         so_mod = self._get_mod("submission_offense", strategy)
         sd_mod = self._get_mod("submission_defense", strategy)
 
@@ -620,7 +733,9 @@ class Fight:
 
         self.fight_log.append(self.commentary.generate_ground_commentary("submission_attempt", attacker=attacker.name, submission=submission))
 
-        success_chance = max(5, min(60, sub_off * 0.6 - sub_def * 0.4))
+        pos_bonus = {Position.GROUND_GUARD: 1.0, Position.GROUND_SIDE: 1.1, Position.GROUND_MOUNT: 1.2, Position.GROUND_BACK: 1.4}
+        pb = pos_bonus.get(pos, 1.0)
+        success_chance = max(5, min(65, (sub_off * 0.6 - sub_def * 0.4) * pb))
         if utils.random_roll(1, 100) <= int(success_chance):
             self.fight_log.append(self.commentary.generate_ground_commentary("submission_tap", attacker=attacker.name, defender=defender.name, submission=submission))
             self.winner = attacker

@@ -387,6 +387,68 @@ class CommentaryEngine:
             ],
         }
 
+        self.range_templates = {
+            "close": [
+                "{fighter} steps in, closing the distance on {opponent}!",
+                "{fighter} cuts off the cage, moving into punching range!",
+                "{fighter} pressures forward, now in the pocket!",
+                "{fighter} slides in with a feint and closes the range!",
+                "{fighter} stalks {opponent} down and enters striking range!",
+                "{fighter} uses head movement to close the distance safely!",
+            ],
+            "retreat": [
+                "{fighter} circles out, creating distance to reset!",
+                "{fighter} steps back, returning to kicking range!",
+                "{fighter} uses footwork to escape the pocket!",
+                "{fighter} pivots off and backs to the center of the cage!",
+                "{fighter} retreats to range, forcing {opponent} to pursue!",
+            ],
+        }
+
+        self.ground_transition_templates = {
+            "pass_guard": [
+                "{fighter} bursts through {opponent}'s guard into side control!",
+                "{fighter} slides past the legs, now in side control!",
+                "{fighter} uses a beautiful pass to get past {opponent}'s guard!",
+                "{fighter} smothers {opponent}'s guard and secures side control!",
+                "{fighter} stacks {opponent} and passes to side control!",
+            ],
+            "mount": [
+                "{fighter} swings a leg over and takes mount! Devastating position!",
+                "{fighter} advances from side control to full mount!",
+                "{fighter} catches {opponent} trying to escape and slides into mount!",
+                "{fighter} is now mounted! {opponent} is in serious trouble!",
+            ],
+            "back_take": [
+                "{fighter} sinks in both hooks and takes the back!",
+                "{fighter} spins behind {opponent} as they scramble and secures back control!",
+                "{fighter} jumps on the back! Both hooks are in!",
+                "{fighter} transitions to the back, what a beautiful scramble!",
+                "{fighter} takes the back! {opponent} is trapped against the cage!",
+            ],
+            "sweep": [
+                "{bottom} sweeps {top} with a brilliant hip bump! Now on top!",
+                "{bottom} uses a butterfly sweep to reverse position!",
+                "{bottom} throws up a leg and reverses {top}! Great scramble!",
+                "{bottom} catches {top} off balance and reverses into top position!",
+                "{bottom} powers through and sweeps! Now they're on top!",
+            ],
+            "stand_up": [
+                "{fighter} uses the cage to work back to their feet!",
+                "{fighter} scrambles up, back to a standing battle!",
+                "{fighter} posts up and explodes back to standing!",
+                "{fighter} fights gravity and gets back up!",
+                "{fighter} creates space and stands back up!",
+            ],
+            "takedown_into_guard": [
+                "{attacker} lands the takedown into {defender}'s guard!",
+                "{attacker} drives {defender} down and settles in the guard!",
+                "{attacker} slams {defender} down, landing in half guard!",
+                "Beautiful takedown! {attacker} is in {defender}'s guard!",
+                "{attacker} chains the takedown and lands in a dominant position in guard!",
+            ],
+        }
+
         self.bonus_templates = [
             "Fight of the Night: {fotn} — both warriors earn {amount}!",
             "Performance of the Night: {potn} takes home an extra {amount}!",
@@ -600,6 +662,15 @@ class CommentaryEngine:
     def generate_leg_damage_commentary(self, fighter: Fighter) -> str:
         template = random.choice(self.leg_damage_commentary)
         return template.format(fighter=fighter.name)
+
+    def generate_range_commentary(self, fighter: Fighter, opponent: Fighter, action: str) -> str:
+        key = "close" if action == "close" else "retreat"
+        template = random.choice(self.range_templates[key])
+        return template.format(fighter=fighter.name, opponent=opponent.name)
+
+    def generate_ground_transition_commentary(self, action: str, **kwargs) -> str:
+        template = random.choice(self.ground_transition_templates[action])
+        return template.format(**kwargs)
 
     def generate_post_fight(self, winner: Fighter, method: str, round_num: int = None, is_decision: bool = False, loser: Fighter = None) -> str:
         if not winner:
