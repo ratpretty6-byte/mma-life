@@ -183,7 +183,7 @@ class Fight:
                     yield {"type": "submission", "text": sub_text,
                            "winner": self.winner.name, "method": self.win_method, "round": self.current_round}
                 yield {"type": "post_fight",
-                       "text": self.commentary.generate_post_fight(self.winner, self.win_method, self.current_round, False)}
+                       "text": self.commentary.generate_post_fight(self.winner, self.win_method, self.current_round, False, self.loser)}
                 if self.winner and self.loser:
                     win_reaction = self.commentary.generate_post_fight_reaction(self.winner, self.loser)
                     if win_reaction:
@@ -202,12 +202,15 @@ class Fight:
                        "text": f"Doctor stoppage! {self.winner.name} wins by {self.win_method}!",
                        "winner": self.winner.name, "method": self.win_method, "round": self.current_round}
                 yield {"type": "post_fight",
-                       "text": self.commentary.generate_post_fight(self.winner, self.win_method, self.current_round, False)}
+                       "text": self.commentary.generate_post_fight(self.winner, self.win_method, self.current_round, False, self.loser)}
                 return
 
             round_desc = self._describe_round(round_num)
+            round_summary = self.commentary.generate_round_summary(self.fighter1, self.fighter2)
             yield {"type": "round_end", "round": round_num,
                    "text": self.commentary.generate_round_end(round_num, self.fighter1, self.fighter2, round_desc)}
+            if round_summary:
+                yield {"type": "round_summary", "text": round_summary, "round": round_num}
 
             for judge in self.judges:
                 f1_score, f2_score = judge.score_round(
