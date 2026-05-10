@@ -233,6 +233,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
         <div class="stat-row"><span class="stat-label">Injuries</span><span class="stat-value" id="hInjuries">None</span></div>
         <div class="stat-row"><span class="stat-label">Gym</span><span class="stat-value" id="hGym">None</span></div>
         <div class="stat-row" id="hFatigueRow"><span class="stat-label">Fatigue</span><span class="stat-value" id="hFatigue">Rested</span></div>
+        <div class="stat-row"><span class="stat-label">Date</span><span class="stat-value" id="hDate">--</span></div>
       </div>
 
       <div id="nextActionCard" class="hidden next-action"></div>
@@ -244,6 +245,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
           <button class="btn btn-primary" onclick="advanceDay()" id="btnAdvanceDay" style="font-size:15px;padding:12px 28px">ADVANCE DAY</button>
           <button class="btn btn-ghost btn-small" onclick="advanceSkip(7)">+1 Week</button>
           <button class="btn btn-ghost btn-small" onclick="advanceSkip(30)">+1 Month</button>
+          <button class="btn btn-gold btn-small hidden" id="btnFightDay" onclick="switchTab('fight')">GO TO FIGHT</button>
         </div>
         <div id="dayResult" class="hidden" style="margin-top:8px;font-size:13px"></div>
       </div>
@@ -602,6 +604,7 @@ function updateAllUI() {
   const fin = state.finance;
   const car = state.career;
   const fb = state.fight_booking;
+  const gd = state.game_date;
 
   qs("#headerStatus").textContent = `${f.name} | ${f.record} | #${f.rank} | ${p ? p.name : "FA"}`;
 
@@ -615,6 +618,14 @@ function updateAllUI() {
   qs("#hStreak").textContent = streak;
   qs("#hInjuries").textContent = (f.injuries&&f.injuries.length) ? f.injuries.map(i=>i.type).join(", ") : "None";
   qs("#hGym").textContent = fin ? fin.gym : "None";
+  qs("#hDate").textContent = gd || "--";
+
+  const fightDayBtn = qs("#btnFightDay");
+  if (fb && fb.days_until <= 0) {
+    fightDayBtn.classList.remove("hidden");
+  } else {
+    fightDayBtn.classList.add("hidden");
+  }
 
   qs("#hFatigueRow").style.display = "";
   const ft = t ? (t.fatigue || 0) : 0;
@@ -668,7 +679,7 @@ function updateNextAction() {
   let html = "";
 
   if (fb && fb.days_until <= 0 && !state.fight_completed) {
-    html = '<div class="action-label">Next Action</div><div class="action-text">FIGHT DAY! Go to Fight tab</div>';
+    html = '<div class="action-label">Next Action</div><div class="action-text">FIGHT DAY!</div><div style="margin-top:6px"><button class="btn btn-gold" onclick="switchTab(\'fight\')" style="font-size:14px">GO TO FIGHT</button></div>';
   } else if (fb && fb.days_until > 0) {
     html = `<div class="action-label">Next Action</div><div class="action-text">Fight in ${fb.days_until} days — keep training!</div>`;
   } else if (t && t.in_camp) {
@@ -702,57 +713,86 @@ async function advanceDay() {
   const btn = qs("#btnAdvanceDay");
   btn.textContent = "Advancing...";
   btn.disabled = true;
-  const resp = await api("/api/advance_day", { sid });
-  btn.textContent = "ADVANCE DAY";
-  btn.disabled = false;
-  if (resp.success) {
-    state = resp.state;
-    if (state && state.strategies) STRATS = state.strategies;
-    try {
-      const nr = await api("/api/news");
-      if (nr && nr.news) newsCache = nr.news;
-    } catch(e) {}
-    updateAllUI();
-    const r = resp.day_result;
-    const div = qs("#dayResult");
-    div.classList.remove("hidden");
-    if ((r.status === "training" || r.status === "in_camp") && r.gains) {
-      let g = Object.entries(r.gains).filter(([k,v]) => v > 0).map(([k,v]) => k.replace(/_/g," ")+" +"+v.toFixed(1));
-      div.innerHTML = `<span style="color:#4aff6a">${r.day}</span>: ${g.join(", ") || "No gains"}`;
-      if (r.injury) div.innerHTML += ` <span style="color:#e62400">| INJURY: ${r.injury.type}</span>`;
-      if (r.camp_over) div.innerHTML += ` <span style="color:#ffd700">| CAMP COMPLETE: ${escHtml(r.camp_name || '')}</span>`;
-    } else if (r.status === "rest") {
-      div.innerHTML = `<span style="color:#4a9eff">${r.day}</span>: Rest day — fatigue recovering`;
-    } else if (r.status === "idle") {
-      div.innerHTML = `<span style="color:#888">${r.day}</span>: Not training — go to the Gym tab to start`;
+  const timeout = setTimeout(() => {
+    btn.textContent = "ADVANCE DAY";
+    btn.disabled = false;
+    toast("Request timed out — server busy, try again", "error");
+  }, 20000);
+  try {
+    const resp = await api("/api/advance_day", { sid });
+    clearTimeout(timeout);
+    btn.textContent = "ADVANCE DAY";
+    btn.disabled = false;
+    if (resp.success) {
+      state = resp.state;
+      if (state && state.strategies) STRATS = state.strategies;
+      try {
+        const nr = await api("/api/news");
+        if (nr && nr.news) newsCache = nr.news;
+      } catch(e) {}
+      updateAllUI();
+      const r = resp.day_result;
+      const div = qs("#dayResult");
+      div.classList.remove("hidden");
+      if ((r.status === "training" || r.status === "in_camp") && r.gains) {
+        let g = Object.entries(r.gains).filter(([k,v]) => v > 0).map(([k,v]) => k.replace(/_/g," ")+" +"+v.toFixed(1));
+        div.innerHTML = `<span style="color:#4aff6a">${r.day}</span>: ${g.join(", ") || "No gains"}`;
+        if (r.injury) div.innerHTML += ` <span style="color:#e62400">| INJURY: ${r.injury.type}</span>`;
+        if (r.camp_over) div.innerHTML += ` <span style="color:#ffd700">| CAMP COMPLETE: ${escHtml(r.camp_name || '')}</span>`;
+      } else if (r.status === "rest") {
+        div.innerHTML = `<span style="color:#4a9eff">${r.day}</span>: Rest day — fatigue recovering`;
+      } else if (r.status === "idle") {
+        div.innerHTML = `<span style="color:#888">${r.day}</span>: Not training — go to the Gym tab to start`;
+      }
+      if (resp.fight_today) {
+        div.innerHTML += '<br><span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>';
+      }
+    } else {
+      toast(resp.error || "Failed to advance day", "error");
     }
-    if (resp.fight_today) {
-      div.innerHTML += '<br><span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>';
-      setTimeout(() => { switchTab("fight"); }, 500);
-    }
-  } else {
-    toast(resp.error || "Failed to advance day", "error");
+  } catch(e) {
+    clearTimeout(timeout);
+    btn.textContent = "ADVANCE DAY";
+    btn.disabled = false;
+    toast("Request failed — try again", "error");
   }
 }
 
 async function advanceSkip(days) {
-  const resp = await api("/api/advance_time", { sid, days });
-  if (resp.success) {
-    state = resp.state;
-    if (state && state.strategies) STRATS = state.strategies;
-    try {
-      const nr = await api("/api/news");
-      if (nr && nr.news) newsCache = nr.news;
-    } catch(e) {}
-    updateAllUI();
-    if (resp.fight_today) {
-      const div = qs("#dayResult");
-      div.classList.remove("hidden");
-      div.innerHTML = '<span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>';
-      setTimeout(() => { switchTab("fight"); }, 500);
+  const btn = qs("#btnAdvanceDay");
+  btn.textContent = "Advancing...";
+  btn.disabled = true;
+  const timeout = setTimeout(() => {
+    btn.textContent = "ADVANCE DAY";
+    btn.disabled = false;
+    toast("Request timed out — server busy, try again", "error");
+  }, 30000);
+  try {
+    const resp = await api("/api/advance_time", { sid, days });
+    clearTimeout(timeout);
+    btn.textContent = "ADVANCE DAY";
+    btn.disabled = false;
+    if (resp.success) {
+      state = resp.state;
+      if (state && state.strategies) STRATS = state.strategies;
+      try {
+        const nr = await api("/api/news");
+        if (nr && nr.news) newsCache = nr.news;
+      } catch(e) {}
+      updateAllUI();
+      if (resp.fight_today) {
+        const div = qs("#dayResult");
+        div.classList.remove("hidden");
+        div.innerHTML = '<span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>';
+      }
+    } else {
+      toast(resp.error || "Failed to advance time", "error");
     }
-  } else {
-    toast(resp.error || "Failed to advance time", "error");
+  } catch(e) {
+    clearTimeout(timeout);
+    btn.textContent = "ADVANCE DAY";
+    btn.disabled = false;
+    toast("Request failed — try again", "error");
   }
 }
 
