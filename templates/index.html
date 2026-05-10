@@ -222,7 +222,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
         <div class="stat-row"><span class="stat-label">Next Fight</span><span class="stat-value" id="hNextFight">Not booked</span></div>
         <div class="stat-row"><span class="stat-label">Injuries</span><span class="stat-value" id="hInjuries">None</span></div>
         <div class="stat-row"><span class="stat-label">Gym</span><span class="stat-value" id="hGym">None</span></div>
-        <div class="stat-row" id="hFatigueRow" style="display:none"><span class="stat-label">Fatigue</span><span class="stat-value" id="hFatigue">0%</span></div>
+        <div class="stat-row" id="hFatigueRow"><span class="stat-label">Fatigue</span><span class="stat-value" id="hFatigue">Rested</span></div>
       </div>
 
       <div id="nextActionCard" class="hidden next-action"></div>
@@ -606,14 +606,12 @@ function updateAllUI() {
   qs("#hInjuries").textContent = (f.injuries&&f.injuries.length) ? f.injuries.map(i=>i.type).join(", ") : "None";
   qs("#hGym").textContent = fin ? fin.gym : "None";
 
-  if (t && t.in_training) {
-    qs("#hFatigueRow").style.display = "";
-    const ft = t.fatigue || 0;
-    const ftColor = ft > 70 ? "#ff4a4a" : (ft > 40 ? "#ffd700" : "#4aff6a");
-    qs("#hFatigue").innerHTML = `<span style="color:${ftColor};font-weight:600">${ft}%</span>`;
-  } else {
-    qs("#hFatigueRow").style.display = "none";
-  }
+  qs("#hFatigueRow").style.display = "";
+  const ft = t ? (t.fatigue || 0) : 0;
+  const ftColor = ft > 70 ? "#ff4a4a" : (ft > 40 ? "#ffd700" : "#4aff6a");
+  qs("#hFatigue").innerHTML = ft > 0
+    ? `<span style="color:${ftColor};font-weight:600">${ft}%</span>`
+    : `<span style="color:#888">Rested</span>`;
 
   if (fb) {
     qs("#hNextFight").textContent = `vs ${fb.opponent.name} (${fb.days_until}d)`;
