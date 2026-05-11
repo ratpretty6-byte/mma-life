@@ -148,6 +148,7 @@ def get_state_dict(session):
         "has_fight": session.get("current_fight_booking") is not None,
         "game_date": game_date.strftime("%Y-%m-%d") if game_date else None,
         "fight_booking": _get_fight_booking_state(session),
+        "fight_state": _get_fight_state(session),
         "strategies": [{"id": s["id"], "name": s["name"], "description": s["description"]} for s in STRATEGIES],
         "traits": utils.TRAITS,
         "personalities": utils.PERSONALITIES,
@@ -194,6 +195,30 @@ def _get_fight_booking_state(session):
         },
         "is_title": fb.is_title_fight,
         "days_until": days_until,
+    }
+
+def _get_fight_state(session):
+    """Return current fight state if a fight is active."""
+    fight = session.get("current_fight")
+    if not fight:
+        return None
+    return {
+        "status": "active",
+        "round": fight.current_round,
+        "total_rounds": fight.rounds,
+        "winner": fight.winner.name if fight.winner else None,
+        "win_method": fight.win_method,
+        "win_round": fight.win_round,
+        "f1_name": fight.fighter1.name,
+        "f2_name": fight.fighter2.name,
+        "f1_health": fight._get_display_health(fight.fighter1),
+        "f2_health": fight._get_display_health(fight.fighter2),
+        "f1_total_score": fight._get_total_score_for(1),
+        "f2_total_score": fight._get_total_score_for(2),
+        "f1_state": fight.f1_machine.get_state(),
+        "f2_state": fight.f2_machine.get_state(),
+        "scores": [[j.scores[r][0] for j in fight.judges] for r in range(len(fight.judges[0].scores))] if fight.judges[0].scores else [],
+        "fight_log_length": len(fight.fight_log),
     }
 
 def _get_training_state(session):
@@ -375,6 +400,16 @@ class Handler(BaseHTTPRequestHandler):
                 sid = params.get("sid", [""])[0]
                 session = get_or_create_session(sid)
                 self.json_resp({"opponents": get_opponents_data(session)})
+
+            elif path == "/api/fight_state":
+                ensure_initialized()
+                sid = params.get("sid", [""])[0]
+                session = get_or_create_session(sid)
+                fs = _get_fight_state(session)
+                if fs:
+                    self.json_resp({"success": True, "fight_state": fs})
+                else:
+                    self.json_resp({"success": False, "error": "No active fight"})
 
             elif path == "/api/agents":
                 self.json_resp({"agents": utils.AGENTS})
@@ -932,15 +967,23 @@ class Handler(BaseHTTPRequestHandler):
             self.json_resp({"error": str(e), "traceback": traceback.format_exc()})
 
     def json_resp(self, data):
-        self.send_response(200)
-        self.send_header("Content-type", "application/json; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+        try:
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
+        except BrokenPipeError:
+            pass
 
 if __name__ == "__main__":
-    PORT = 8080
+    PORT = 8000
     print(f"Server starting on port {PORT}...")
+    print("Initializing game world...")
+    ensure_initialized()
+    print("Game world ready!")
     print(f"Open http://localhost:{PORT} in your browser")
     server = HTTPServer(("0.0.0.0", PORT), Handler)
+    server.allow_reuse_address = True
     server.serve_forever()

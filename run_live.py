@@ -39,7 +39,7 @@ for _ in range(90):
         output_lines.append(line)
         print(f"  {line}", flush=True)
         # Accept any https URL that contains a unique tunnel identifier
-        m = re.search(r'https://([a-zA-Z0-9][a-zA-Z0-9-]*\.lhr\.life)', line)
+        m = re.search(r'https://([a-zA-Z0-9][a-zA-Z0-9-]*\.localhost\.run)', line)
         if m:
             found_url = m.group(0)
             break
@@ -47,7 +47,7 @@ for _ in range(90):
         m2 = re.search(r'\*\*\s+(https?://\S+)\s+\*\*', line)
         if m2:
             url = m2.group(1)
-            if 'localhost.run' not in url or 'admin' not in url:
+            if 'localhost.run' not in url and 'admin' not in url:
                 found_url = url
                 break
     if found_url:

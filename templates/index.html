@@ -37,7 +37,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .tab.active { background: #14141f; color: #e62400; border-color: #e62400; }
 .scroll { max-height: 70vh; overflow-y: auto; }
 .screen-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 12px; text-align: center; }
-.fight-log { background: #07070c; border: 1px solid #2a2a3a; border-radius: 6px; padding: 10px; height: 360px; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.fight-log { background: #07070c; border: 1px solid #2a2a3a; border-radius: 6px; padding: 10px; height: 240px; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
 .fight-log .action { color: #ccc; }
 .fight-log .damage { color: #e62400; font-style: italic; }
 .fight-log .big { color: #ffd700; font-weight: 700; font-size: 14px; }
@@ -318,6 +318,67 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div id="fightLive" class="hidden">
+        <div id="fightHealthBars" class="card" style="margin-bottom:6px;padding:8px">
+          <div style="display:grid;grid-template-columns:1fr 40px 1fr;gap:6px;align-items:center">
+            <div style="text-align:right">
+              <div id="f1NameBar" style="font-weight:700;font-size:13px;color:#e0e0e0"></div>
+              <div id="f1StateBar" style="font-size:11px;margin-top:2px"></div>
+            </div>
+            <div id="f1HealthBars" style="display:flex;flex-direction:column;gap:2px">
+              <div style="display:flex;align-items:center;gap:3px">
+                <span style="font-size:9px;color:#888;width:22px">HP</span>
+                <div style="flex:1;height:10px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+                  <div id="f1HpBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <span style="font-size:9px;color:#888;width:22px">HD</span>
+                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+                  <div id="f1HeadBar" style="height:100%;width:100%;background:#ff4a4a;border-radius:3px;transition:width .3s"></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <span style="font-size:9px;color:#888;width:22px">BD</span>
+                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+                  <div id="f1BodyBar" style="height:100%;width:100%;background:#ff9a4a;border-radius:3px;transition:width .3s"></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <span style="font-size:9px;color:#888;width:22px">LD</span>
+                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+                  <div id="f1LegBar" style="height:100%;width:100%;background:#4aff6a;border-radius:3px;transition:width .3s"></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <span style="font-size:9px;color:#888;width:22px">BL</span>
+                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+                  <div id="f1BloodBar" style="height:100%;width:0%;background:#8b0000;border-radius:3px;transition:width .3s"></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <span style="font-size:9px;color:#888;width:22px">ST</span>
+                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+                  <div id="f1StamBar" style="height:100%;width:100%;background:#4a9eff;border-radius:3px;transition:width .3s"></div>
+                </div>
+              </div>
+            </div>
+            <div style="text-align:left">
+              <div id="f2NameBar" style="font-weight:700;font-size:13px;color:#e0e0e0"></div>
+              <div id="f2StateBar" style="font-size:11px;margin-top:2px"></div>
+            </div>
+          </div>
+          <div id="fightScoreBars" style="margin-top:6px;display:none">
+            <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px">
+              <div id="f1ScoreBar" style="flex:1;height:12px;background:#1a2a1a;border-radius:3px;overflow:hidden">
+                <div id="f1ScoreFill" style="height:100%;width:50%;background:#ffd700;border-radius:3px;transition:width .3s"></div>
+              </div>
+              <span id="scoreText" style="font-size:11px;color:#ffd700;min-width:30px;text-align:center">0-0</span>
+              <div id="f2ScoreBar" style="flex:1;height:12px;background:#2a1a1a;border-radius:3px;overflow:hidden">
+                <div id="f2ScoreFill" style="height:100%;width:50%;background:#ffd700;border-radius:3px;transition:width .3s;float:right"></div>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="card">
           <div class="flex-between">
             <div class="card-title" style="margin-bottom:0">LIVE FIGHT</div>
@@ -1240,9 +1301,85 @@ async function startFight() {
   qs("#fightStratPrompt").classList.add("hidden");
   qs("#fightResult").classList.add("hidden");
   qs("#fightHeader").textContent = `${state.fighter.name} vs ${resp.opponent} | ${state.fight_booking.is_title ? "TITLE FIGHT" : "3 Rounds"}`;
+
+  // Initialize health bars
+  const f1Name = state.fighter.name;
+  const f2Name = resp.opponent;
+  qs("#f1NameBar").textContent = f1Name;
+  qs("#f2NameBar").textContent = f2Name;
+  qs("#f1StateBar").textContent = "";
+  qs("#f2StateBar").textContent = "";
+
+  // Initialize health from the fight result's starting health if available
+  if (resp.fight_result && resp.fight_result.f1_health) {
+    updateHealthBars(resp.fight_result.f1_health, resp.fight_result.f2_health);
+  } else {
+    updateHealthBars({head:100,body:100,legs:100,overall:100}, {head:100,body:100,legs:100,overall:100});
+  }
+
+  // Show score bars for title fights or regular fights
+  qs("#fightScoreBars").style.display = "block";
+  updateScoreBars(0, 0);
+
   fightReplaying = true;
   await replayFightEvents(resp.fight_result);
 }
+
+function updateHealthBars(f1Health, f2Health) {
+  // f1Health / f2Health: {head, body, legs, overall, left_eye, right_eye, jaw, blood, body_level, leg_level}
+  if (f1Health) {
+    const f1 = f1Health;
+    qs("#f1HpBar").style.width = Math.max(0, f1.overall || 100) + "%";
+    // Color gradient from green to red based on health
+    const hp1 = f1.overall || 100;
+    qs("#f1HpBar").style.background = hp1 > 60 ? "#e62400" : (hp1 > 30 ? "#ff6a00" : "#ff0000");
+    qs("#f1HeadBar").style.width = Math.max(0, f1.head || 100) + "%";
+    qs("#f1BodyBar").style.width = Math.max(0, f1.body || 100) + "%";
+    qs("#f1LegBar").style.width = Math.max(0, f1.legs || 100) + "%";
+    qs("#f1BloodBar").style.width = Math.min(100, f1.blood || 0) + "%";
+  }
+  if (f2Health) {
+    const f2 = f2Health;
+    qs("#f2HpBar").style.width = Math.max(0, f2.overall || 100) + "%";
+    const hp2 = f2.overall || 100;
+    qs("#f2HpBar").style.background = hp2 > 60 ? "#e62400" : (hp2 > 30 ? "#ff6a00" : "#ff0000");
+    qs("#f2HeadBar").style.width = Math.max(0, f2.head || 100) + "%";
+    qs("#f2BodyBar").style.width = Math.max(0, f2.body || 100) + "%";
+    qs("#f2LegBar").style.width = Math.max(0, f2.legs || 100) + "%";
+    qs("#f2BloodBar").style.width = Math.min(100, f2.blood || 0) + "%";
+  }
+}
+
+function updateScoreBars(f1Score, f2Score) {
+  const total = f1Score + f2Score || 1;
+  qs("#f1ScoreFill").style.width = (f1Score / total * 100) + "%";
+  qs("#f2ScoreFill").style.width = (f2Score / total * 100) + "%";
+  qs("#scoreText").textContent = `${f1Score}-${f2Score}`;
+}
+
+function updateFighterState(nameBar, stateBar, state) {
+  if (!state || state === "NORMAL") {
+    stateBar.textContent = "";
+    stateBar.style.color = "";
+  } else if (state === "HURT") {
+    stateBar.textContent = "★ HURT";
+    stateBar.style.color = "#ffd700";
+  } else if (state === "ROCKED") {
+    stateBar.textContent = "★ ROCKED";
+    stateBar.style.color = "#ff9a4a";
+  } else if (state === "STUNNED") {
+    stateBar.textContent = "★ STUNNED";
+    stateBar.style.color = "#ff4a4a";
+  } else if (state === "DOWN") {
+    stateBar.textContent = "★ DOWN";
+    stateBar.style.color = "#ff0000";
+  }
+}
+
+let _lastF1Health = null, _lastF2Health = null;
+let _lastF1State = null, _lastF2State = null;
+let _f1TotalScore = 0, _f2TotalScore = 0;
+let _roundScores = [];
 
 async function replayFightEvents(fightResult) {
   const log = qs("#fightLog");
@@ -1271,6 +1408,13 @@ async function replayFightEvents(fightResult) {
       el.textContent = "--- BETWEEN ROUND " + ev.round + " ---";
       log.appendChild(el);
       log.scrollTop = log.scrollHeight;
+      // Update health/scores from the strategy prompt state
+      if (ev.f1_health) {
+        updateHealthBars(ev.f1_health, ev.f2_health);
+        updateFighterState(qs("#f1NameBar"), qs("#f1StateBar"), ev.f1_state);
+        updateFighterState(qs("#f2NameBar"), qs("#f2StateBar"), ev.f2_state);
+        if (ev.f1_total_score != null) updateScoreBars(ev.f1_total_score, ev.f2_total_score);
+      }
       if (fightSpeed === 0) {
         const scoreDetail = ev.score_detail || "";
         qs("#stratPromptTitle").textContent = `Between Round ${ev.round} — ${scoreDetail}`;
@@ -1280,6 +1424,15 @@ async function replayFightEvents(fightResult) {
       fightPaused = true;
       showStrategyPrompt(ev);
       return;
+    } else if (ev.type === "round_end" || ev.type === "round_summary") {
+      // Update scores after round ends
+      if (ev.scores) {
+        _roundScores = ev.scores;
+        const f1r = _roundScores.reduce((s, r) => s + r[0], 0);
+        const f2r = _roundScores.reduce((s, r) => s + r[1], 0);
+        updateScoreBars(f1r, f2r);
+      }
+      el.innerHTML = formatCommentary(ev.text || "");
     } else {
       el.innerHTML = formatCommentary(ev.text || "");
     }
@@ -1287,6 +1440,14 @@ async function replayFightEvents(fightResult) {
     if (el.textContent || el.innerHTML) {
       log.appendChild(el);
       log.scrollTop = log.scrollHeight;
+    }
+
+    // Update health bars from action events that carry health data
+    if (ev.f1_health && ev.type === "action") {
+      updateHealthBars(ev.f1_health, ev.f2_health);
+      if (ev.f1_state) updateFighterState(qs("#f1NameBar"), qs("#f1StateBar"), ev.f1_state);
+      if (ev.f2_state) updateFighterState(qs("#f2NameBar"), qs("#f2StateBar"), ev.f2_state);
+      if (ev.f1_total_score != null) updateScoreBars(ev.f1_total_score, ev.f2_total_score);
     }
 
     if (fightSpeed > 0) {
@@ -1301,6 +1462,20 @@ async function replayFightEvents(fightResult) {
       else if (ev.type === "score_update") delay = 1500;
       else if (ev.type === "round_summary") delay = 3500;
       await sleep(delay / fightSpeed);
+    }
+  }
+
+  // Use final health from complete event if available
+  if (fightResult.f1_health) {
+    updateHealthBars(fightResult.f1_health, fightResult.f2_health);
+  }
+  if (fightResult.total_scores) {
+    const scores = fightResult.total_scores;
+    const names = Object.keys(scores);
+    if (names.length >= 2) {
+      const f1Score = scores[names[0]] || 0;
+      const f2Score = scores[names[1]] || 0;
+      updateScoreBars(f1Score, f2Score);
     }
   }
 

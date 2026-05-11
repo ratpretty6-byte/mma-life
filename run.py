@@ -12,6 +12,7 @@ import web_server
 def start_tunnel():
     """Start localhost.run tunnel and return URL"""
     import subprocess
+    import select
     try:
         proc = subprocess.Popen(
             ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'ServerAliveInterval=30',
@@ -21,18 +22,16 @@ def start_tunnel():
             start_new_session=True,
         )
         time.sleep(5)
-        # Try to get URL from output
-        import select
         url = None
         for _ in range(20):
             r, _, _ = select.select([proc.stdout], [], [], 1)
             if r:
                 line = proc.stdout.readline().decode(errors='ignore')
                 print(f'TUNNEL: {line.strip()}')
-                if 'localhost.run' in line and ('https://' in line or 'http://' in line):
+                if 'localhost.run' in line or 'lhr.life' in line:
                     for word in line.split():
-                        if 'localhost.run' in word:
-                            url = word.strip()
+                        if 'localhost.run' in word or 'lhr.life' in word:
+                            url = word.strip().rstrip(',;')
                             break
             if url:
                 break
@@ -42,7 +41,7 @@ def start_tunnel():
         return None
 
 if __name__ == '__main__':
-    server = HTTPServer(('0.0.0.0', 8000), web_server.MMAHandler)
+    server = HTTPServer(('0.0.0.0', 8000), web_server.Handler)
     print(f'Server starting on http://0.0.0.0:8000')
     
     # Start tunnel in background thread

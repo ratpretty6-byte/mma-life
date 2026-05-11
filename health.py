@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 from fighter import Fighter
 from datetime import datetime, timedelta
+import random
 
 INJURY_TYPES = {
     "cut": {"base_severity": 0.3, "recovery_days": 7, "affected_attrs": ["striking_accuracy"]},
@@ -9,19 +10,25 @@ INJURY_TYPES = {
     "strain": {"base_severity": 0.4, "recovery_days": 10, "affected_attrs": ["athleticism"]},
     "broken_bone": {"base_severity": 0.8, "recovery_days": 60, "affected_attrs": ["striking_power", "kick_power"]},
     "concussion": {"base_severity": 0.7, "recovery_days": 45, "affected_attrs": ["composure", "fight_iq"]},
+    "ligament_tear": {"base_severity": 0.6, "recovery_days": 42, "affected_attrs": ["athleticism", "takedown_power"]},
+    "rib_injury": {"base_severity": 0.5, "recovery_days": 30, "affected_attrs": ["striking_power", "cardio"]},
 }
+
 
 class HealthSystem:
     def __init__(self, fighter: Fighter):
         self.fighter = fighter
         self.medical_suspension: Optional[datetime] = None
+        self.concussion_count = 0  # Track cumulative concussions
+        self.last_fight_injury_severity = 0.0
 
     def add_injury(self, injury_type: str, severity_mult: float = 1.0, game_date: datetime = None) -> Dict:
         if injury_type not in INJURY_TYPES:
             return {}
         info = INJURY_TYPES[injury_type]
+        # Injury severity scales with how much damage was taken
         severity = min(1.0, info["base_severity"] * severity_mult)
-        recovery_days = int(info["recovery_days"] * severity_mult)
+        recovery_days = int(info["recovery_days"] * (0.5 + severity))
         now = game_date or datetime.now()
         injury = {
             "type": injury_type,
@@ -32,6 +39,14 @@ class HealthSystem:
         self.fighter.add_injury(injury_type, severity, info["affected_attrs"], recovery_days, game_date)
         if severity >= 0.6:
             self.medical_suspension = injury["recovery_end"]
+
+        # Track concussion legacy
+        if injury_type == "concussion":
+            self.concussion_count += 1
+            # Cumulative concussions increase future KO susceptibility
+            self.fighter.attributes["durability"] = max(0, self.fighter.attributes["durability"] - self.concussion_count * 2)
+
+        self.last_fight_injury_severity = severity
         return injury
 
     def add_medical_suspension(self, days: int, reason: str = "medical", game_date: datetime = None):
@@ -77,3 +92,29 @@ class HealthSystem:
             return 14
         else:
             return 7
+
+    def get_post_fight_injury_report(self, method: str, fight_damage: float) -> Dict:
+        """Generate post-fight injury assessment based on fight outcome."""
+        report = {"injuries": [], "medical_suspension_days": 0}
+
+        # KO/TKO fighters need longer recovery
+        if "KO" in method or "TKO" in method:
+            report["medical_suspension_days"] = max(30, int(fight_damage * 0.5))
+
+        # Generate injuries based on fight severity
+        if fight_damage > 30:
+            # High damage fight — risk of cuts, bruising
+            if random.random() < 0.4:
+                report["injuries"].append({
+                    "type": "cut",
+                    "severity": min(0.8, fight_damage / 100),
+                    "recovery_days": 7
+                })
+            if random.random() < 0.3:
+                report["injuries"].append({
+                    "type": "swelling",
+                    "severity": min(0.6, fight_damage / 150),
+                    "recovery_days": 5
+                })
+
+        return report

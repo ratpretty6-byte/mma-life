@@ -4,6 +4,7 @@ from typing import Optional, Dict, Tuple
 import utils
 from fighter import Fighter
 
+
 class Position(Enum):
     DISTANCE = "Distance"
     POCKET = "Pocket"
@@ -12,10 +13,11 @@ class Position(Enum):
     GROUND_SIDE = "Ground (Side Control)"
     GROUND_MOUNT = "Ground (Mount)"
     GROUND_BACK = "Ground (Back Mount)"
+    BACK_AGAINST_CAGE = "Back Against Cage"
 
     @staticmethod
     def is_standing(pos: "Position") -> bool:
-        return pos in (Position.DISTANCE, Position.POCKET)
+        return pos in (Position.DISTANCE, Position.POCKET, Position.BACK_AGAINST_CAGE, Position.CLINCH)
 
     @staticmethod
     def is_ground(pos: "Position") -> bool:
@@ -51,6 +53,7 @@ class PositionSystem:
         self.bottom_fighter: Optional[Fighter] = None
         self.clinch_initiator: Optional[Fighter] = None
         self.position_time = 0
+        self.cage_position: Optional[Fighter] = None  # Which fighter has their back to the cage
 
     def _is_top(self, fighter: Fighter) -> bool:
         return self.top_fighter is fighter
@@ -68,26 +71,46 @@ class PositionSystem:
     def close_distance(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0) -> bool:
         if self.current_position != Position.DISTANCE:
             return False
+
+        reach_diff = attacker.reach - defender.reach
+        reach_mod = 1.0 - max(0, reach_diff) * 0.004 if reach_diff > 0 else 1.0 + min(0.1, abs(reach_diff) * 0.003)
+
         speed_attr = attacker.get_effective_attribute("hand_speed", fatigue)
         athleticism = attacker.get_effective_attribute("athleticism", fatigue)
         defender_ath = defender.get_effective_attribute("athleticism", fatigue)
         success_chance = (speed_attr * 0.5 + athleticism * 0.5) - defender_ath * 0.3
-        success_chance = max(40, min(95, success_chance))
+        success_chance *= reach_mod
+        success_chance *= max(0.4, 1.0 - fatigue * 0.3)
+        success_chance = max(20, min(92, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
+            # Check if defender is against cage
+            if self.cage_position == defender:
+                self.current_position = Position.POCKET
+                self.position_time = 0
+                return True
             self.current_position = Position.POCKET
             self.position_time = 0
             return True
         return False
 
     def retreat_to_distance(self, fighter: Fighter, opponent: Fighter, fatigue: float = 0.0) -> bool:
-        if self.current_position != Position.POCKET:
+        if self.current_position not in (Position.POCKET, Position.CLINCH):
             return False
+
         athleticism = fighter.get_effective_attribute("athleticism", fatigue)
         opponent_aggression = opponent.get_effective_attribute("aggression", 1.0)
-        success_chance = athleticism * 0.6 - opponent_aggression * 0.3
-        success_chance = max(10, min(70, success_chance))
+
+        # Against cage, retreat is harder
+        escape_mod = 0.6 if self.cage_position == fighter else 1.0
+
+        success_chance = (athleticism * 0.6 - opponent_aggression * 0.3) * escape_mod
+        success_chance *= max(0.4, 1.0 - fatigue * 0.4)
+        success_chance = max(10, min(65, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             self.current_position = Position.DISTANCE
+            self.cage_position = None
             self.position_time = 0
             return True
         return False
@@ -96,24 +119,46 @@ class PositionSystem:
         takedown_power = attacker.get_effective_attribute("takedown_power", fatigue)
         takedown_accuracy = attacker.get_effective_attribute("takedown_accuracy", fatigue)
         wrestling_defense = defender.get_effective_attribute("wrestling_defense", fatigue)
+
+        # Range penalty
         range_penalty = 0.7 if self.current_position == Position.DISTANCE else 1.0
-        success_chance = ((takedown_power * 0.4 + takedown_accuracy * 0.6) - (wrestling_defense * 0.5)) * range_penalty
-        success_chance = max(5, min(95, success_chance))
+
+        # Height/weight advantage
+        height_diff = attacker.height - defender.height
+        height_mod = 1.0 - max(0, height_diff) * 0.003 if height_diff > 0 else 1.0 + min(0.15, abs(height_diff) * 0.002)
+        weight_advantage = min(0.2, max(-0.15, (attacker.base_weight_lbs - defender.base_weight_lbs) / 1000))
+
+        success_chance = ((takedown_power * 0.4 + takedown_accuracy * 0.6) - (wrestling_defense * 0.5))
+        success_chance *= range_penalty * height_mod
+        success_chance *= (1.0 + weight_advantage)
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(5, min(92, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             self._set_ground(attacker, defender, Position.GROUND_GUARD)
+            # If defender was against cage, mention it
+            if self.cage_position == defender:
+                pass  # Commentary can reference cage takedown
             return True
         return False
 
     def attempt_clinch(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0) -> bool:
         if self.current_position not in (Position.POCKET, Position.DISTANCE):
             return False
+
         if self.current_position == Position.DISTANCE:
             if not self.close_distance(attacker, defender, fatigue):
                 return False
+
         clinch_control = attacker.get_effective_attribute("clinch_control", fatigue)
         clinch_escapes = defender.get_effective_attribute("clinch_escapes", fatigue)
-        success_chance = clinch_control * 0.7 - clinch_escapes * 0.5
-        success_chance = max(10, min(90, success_chance))
+        reach_diff = attacker.reach - defender.reach
+        reach_mod = 1.0 - max(0, reach_diff) * 0.004 if reach_diff > 0 else 1.0 + min(0.1, abs(reach_diff) * 0.003)
+
+        success_chance = (clinch_control * 0.7 - clinch_escapes * 0.5) * reach_mod
+        success_chance *= max(0.4, 1.0 - fatigue * 0.3)
+        success_chance = max(10, min(88, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             self.current_position = Position.CLINCH
             self.clinch_initiator = attacker
@@ -124,10 +169,16 @@ class PositionSystem:
     def break_clinch(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0) -> bool:
         if self.current_position != Position.CLINCH:
             return False
+
         clinch_escapes = attacker.get_effective_attribute("clinch_escapes", fatigue)
         clinch_control = defender.get_effective_attribute("clinch_control", fatigue)
-        success_chance = clinch_escapes * 0.6 - clinch_control * 0.4
-        success_chance = max(15, min(85, success_chance))
+        strength_diff = (attacker.attributes.get("striking_power", 50) -
+                        defender.attributes.get("striking_power", 50)) * 0.003
+
+        success_chance = clinch_escapes * 0.6 - clinch_control * 0.4 + strength_diff
+        success_chance *= max(0.3, 1.0 - fatigue * 0.35)
+        success_chance = max(8, min(85, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             self.current_position = Position.POCKET
             self.clinch_initiator = None
@@ -138,10 +189,19 @@ class PositionSystem:
     def takedown_from_clinch(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0) -> bool:
         if self.current_position != Position.CLINCH:
             return False
+
         td_power = attacker.get_effective_attribute("takedown_power", fatigue) * 1.15
         wd = defender.get_effective_attribute("wrestling_defense", fatigue)
-        success_chance = td_power * 0.5 - wd * 0.4
-        success_chance = max(10, min(90, success_chance))
+        height_diff = attacker.height - defender.height
+        height_mod = 1.0 - max(0, height_diff) * 0.003 if height_diff > 0 else 1.0 + abs(height_diff) * 0.002
+
+        # Weight advantage helps in clinch takedowns
+        weight_mod = 1.0 + min(0.2, max(-0.15, (attacker.base_weight_lbs - defender.base_weight_lbs) / 800))
+
+        success_chance = (td_power * 0.5 - wd * 0.4) * height_mod * weight_mod
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(8, min(88, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             initiator_is_attacker = (self.clinch_initiator == attacker)
             if initiator_is_attacker:
@@ -154,10 +214,19 @@ class PositionSystem:
     def pass_guard(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
         if self.current_position != Position.GROUND_GUARD:
             return False
+
         top_control = top.get_effective_attribute("top_control", fatigue)
         bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+
+        # Weight difference affects guard passing
+        weight_diff = top.base_weight_lbs - bottom.base_weight_lbs
+        weight_mod = 1.0 + min(0.15, max(-0.1, weight_diff / 150))
+
         success_chance = top_control * 0.6 - bottom_control * 0.4
-        success_chance = max(10, min(80, success_chance))
+        success_chance *= weight_mod
+        success_chance *= max(0.4, 1.0 - fatigue * 0.3)
+        success_chance = max(8, min(80, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             self.current_position = Position.GROUND_SIDE
             self.position_time = 0
@@ -167,10 +236,17 @@ class PositionSystem:
     def advance_to_mount(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
         if self.current_position != Position.GROUND_SIDE:
             return False
+
         top_control = top.get_effective_attribute("top_control", fatigue)
         bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+
+        weight_mod = 1.0 + min(0.1, max(-0.1, (top.base_weight_lbs - bottom.base_weight_lbs) / 1000))
+
         success_chance = top_control * 0.5 - bottom_control * 0.3
-        success_chance = max(5, min(70, success_chance))
+        success_chance *= weight_mod
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(4, min(70, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             self.current_position = Position.GROUND_MOUNT
             self.position_time = 0
@@ -180,10 +256,14 @@ class PositionSystem:
     def take_back(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
         if self.current_position not in (Position.GROUND_GUARD, Position.GROUND_SIDE):
             return False
+
         top_control = top.get_effective_attribute("top_control", fatigue) * 0.8
         bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+
         success_chance = top_control * 0.4 - bottom_control * 0.3
-        success_chance = max(3, min(50, success_chance))
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(2, min(50, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             self.current_position = Position.GROUND_BACK
             self.position_time = 0
@@ -193,11 +273,24 @@ class PositionSystem:
     def sweep_from_bottom(self, bottom_fighter: Fighter, top_fighter: Fighter, fatigue: float = 0.0) -> bool:
         if not Position.is_ground(self.current_position):
             return False
-        pos_factor = 1.0 if self.current_position == Position.GROUND_GUARD else (0.7 if self.current_position == Position.GROUND_SIDE else (0.4 if self.current_position == Position.GROUND_MOUNT else 0.2))
+
+        pos_factor = {
+            Position.GROUND_GUARD: 1.0,
+            Position.GROUND_SIDE: 0.7,
+            Position.GROUND_MOUNT: 0.4,
+            Position.GROUND_BACK: 0.2,
+        }.get(self.current_position, 0.5)
+
         bottom_control = bottom_fighter.get_effective_attribute("bottom_control", fatigue)
         top_control = top_fighter.get_effective_attribute("top_control", fatigue)
-        success_chance = (bottom_control * 0.6 - top_control * 0.4) * pos_factor
-        success_chance = max(5, min(70, success_chance))
+
+        # Weight advantage for the bottom fighter helps sweeps
+        weight_mod = 1.0 + min(0.15, max(-0.1, (bottom_fighter.base_weight_lbs - top_fighter.base_weight_lbs) / 800))
+
+        success_chance = (bottom_control * 0.6 - top_control * 0.4) * pos_factor * weight_mod
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(4, min(70, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             self._set_ground(bottom_fighter, top_fighter, Position.GROUND_GUARD)
             return True
@@ -206,12 +299,22 @@ class PositionSystem:
     def stand_up_from_bottom(self, bottom_fighter: Fighter, top_fighter: Fighter, fatigue: float = 0.0) -> bool:
         if not Position.is_ground(self.current_position):
             return False
-        pos_factor = 1.2 if self.current_position == Position.GROUND_GUARD else (1.0 if self.current_position == Position.GROUND_SIDE else (0.6 if self.current_position == Position.GROUND_MOUNT else 0.4))
+
+        pos_factor = {
+            Position.GROUND_GUARD: 1.0,
+            Position.GROUND_SIDE: 0.8,
+            Position.GROUND_MOUNT: 0.5,
+            Position.GROUND_BACK: 0.3,
+        }.get(self.current_position, 0.5)
+
         bottom_control = bottom_fighter.get_effective_attribute("bottom_control", fatigue)
         top_control = top_fighter.get_effective_attribute("top_control", fatigue)
         athleticism = bottom_fighter.get_effective_attribute("athleticism", fatigue)
+
         success_chance = (bottom_control * 0.3 + athleticism * 0.5 - top_control * 0.4) * pos_factor
-        success_chance = max(5, min(75, success_chance))
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(4, min(75, success_chance))
+
         if utils.random_roll(1, 100) <= success_chance:
             self.current_position = Position.DISTANCE
             self.top_fighter = None
@@ -220,6 +323,30 @@ class PositionSystem:
             return True
         return False
 
+    def get_reach_advantage(self, attacker: Fighter, defender: Fighter) -> float:
+        """
+        Returns a multiplier for strike accuracy based on reach advantage.
+        Longer reach = easier to land, shorter reach = must get closer (riskier).
+        """
+        diff = attacker.reach - defender.reach
+        # 1 inch advantage ≈ 0.3% accuracy bonus, 3 inch disadvantage ≈ -0.6%
+        return 1.0 + diff * 0.003
+
+    def get_cage_penalty(self, fighter: Fighter) -> float:
+        """
+        Fighter with back to cage gets movement/defense penalty.
+        """
+        if self.cage_position == fighter:
+            return 0.85  # 15% penalty to evasion/defense
+        return 1.0
+
+    def set_cage_position(self, fighter: Fighter):
+        """Mark a fighter as being against the cage."""
+        self.cage_position = fighter
+
+    def clear_cage_position(self):
+        self.cage_position = None
+
     def get_position_description(self) -> str:
         p = self.current_position
         if p == Position.DISTANCE:
@@ -227,8 +354,7 @@ class PositionSystem:
         elif p == Position.POCKET:
             return "Fighters are in the pocket, trading strikes."
         elif p == Position.CLINCH:
-            initiator = self.clinch_initiator.name if self.clinch_initiator else "Unknown"
-            return f"{initiator} has secured the clinch."
+            return f"{self.clinch_initiator.name if self.clinch_initiator else 'Unknown'} has secured the clinch."
         elif p == Position.GROUND_GUARD:
             return f"{self.top_fighter.name} is in {self.bottom_fighter.name}'s guard."
         elif p == Position.GROUND_SIDE:
@@ -237,4 +363,11 @@ class PositionSystem:
             return f"{self.top_fighter.name} has mounted {self.bottom_fighter.name}!"
         elif p == Position.GROUND_BACK:
             return f"{self.top_fighter.name} has {self.bottom_fighter.name}'s back!"
+        elif p == Position.BACK_AGAINST_CAGE:
+            cage_fighter = self.cage_position.name if self.cage_position else "Unknown"
+            return f"{cage_fighter} is backed against the cage!"
         return "Unknown position"
+
+    @property
+    def is_against_cage(self) -> bool:
+        return self.cage_position is not None

@@ -20,6 +20,7 @@ class FightBooking:
         self.round = None
         self.cancellation_reason = None
         self.bonuses = []
+        self.fight_stats: Dict = {}
 
     def cancel(self, reason: str = "injury"):
         self.status = "cancelled"
@@ -40,12 +41,14 @@ class FightBooking:
         else:
             self.fight_position = "prelim"
 
-    def complete(self, winner: Fighter, method: str, round: Optional[int] = None):
+    def complete(self, winner: Fighter, method: str, round: Optional[int] = None, fight_stats: Dict = None):
         self.status = "completed"
         self.phase = "completed"
         self.winner = winner
         self.method = method
         self.round = round
+        self.fight_stats = fight_stats or {}
+
         if winner:
             loser = self.fighter2 if winner == self.fighter1 else self.fighter1
             winner.wins += 1
@@ -56,10 +59,20 @@ class FightBooking:
                 winner.knockouts += 1
             elif "Submission" in method:
                 winner.submissions += 1
+            # Shake ring rust on win
+            winner.shake_ring_rust()
+            loser.shake_ring_rust()
         else:
             self.fighter1.draws += 1
             self.fighter2.draws += 1
         self.promotion.update_rankings()
+
+    def record_round_stats(self, round_num: int, stats: Dict):
+        """Record per-round statistics for enhanced scoring and news."""
+        if "rounds" not in self.fight_stats:
+            self.fight_stats["rounds"] = {}
+        self.fight_stats["rounds"][round_num] = stats
+
 
 class Event:
     def __init__(self, name: str, date: datetime, promotion: Promotion, location: str = ""):
@@ -107,35 +120,77 @@ class Event:
         candidates.sort(key=lambda f: abs(f.rank - original_rank))
         return candidates[0] if candidates else None
 
-    def determine_bonuses(self):
+    def determine_bonuses(self) -> Optional[Dict]:
+        """
+        Enhanced bonus determination that considers:
+        - Fight excitement (significant strikes, near-finishes)
+        - Round finishes
+        - Submission/KO quality
+        - Fight of the Night vs Performance of the Night split
+        """
         best_fight = None
         best_fight_score = 0
         best_perf = None
         best_perf_score = 0
+
         for f in self.fights:
             if f.status != "completed" or not f.winner:
                 continue
-            score = 50
+
+            score = 50  # Base score
+
+            # Bonus for early round finishes
             if f.round and f.round <= 2:
                 score += 25
+            elif f.round and f.round <= 1:
+                score += 35
+
+            # Method bonuses
             if "Submission" in (f.method or ""):
-                score += 10
-            if "KO" in (f.method or ""):
                 score += 15
+                # Back mount or rare submission = extra
+                if "rear_naked" in (f.method or "").lower():
+                    score += 10
+            if "KO" in (f.method or ""):
+                score += 20
+            if "TKO (Referee" in (f.method or ""):
+                score += 10  # Dominant performance
+
+            # Fight stats bonus if available
+            stats = f.fight_stats
+            if stats:
+                rounds = stats.get("rounds", {})
+                total_sig_strikes = sum(
+                    (r.get(f.winner.name, {}) if isinstance(r, dict) else {}).get("sig_strikes", 0)
+                    for r in rounds.values()
+                )
+                if total_sig_strikes > 50:
+                    score += 10
+
+            # Update best performance
             if score > best_perf_score:
                 best_perf_score = score
                 best_perf = f
+
+        # Find best fight (back-and-forth, significant strikes)
         if self.fights and not best_fight:
             best_fight = self.fights[0]
             best_fight_score = best_perf_score
+
         for f in self.fights:
             if f.status != "completed":
                 continue
+            # Fights going to decision with high activity are FOTN candidates
             if f.winner and f.round and f.round >= 3:
                 score = (f.fighter1.wins + f.fighter2.wins) * 2
+                fight_stats = f.fight_stats.get("rounds", {})
+                # Check if fight was competitive
+                if len(fight_stats) >= 3:
+                    score += 15  # Competitive multi-round fight
                 if score > best_fight_score:
                     best_fight_score = score
                     best_fight = f
+
         result = {}
         if best_fight:
             name = f"{best_fight.fighter1.name} vs {best_fight.fighter2.name}"
@@ -145,6 +200,7 @@ class Event:
             self.perf_of_night = best_perf.winner.name
             result["perf_of_night"] = best_perf.winner.name
         return result if result else None
+
 
 class EventSystem:
     def __init__(self):

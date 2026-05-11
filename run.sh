@@ -16,7 +16,7 @@ sleep 2
 echo "========================================"
 echo "  MMA Life Simulator is running!"
 echo "  Open in your browser:"
-echo "  http://localhost:8080"
+echo "  http://localhost:8000"
 echo "========================================"
 echo ""
 echo "Server logs: tail -f /tmp/mma_server.log"

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import random
 import utils
 
+
 class Fighter:
     PHYSICAL_ATTRS = [
         "striking_power", "striking_accuracy", "hand_speed",
@@ -17,6 +18,30 @@ class Fighter:
         "mental_toughness", "fight_iq", "heart", "discipline",
         "charisma", "aggression", "composure", "adaptability"
     ]
+
+    # 9 body zones — more granular than old head/body/legs model
+    BODY_ZONES = [
+        "left_eye", "right_eye", "jaw", "temple", "nose",
+        "chest", "solar_plexus", "liver",
+        "lead_leg", "rear_leg"
+    ]
+
+    # Zone damage multipliers — how much a hit to this zone hurts
+    ZONE_KO_MULTIPLIER = {
+        "jaw": 1.4, "temple": 1.8, "nose": 1.0,
+        "left_eye": 0.7, "right_eye": 0.7,
+        "solar_plexus": 1.3, "liver": 1.5,
+        "chest": 0.6, "kidneys": 0.8,
+        "lead_leg": 0.5, "rear_leg": 0.6
+    }
+
+    # Zone group mapping for scoring/display
+    ZONE_GROUPS = {
+        "left_eye": "head", "right_eye": "head", "jaw": "head",
+        "temple": "head", "nose": "head",
+        "chest": "body", "solar_plexus": "body", "liver": "body",
+        "lead_leg": "legs", "rear_leg": "legs"
+    }
 
     def __init__(self, name: str, age: int, weight_lbs: float, background: str = "mma", archetype: str = "balanced",
                  nationality: str = "American", home_region: str = "California", trait_id: str = None, personality_id: str = "humble",
@@ -110,6 +135,93 @@ class Fighter:
                         if attr in self.attributes:
                             self.attributes[attr] = utils.clamp(self.attributes[attr] + bonus, utils.ATTR_MIN, utils.ATTR_MAX)
 
+    def init_fight_health(self):
+        """Initialize 9-zone health model for a fight. Based on durability + age."""
+        durability = self.attributes.get("durability", 50)
+        age_mod = utils.get_age_modifier(self.age)
+        base_health = durability * age_mod
+
+        # Some zones naturally have lower health
+        zone_base = {
+            "left_eye": 0.75, "right_eye": 0.75,  # eyes are vulnerable
+            "jaw": 0.70,   # jaw = KO hotspot
+            "temple": 0.65, # temple = most dangerous
+            "nose": 0.85,
+            "chest": 0.95,
+            "solar_plexus": 0.85,
+            "liver": 0.80,
+            "lead_leg": 0.90,
+            "rear_leg": 0.90,
+        }
+
+        self._zone_health = {}
+        self._zone_max_health = {}
+        for zone in self.BODY_ZONES:
+            max_h = base_health * zone_base.get(zone, 1.0)
+            # Random variance: ±8%
+            max_h *= (1.0 + random.uniform(-0.08, 0.08))
+            self._zone_max_health[zone] = max_h
+            self._zone_health[zone] = max_h
+
+        # Blood tracking
+        self._blood_level = 0.0  # 0-100, blood in eyes/vision
+
+    def get_zone_health(self, zone: str) -> float:
+        return max(0, self._zone_health.get(zone, 50))
+
+    def get_zone_health_pct(self, zone: str) -> float:
+        max_h = self._zone_max_health.get(zone, 50)
+        return max(0, self._zone_health.get(zone, 50) / max_h * 100)
+
+    def get_group_health(self, group: str) -> float:
+        """Get average health percentage for a body group (head/body/legs)."""
+        zones = [z for z, g in self.ZONE_GROUPS.items() if g == group]
+        if not zones:
+            return 100
+        return sum(self.get_zone_health_pct(z) for z in zones) / len(zones)
+
+    def get_overall_health_pct(self) -> float:
+        return sum(self.get_group_health(g) for g in ["head", "body", "legs"]) / 3.0
+
+    def apply_damage_to_zone(self, zone: str, raw_damage: float, fight) -> float:
+        """Apply damage to a specific body zone. Returns actual damage dealt."""
+        zone_mult = self.ZONE_KO_MULTIPLIER.get(zone, 1.0)
+        # Temple and jaw have KO bonus — hits here contribute more to KO threshold
+        effective_damage = raw_damage * zone_mult
+
+        current = self._zone_health.get(zone, 50)
+        new_health = max(0, current - effective_damage)
+        actual_damage = current - new_health
+        self._zone_health[zone] = new_health
+
+        # Damage to eyes causes vision impairment (blood)
+        if zone in ("left_eye", "right_eye"):
+            fight._add_blood(self, effective_damage)
+
+        # Damage to jaw/temple contributes to head KO tracker
+        if zone in ("jaw", "temple", "left_eye", "right_eye", "nose"):
+            fight._track_head_damage(self, effective_damage)
+            fight._track_ko_accumulation(self, effective_damage, zone_mult)
+
+        return actual_damage
+
+    def get_chin_resistance(self) -> float:
+        """
+        Chin resistance — higher = harder to KO.
+        Based on mental toughness, durability, composure, heart, and fighting spirit.
+        Returns threshold: KO happens when accumulated head damage exceeds this.
+        """
+        base = (
+            self.attributes.get("durability", 50) * 0.30 +
+            self.attributes.get("mental_toughness", 50) * 0.25 +
+            self.attributes.get("composure", 50) * 0.20 +
+            self.attributes.get("heart", 50) * 0.15 +
+            self.attributes.get("aggression", 50) * 0.10
+        )
+        # Age factor: older fighters have lower chin resistance
+        age_mod = 1.0 - max(0, (self.age - 30)) * 0.005
+        return base * age_mod * 1.5  # Scale factor so values are in 30-120 range
+
     def get_effective_attribute(self, attr: str, fatigue: float = 0.0) -> int:
         base = self.attributes.get(attr, 50)
         age_mod = utils.get_age_modifier(self.age)
@@ -124,6 +236,8 @@ class Fighter:
             injury_penalty += cut_penalties["cardio_penalty"]
         elif attr == "durability":
             injury_penalty += cut_penalties["durability_penalty"]
+        elif attr in ("striking_power", "kick_power"):
+            injury_penalty += cut_penalties["strength_penalty"]
 
         ring_rust = self.get_ring_rust_penalty()
         confidence_mod = self.get_confidence_modifier()
@@ -175,7 +289,7 @@ class Fighter:
 
     def cut_weight(self, target_weight_lbs: float) -> bool:
         self.weight_cut_lbs = max(0, self.base_weight_lbs - target_weight_lbs)
-        if self.weight_cut_lbs > 10 and utils.random_roll(1, 100) <= 10:
+        if self.weight_cut_lbs > 10 and random.random() <= 10:
             self.weigh_in_pass = False
             return False
         self.current_weight_lbs = target_weight_lbs

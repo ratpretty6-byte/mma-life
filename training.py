@@ -5,7 +5,8 @@ from datetime import datetime
 import utils
 
 class TrainingDrill:
-    def __init__(self, name: str, drill_type: str, affected_attrs: List[str], duration_days: int, base_gain: float, fatigue_rate: float, injury_risk: float):
+    def __init__(self, name: str, drill_type: str, affected_attrs: List[str],
+                 duration_days: int, base_gain: float, fatigue_rate: float, injury_risk: float):
         self.name = name
         self.drill_type = drill_type
         self.affected_attrs = affected_attrs
@@ -33,9 +34,12 @@ CAMP_TEMPLATES = [
     {"name": "BJJ Camp", "camp_type": "bjj", "duration_weeks": 4, "cost": 3000, "coach_bonus": 0.2},
     {"name": "Wrestling Camp", "camp_type": "wrestling", "duration_weeks": 4, "cost": 3000, "coach_bonus": 0.2},
     {"name": "MMA Camp", "camp_type": "mma", "duration_weeks": 6, "cost": 7000, "coach_bonus": 0.3},
+    {"name": "Striking Intensive", "camp_type": "striking", "duration_weeks": 3, "cost": 4000, "coach_bonus": 0.25},
+    {"name": "Grappling Intensive", "camp_type": "grappling", "duration_weeks": 3, "cost": 4000, "coach_bonus": 0.25},
 ]
 
 DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
 
 class TrainingCamp:
     def __init__(self, name: str, camp_type: str, duration_weeks: int, cost: float, coach_bonus: float):
@@ -51,12 +55,17 @@ class TrainingCamp:
             self.available_drills = [d for d in DRILLS if d.drill_type == "grappling"]
         elif camp_type == "wrestling":
             self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling", "clinch"]]
-        else:
+        elif camp_type == "striking":
+            self.available_drills = [d for d in DRILLS if d.drill_type in ["striking", "sparring"]]
+        elif camp_type == "grappling":
+            self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling"]]
+        else:  # MMA camp
             self.available_drills = DRILLS.copy()
 
     @staticmethod
     def get_available_camps() -> List['TrainingCamp']:
         return [TrainingCamp(**t) for t in CAMP_TEMPLATES]
+
 
 class TrainingSystem:
     def __init__(self, fighter: Fighter):
@@ -72,6 +81,10 @@ class TrainingSystem:
         self.weekly_schedule: Dict[int, Optional[str]] = {}
         self.current_week_day = 0
         self.week_started = False
+
+        # Track fight preparation status
+        self.fight_camp_active = False
+        self.total_camp_days = 0  # For fight prep tracking
 
     def auto_fill_schedule(self, drill: TrainingDrill):
         for d in range(5):
@@ -119,6 +132,8 @@ class TrainingSystem:
         self.days_trained = 0
         self.total_days_elapsed = 0
         self.in_training = True
+        self.fight_camp_active = True
+        self.total_camp_days = camp.duration_weeks * 7
         self.auto_fill_schedule(drill)
         return True
 
@@ -141,6 +156,7 @@ class TrainingSystem:
                 self.current_drill = None
                 self.days_trained = 0
                 camp_over = True
+                self.fight_camp_active = False
 
         drill = self.get_today_drill()
         is_rest = drill is None
@@ -154,7 +170,7 @@ class TrainingSystem:
             return result
 
         if is_rest:
-            self.fatigue = max(0.0, self.fatigue - 0.2)
+            self.fatigue = max(0.0, self.fatigue - 0.25)  # Better rest recovery
             result["status"] = "rest"
             result["fatigue"] = self.fatigue
             self._advance_week_day()
@@ -162,7 +178,7 @@ class TrainingSystem:
 
         self.current_drill = drill
         self.days_trained += 1
-        intensity_mult = {"light": 0.7, "moderate": 1.0, "intense": 1.3}.get(self.intensity, 1.0)
+        intensity_mult = {"light": 0.6, "moderate": 1.0, "intense": 1.4}.get(self.intensity, 1.0)
 
         gym_bonus = 0.0
         if self.fighter.gym:
@@ -176,9 +192,12 @@ class TrainingSystem:
         camp_bonus = self.current_camp.coach_bonus if self.current_camp else 0.0
         gain_mult = 1.0 + camp_bonus + gym_bonus
 
+        # Overtraining check: if fatigue > 70%, gains are reduced
+        overtraining_mult = max(0.3, 1.0 - max(0, self.fatigue - 0.7) * 2.0)
+
         gains = {}
         for attr in drill.affected_attrs:
-            gain = drill.base_gain * intensity_mult * gain_mult
+            gain = drill.base_gain * intensity_mult * gain_mult * overtraining_mult
             old_val = self.fighter.attributes[attr]
             new_val = utils.clamp(old_val + gain, utils.ATTR_MIN, utils.ATTR_MAX)
             self.fighter.attributes[attr] = new_val
@@ -188,15 +207,16 @@ class TrainingSystem:
 
         self.fatigue = utils.clamp(self.fatigue + (drill.fatigue_rate * intensity_mult), 0.0, 1.0)
 
-        injury = None
-        if random.random() < (drill.injury_risk * intensity_mult):
+        # Overtraining injury risk (if fatigue > 80% for extended period)
+        if self.fatigue > 0.8 and random.random() < 0.05:
             injury = self._generate_injury()
             self.fighter.add_injury(injury["type"], injury["severity"], injury["affected_attrs"], injury["recovery_days"], game_date)
+            result["injury"] = injury
 
         result["status"] = "in_camp" if camp_bonus > 0 else "training"
         result["gains"] = gains
         result["fatigue"] = self.fatigue
-        result["injury"] = injury
+        result["overtraining_risk"] = self.fatigue > 0.7
         if camp_over:
             result["camp_name"] = prev_camp.name if prev_camp else None
 
@@ -218,7 +238,8 @@ class TrainingSystem:
         self.current_camp = None
         self.current_drill = None
         self.days_trained = 0
-        self.fatigue = max(0.0, self.fatigue - 0.3)
+        self.fatigue = max(0.0, self.fatigue - 0.35)
+        self.fight_camp_active = False
 
     def stop_training(self):
         self.current_camp = None
@@ -229,6 +250,7 @@ class TrainingSystem:
         self.weekly_schedule = {}
         self.week_started = False
         self.current_week_day = 0
+        self.fight_camp_active = False
 
     def get_gym_bonus_for_drill(self, drill_name: str) -> float:
         if not self.fighter.gym:
@@ -256,4 +278,32 @@ class TrainingSystem:
             "schedule": sched,
             "current_day": DAYS_OF_WEEK[self.current_week_day],
             "week_started": self.week_started,
+            "overtraining_risk": self.fatigue > 0.7,
         }
+
+    def get_fight_readiness(self) -> Dict:
+        """Return a readiness assessment for an upcoming fight."""
+        readiness = {
+            "overall": 0.0,
+            "stamina_pct": max(0, 100 - self.fatigue * 100),
+            "camp_active": self.fight_camp_active,
+            "overtraining": self.fatigue > 0.7,
+            "notes": [],
+        }
+
+        if readiness["overtraining"]:
+            readiness["notes"].append("Overtraining detected — reduced fight performance expected")
+            readiness["overall"] = 0.6
+        elif self.fatigue > 0.5:
+            readiness["notes"].append("Moderate fatigue — some performance reduction")
+            readiness["overall"] = 0.8
+        else:
+            readiness["notes"].append("Fighter is well-rested and ready")
+            readiness["overall"] = 1.0
+
+        # Camp type bonus
+        if self.current_camp:
+            readiness["notes"].append(f"Currently in {self.current_camp.name}")
+            readiness["overall"] = min(1.0, readiness["overall"] + 0.05)
+
+        return readiness

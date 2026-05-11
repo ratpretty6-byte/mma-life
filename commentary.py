@@ -2,6 +2,7 @@ import random
 from typing import Dict, List, Optional
 from fighter import Fighter
 from positions import PositionSystem, Position
+from utils import SEVERITY_TIERS
 
 BACKGROUND_ENTRANCES = {
     "muay_thai": [
@@ -22,12 +23,12 @@ BACKGROUND_ENTRANCES = {
     "wrestling": [
         "{fighter} storms to the cage with an intense stare, hands ready to clinch and grind.",
         "{fighter} bounces on their toes, low stance, hands probing — a wrestler's posture.",
-        "{fighter} slaps their own headgearless head and locks eyes with their opponent, ready for war.",
+        "{fighter} slaps their own head and locks eyes with their opponent, ready for war.",
     ],
     "judo": [
         "{fighter} steps onto the canvas with a measured, purposeful stride, gripping imaginary sleeves.",
         "{fighter} circles with a wide base, hands low, looking for that explosive hip toss.",
-        "{fighter} adjusts their gi-less collar grip habitually, the judoka instincts surfacing.",
+        "{fighter} adjusts their collar grip habitually, the judoka instincts surfacing.",
     ],
     "taekwondo": [
         "{fighter} flashes a quick spinning hook kick in the air during their entrance — pure showmanship.",
@@ -133,6 +134,7 @@ PREFIGHT_MATCHUP_TEMPLATES = [
     "Stylistically, this is fascinating! {f1} wants to {goal1}, while {f2} wants to {goal2}!",
 ]
 
+
 class CommentaryEngine:
     def __init__(self):
         self.strike_templates = {
@@ -182,7 +184,14 @@ class CommentaryEngine:
                 "{attacker} slices through the guard with a {strike_type}!",
                 "{defender}'s face is getting marked up from the ground and pound!",
                 "{attacker} transitions and lands a {strike_type} from a new angle!",
-            ]
+            ],
+            "critical": [
+                "CRITICAL HIT! {attacker} lands a devastating {strike_type} flush on {defender}'s {target}!",
+                "HUGE shot from {attacker}! That {strike_type} landed perfectly on {defender}'s {target}!",
+                "{defender} got absolutely RIPPED by that {strike_type} to the {target}!",
+                "That {strike_type} from {attacker} had EVERYTHING behind it — {defender} is in trouble!",
+                "WHAT A SHOT! {attacker} lands a perfect {strike_type} that wobbles {defender}!",
+            ],
         }
 
         self.takedown_templates = {
@@ -232,6 +241,7 @@ class CommentaryEngine:
                 "{bottom} uses a beautiful butterfly sweep to reverse position!",
                 "{bottom} throws up a leg and reverses {top}! Great scramble!",
                 "Fantastic reversal by {bottom}! Now they're on top!",
+                "{bottom} powers through and sweeps! Now they're on top!",
             ],
             "submission_attempt": [
                 "{attacker} locks in a tight {submission}!",
@@ -243,7 +253,7 @@ class CommentaryEngine:
             "submission_defend": [
                 "{defender} defends the {submission} well, escaping the position!",
                 "{defender} refuses to tap, fighting the {submission}!",
-                "{defender} stays calm and works their way out of the {submission}!",
+                "{defender} stays calm and works their way out of the {submission} attempt!",
                 "{defender} pops their head out and escapes the {submission} attempt!",
             ],
             "submission_tap": [
@@ -279,6 +289,13 @@ class CommentaryEngine:
             "{fighter} is on wobbly legs but the referee lets it continue!",
             "{fighter} survives the round! What a recovery!",
             "{fighter} is badly hurt but showing incredible heart to survive!",
+            "{fighter} gathers themselves — incredible toughness!",
+        ]
+
+        self.stopped_templates = [
+            "The referee jumps in — it's all over!",
+            "Waved off! The referee stops the fight!",
+            "TKO! The referee has seen enough!",
         ]
 
         self.round_templates = {
@@ -286,7 +303,7 @@ class CommentaryEngine:
                 "Round {round_num} starts, {fighter1} and {fighter2} touch gloves!",
                 "Round {round_num} is underway, {fighter1} takes the center immediately.",
                 "Here we go with round {round_num}! Both fighters meet in the center!",
-                "The referee waves them in for round {round_num}! Let's go!",
+                "The referee signals round {round_num} — let's go!",
                 "Round {round_num} begins! {fighter1} comes forward, {fighter2} circles!",
                 "Here comes round {round_num}! Both fighters look ready to go to war!",
             ],
@@ -342,7 +359,7 @@ class CommentaryEngine:
             "{fighter}'s face is a crimson mask! That cut is pouring blood!",
             "The blood is streaming down {fighter}'s face, making it hard to see!",
             "{fighter} wipes the blood away but it keeps coming!",
-            "A deep gash has opened up on {fighter}! The ref might take a look!",
+            "A deep gash has opened up on {fighter}!",
         ]
 
         self.swelling_commentary = [
@@ -361,6 +378,14 @@ class CommentaryEngine:
             "{fighter} is putting less weight on that lead leg now! Those kicks are paying off!",
             "The leg kicks are adding up! {fighter}'s mobility is compromised!",
             "{fighter} checks a kick but their leg is already too damaged to fully block it!",
+        ]
+
+        self.body_shot_commentary = [
+            "That body shot lands clean! {defender} gasps for air!",
+            "A vicious body shot from {attacker}! {defender} is feeling that!",
+            "{attacker} works the body, breaking {defender} down piece by piece!",
+            "The body work from {attacker} is paying off — {defender} is slowing down!",
+            "Another body shot from {attacker}! You can see {defender} wilting!",
         ]
 
         self.post_fight_templates = {
@@ -384,6 +409,16 @@ class CommentaryEngine:
                 "{winner} forces the tap! That's a {method} victory!",
                 "{winner} sinks it in and {loser} has no choice! {method} in round {round}!",
                 "WHAT A SUBMISSION! {winner} with the {method}! {loser} had to tap!",
+            ],
+            "tko_referee": [
+                "The referee steps in and stops the fight! {winner} by TKO!",
+                "Referee stoppage! {winner} dominated {loser} into oblivion!",
+                "The ref has seen enough — {winner} wins by TKO in round {round}!",
+            ],
+            "tko_ground": [
+                "Ground and pound finishes it! {winner} by TKO in round {round}!",
+                "{winner} unleashes on the ground and the ref jumps in!",
+                "The punishment on the ground was too much — TKO for {winner}!",
             ],
         }
 
@@ -445,9 +480,32 @@ class CommentaryEngine:
                 "{attacker} drives {defender} down and settles in the guard!",
                 "{attacker} slams {defender} down, landing in half guard!",
                 "Beautiful takedown! {attacker} is in {defender}'s guard!",
-                "{attacker} chains the takedown and lands in a dominant position in guard!",
+                "{attacker} chains the takedown and lands in a dominant position!",
             ],
         }
+
+        self.stamina_commentary = [
+            "{fighter} is showing signs of fatigue — heavy breathing!",
+            "{fighter}'s pace is slowing down considerably!",
+            "Both fighters are gassed but {fighter} is feeling it more!",
+            "{fighter} is carrying a lot of ring rust — labored!",
+            "{fighter}'s legs are heavy — can barely move!",
+        ]
+
+        self.desperation_commentary = [
+            "{fighter} is winging wild shots looking for a finish!",
+            "Desperation from {fighter} — throwing everything forward!",
+            "{fighter} knows time is running out — pressing hard!",
+            "Last chance energy from {fighter}!",
+            "{fighter} turns it on — this is survival mode!",
+        ]
+
+        self.comeback_commentary = [
+            "{fighter} is turning this fight around!",
+            "What a response from {fighter}! Back in this fight!",
+            "{fighter} digs deep and starts landing again!",
+            "The tide is turning! {fighter} is finding a second wind!",
+        ]
 
         self.bonus_templates = [
             "Fight of the Night: {fotn} — both warriors earn {amount}!",
@@ -489,9 +547,37 @@ class CommentaryEngine:
             return random.choice(templates).format(fighter=fighter.name, opponent=opponent.name)
         return None
 
+    # ============================================================
+    # TIME-AWARE COMMENTARY
+    # ============================================================
+
+    def _time_stamp(self, round_num: int, time_elapsed: int) -> str:
+        """Generate timestamp string R# M:SS"""
+        remaining = max(0, 300 - time_elapsed)
+        mins = remaining // 60
+        secs = remaining % 60
+        return f"R{round_num} {mins}:{secs:02d}"
+
+    def _urgency_phrase(self, round_num: int, time_elapsed: int, is_title: bool) -> str:
+        """Generate urgency-based commentary phrases based on round time remaining."""
+        remaining = 300 - time_elapsed
+        if remaining <= 10:
+            return random.choice([
+                "The horn is about to sound!",
+                "Final seconds of the round!",
+                "Both fighters know time is almost up!",
+                "This is the last ten seconds!",
+            ])
+        elif remaining <= 30:
+            return random.choice([
+                "Thirty seconds left in the round!",
+                f"{self._time_stamp(round_num, time_elapsed)} — the pressure is mounting!",
+                "The pace picks up as the round winds down!",
+            ])
+        return ""
+
     def generate_pre_fight_buildup(self, fighter1: Fighter, fighter2: Fighter, context: Optional[Dict] = None) -> List[str]:
         parts = []
-
         template = random.choice(self.pre_fight_templates)
         parts.append(template.format(fighter1=fighter1.name, fighter2=fighter2.name,
                                      rec1=self._get_record(fighter1), rec2=self._get_record(fighter2)))
@@ -543,8 +629,8 @@ class CommentaryEngine:
         return bg_map.get(bg, "keep it standing and strike")
 
     def generate_strike_commentary(self, attacker: Fighter, defender: Fighter, strike_type: str, target: str, position: Position) -> str:
-        pos_key = "ground" if "ground" in position.name.lower() else position.name.lower()
-        if pos_key not in self.strike_templates:
+        pos_key = "ground" if Position.is_ground(position) else position.name.lower()
+        if pos_key not in self.strike_templates or pos_key == "dstance":
             pos_key = "standing"
         template = random.choice(self.strike_templates[pos_key])
         return template.format(attacker=attacker.name, defender=defender.name, strike_type=strike_type, target=target)
@@ -574,6 +660,14 @@ class CommentaryEngine:
     def generate_recovery_commentary(self, fighter: Fighter) -> str:
         template = random.choice(self.recovery_templates)
         return template.format(fighter=fighter.name)
+
+    def generate_stoppage_commentary(self, winner: Fighter, loser: Fighter, method: str, round_num: int) -> str:
+        if "Referee" in method:
+            template = random.choice(self.post_fight_templates["tko_referee"])
+            return template.format(winner=winner.name, loser=loser.name, round=round_num)
+        else:
+            template = random.choice(self.post_fight_templates["tko_ground"])
+            return template.format(winner=winner.name, loser=loser.name, round=round_num)
 
     def generate_round_summary(self, fighter1: Fighter, fighter2: Fighter) -> str:
         template = random.choice(self.round_templates.get("summary", [""]))
@@ -663,6 +757,10 @@ class CommentaryEngine:
         template = random.choice(self.leg_damage_commentary)
         return template.format(fighter=fighter.name)
 
+    def generate_body_shot_commentary(self, attacker: Fighter, defender: Fighter) -> str:
+        template = random.choice(self.body_shot_commentary)
+        return template.format(attacker=attacker.name, defender=defender.name)
+
     def generate_range_commentary(self, fighter: Fighter, opponent: Fighter, action: str) -> str:
         key = "close" if action == "close" else "retreat"
         template = random.choice(self.range_templates[key])
@@ -680,6 +778,12 @@ class CommentaryEngine:
             template = random.choice(self.post_fight_templates["decision"])
             score_detail = f"{winner.name} gets the nod"
             return template.format(score_detail=score_detail)
+        elif "TKO (Referee" in method:
+            template = random.choice(self.post_fight_templates["tko_referee"])
+            return template.format(winner=winner.name, loser=loser_name, round=round_num)
+        elif "TKO (Ground" in method:
+            template = random.choice(self.post_fight_templates["tko_ground"])
+            return template.format(winner=winner.name, loser=loser_name, round=round_num)
         elif "KO" in method or "TKO" in method:
             template = random.choice(self.post_fight_templates["ko"])
             return template.format(winner=winner.name, loser=loser_name, method=method, round=round_num)
@@ -701,3 +805,28 @@ class CommentaryEngine:
         if perf_of_night:
             results.append(f"Performance of the Night: {perf_of_night} takes home {amount}!")
         return "\n".join(results) if results else ""
+
+    def generate_fatigue_commentary(self, fighter: Fighter, fatigue: float) -> Optional[str]:
+        """Generate fatigue-related commentary based on fatigue level."""
+        if fatigue < 0.4:
+            return None
+        weighted = [(t, 1.0 - abs(fatigue - t)) for t in [0.4, 0.55, 0.7, 0.85]]
+        valid = [(t, w) for t, w in weighted if w > 0]
+        if not valid:
+            return None
+        template = random.choice(self.stamina_commentary)
+        return template.format(fighter=fighter.name)
+
+    def generate_desperation_commentary(self, fighter: Fighter, is_losing: bool) -> Optional[str]:
+        """Generate desperation commentary when fighter is losing badly."""
+        if not is_losing:
+            return None
+        if random.random() < 0.3:
+            return random.choice(self.desperation_commentary).format(fighter=fighter.name)
+        return None
+
+    def generate_comeback_commentary(self, fighter: Fighter, was_losing: bool, now_ahead: bool) -> Optional[str]:
+        """Generate comeback commentary."""
+        if was_losing and now_ahead:
+            return random.choice(self.comeback_commentary).format(fighter=fighter.name)
+        return None
