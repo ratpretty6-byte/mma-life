@@ -80,51 +80,57 @@ class MMALifeApp(App):
     def show_creation(self):
         self.content.clear_widgets()
         self.log("=== Create Fighter ===")
-        
+
+        self.selected_bg = "mma"
+
         layout = GridLayout(cols=2, spacing=5, size_hint_y=None)
         layout.bind(minimum_height=layout.setter('height'))
-        
+
         # Name
         layout.add_widget(Label(text="Name:"))
         name_input = TextInput(multiline=False, size_hint_y=None, height=40)
         layout.add_widget(name_input)
-        
+
         # Age
         layout.add_widget(Label(text="Age:"))
         age_input = TextInput(multiline=False, input_filter='int', size_hint_y=None, height=40)
         age_input.text = "25"
         layout.add_widget(age_input)
-        
+
         # Weight
         layout.add_widget(Label(text="Weight (lbs):"))
         weight_input = TextInput(multiline=False, input_filter='int', size_hint_y=None, height=40)
         weight_input.text = "155"
         layout.add_widget(weight_input)
-        
+
         # Background
         layout.add_widget(Label(text="Background:"))
         bg_layout = BoxLayout(orientation='vertical', size_hint_y=None, height=120)
         for bg in ["mma", "wrestling", "bjj", "muay_thai", "boxing"]:
             btn = Button(text=bg.title(), size_hint_y=None, height=30)
+            btn.bind(on_press=lambda x, b=bg: self.select_bg(b))
             bg_layout.add_widget(btn)
         layout.add_widget(bg_layout)
-        
+
         self.content.add_widget(layout)
-        
+
         # Create button
         create_btn = Button(text="Create Fighter", size_hint_y=None, height=50)
         create_btn.bind(on_press=lambda x: self.create_fighter(
-            name_input.text, int(age_input.text or 25), 
-            float(weight_input.text or 155), "mma"
+            name_input.text, int(age_input.text or 25),
+            float(weight_input.text or 155), self.selected_bg
         ))
         self.content.add_widget(create_btn)
+
+    def select_bg(self, bg):
+        self.selected_bg = bg
     
     def create_fighter(self, name, age, weight, bg):
         if not name:
             self.log("Please enter a name")
             return
         self.fighter = Fighter(name, age, weight, bg)
-        self.career, self.training, self.finance, self.health, self.media, self.event_sys, self.promo = career, training, finance, health, media, event_sys, promo = setup_career(self.fighter)
+        self.career, self.training, self.finance, self.health, self.media, self.event_sys, self.promo = setup_career(self.fighter)
         
         # Create rival
         self.rival = Fighter("Rival Fighter", 25, weight, "boxing")
