@@ -247,7 +247,15 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div style="margin-top:12px;text-align:center">
-        <a href="https://mma-life-production.up.railway.app/create" class="btn btn-primary" style="font-size:16px;padding:12px 40px;text-decoration:none;display:inline-block;border:none;cursor:pointer;">START CAREER</a>
+        <form action="/api/create_fighter" method="POST" style="display:inline">
+          <input type="hidden" name="age" value="25">
+          <input type="hidden" name="background" value="mma">
+          <input type="hidden" name="weight_class" value="3">
+          <input type="hidden" name="nationality" value="American">
+          <input type="hidden" name="region" value="California">
+          <input type="hidden" name="personality_id" value="humble">
+          <button type="submit" class="btn btn-primary" style="font-size:16px;padding:12px 40px;border:none;cursor:pointer;">START CAREER</button>
+        </form>
       </div>
     </div>
   </div>
@@ -551,99 +559,37 @@ function showModal(html) { qs("#modalContent").innerHTML = html; qs("#modalOverl
 function closeModal(e) { if (!e || e.target === qs("#modalOverlay")) qs("#modalOverlay").classList.add("hidden"); }
 
 async function init() {
-  console.log("init() starting...");
-  console.log("sid from URL:", sid);
-  alert("Loading... sid=" + sid);
   qs("#headerStatus").textContent = "Loading...";
   try {
-    console.log("Calling /api/init...");
     const resp = await api("/api/init");
-    console.log("Got response:", resp);
     if (resp && resp.ready) {
       qs("#headerStatus").textContent = `World loaded: ${resp.promotions.regional}R / ${resp.promotions.national}N / ${resp.promotions.world}W fighters`;
       
-      // If we have a valid sid from URL, try to load the game
       if (urlSid) {
-        console.log("Attempting to load game with sid:", sid);
         try {
           const stateResp = await api("/api/state?sid=" + encodeURIComponent(sid));
           if (stateResp && stateResp.fighter) {
-            console.log("Game loaded successfully!");
-            alert("Game loaded! Fighter: " + stateResp.fighter.name);
             state = stateResp;
             if (state.strategies) STRATS = state.strategies;
             qs("#screen-create").classList.add("hidden");
             qs("#screen-game").classList.remove("hidden");
             updateAllUI();
-            return; // Don't show create form
-          } else {
-            alert("No fighter in session");
+            return;
           }
         } catch(e) {
           console.log("No existing session, showing create form");
         }
       }
       
-      // No valid session, show create form
-      console.log("Calling initCreateForm...");
       initCreateForm();
     } else {
-      console.log("Init response not ready:", resp);
       qs("#headerStatus").textContent = "Error: " + (resp ? resp.error : "Unknown");
     }
   } catch(e) {
     console.error("Init error:", e);
     qs("#headerStatus").textContent = "Error: " + e.message;
-    alert("Error loading game: " + e.message);
   }
 }
-
-// Quick Start Career click handler
-document.addEventListener('DOMContentLoaded', function() {
-  // Handle START CAREER button with data-action="start"
-  document.querySelector('[data-action="start"]').addEventListener('click', function(e) {
-    e.preventDefault();
-    window.location.href = '/create';
-  });
-  
-  const quickBtn = document.getElementById('quickStartBtn');
-  if(quickBtn) {
-    quickBtn.addEventListener('click', async function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      const urlParams = new URLSearchParams(window.location.search);
-      const curSid = urlParams.get('sid') || 'sess_' + Math.random().toString(36).slice(2);
-      const names = ['Alex Torres','Jordan Lee','Mike Santos','Chris Kim','James Chen'];
-      const name = names[Math.floor(Math.random() * names.length)];
-      const nationalities = ['American','Brazilian','Russian','Japanese','British','Canadian'];
-      const nationality = nationalities[Math.floor(Math.random() * nationalities.length)];
-      const region = nationality === 'American' ? 'California' : (nationality === 'Brazilian' ? 'Rio de Janeiro' : 'Capital');
-      const bg = 'mma';
-      const btn = document.getElementById('quickStartBtn');
-      btn.textContent = 'Creating...';
-      btn.style.pointerEvents = 'none';
-      try {
-        const resp = await fetch('/api/create_fighter', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({name, age: 25, background: bg, weight_class: 4, sid: curSid, nationality, region, trait_id: null, personality_id: 'humble'})
-        });
-        const json = await resp.json();
-        if(json && json.success) {
-          window.location.href = '/?sid=' + curSid;
-        } else {
-          alert('Error: ' + (json && json.error) || 'Unknown');
-          btn.textContent = 'START CAREER';
-          btn.style.pointerEvents = 'auto';
-        }
-      } catch(err) {
-        alert('Error: ' + err.message);
-        btn.textContent = 'START CAREER';
-        btn.style.pointerEvents = 'auto';
-      }
-    });
-  }
-});
 
 function initCreateForm() {
   console.log("initCreateForm called");
@@ -752,80 +698,6 @@ function updateRegions() {
 }
 
 init();
-
-async function quickStartCareer() {
-  alert("Function called! sid=" + sid);
-  // Generate random name
-  // Generate random name
-  const names = ["Alex Torres","Jordan Lee","Mike Santos","Chris Kim","James Chen","Ryan Silva","Dan Williams","Tom Johnson","Sam Jackson","Carlos Rivera"];
-  const name = names[Math.floor(Math.random() * names.length)];
-  const nationalities = ["American","Brazilian","Russian","Japanese","British","Canadian","French","Dutch","Australian","Polish","Korean","Mexican","Chinese","Swedish","Irish","Nigerian","New Zealander","German","Italian","Spanish","Ukrainian","Cuban","Jamaican","South African","Swiss","Belgian","Norwegian","Finnish","Danish","Icelandic"];
-  const nationality = nationalities[Math.floor(Math.random() * nationalities.length)];
-  const regions = {
-    "American":["California","Texas","New York","Florida","Ohio","Colorado","Nevada","Arizona"],
-    "Brazilian":["Rio de Janeiro","Sao Paulo","Bahia","Minas Gerais","Ceara"],
-    "Russian":["Moscow","St. Petersburg","Dagestan","Chechnya","Siberia"],
-    "Japanese":["Tokyo","Osaka","Yokohama","Nagoya","Okinawa"],
-    "British":["London","Manchester","Liverpool","Birmingham","Scotland"],
-    "Canadian":["Ontario","Quebec","British Columbia","Alberta","Nova Scotia"],
-    "French":["Paris","Lyon","Marseille","Bordeaux","Toulouse"],
-    "Dutch":["Amsterdam","Rotterdam","Utrecht","The Hague","Eindhoven"],
-    "Australian":["Sydney","Melbourne","Brisbane","Perth","Gold Coast"],
-    "Polish":["Warsaw","Krakow","Gdansk","Wroclaw","Poznan"],
-    "Korean":["Seoul","Busan","Incheon","Daegu","Ulsan"],
-    "Mexican":["Mexico City","Guadalajara","Monterrey","Tijuana","Puebla"],
-    "Chinese":["Beijing","Shanghai","Shenzhen","Guangzhou","Chengdu"],
-    "Swedish":["Stockholm","Gothenburg","Malmo","Uppsala","Linkoping"],
-    "Irish":["Dublin","Cork","Galway","Limerick","Belfast"],
-    "Nigerian":["Lagos","Abuja","Port Harcourt","Ibadan","Kano"],
-    "New Zealander":["Auckland","Wellington","Christchurch","Hamilton","Tauranga"],
-    "German":["Berlin","Munich","Hamburg","Cologne","Frankfurt"],
-    "Italian":["Rome","Milan","Naples","Turin","Florence"],
-    "Spanish":["Madrid","Barcelona","Valencia","Seville","Bilbao"],
-    "Ukrainian":["Kyiv","Kharkiv","Odessa","Dnipro","Lviv"],
-    "Cuban":["Havana","Santiago","Camaguey","Holguin","Santa Clara"],
-    "Jamaican":["Kingston","Montego Bay","Ocho Rios","Negril","Spanish Town"],
-    "South African":["Johannesburg","Cape Town","Durban","Pretoria","Port Elizabeth"],
-    "Swiss":["Zurich","Geneva","Basel","Bern","Lausanne"],
-    "Belgian":["Brussels","Antwerp","Ghent","Bruges","Liege"],
-    "Norwegian":["Oslo","Bergen","Trondheim","Stavanger","Tromso"],
-    "Finnish":["Helsinki","Espoo","Tampere","Turku","Oulu"],
-    "Danish":["Copenhagen","Aarhus","Odense","Aalborg","Esbjerg"],
-    "Icelandic":["Reykjavik","Kopavogur","Hafnarfjordur","Akureyri","Gardabaer"]
-  };
-  const regionList = regions[nationality] || ["Capital"];
-  const region = regionList[0];
-  const backgrounds = ["mma","wrestling","bjj","muay_thai","boxing","judo","taekwondo","karate","sambo","kickboxing","capoeira"];
-  const bg = backgrounds[Math.floor(Math.random() * backgrounds.length)];
-  const age = Math.floor(Math.random() * 10) + 22; // 22-32
-  const weightClasses = [115,125,135,145,155,170,185,205,265];
-  const wc = 4; // Lightweight
-  const traits = [null,"heavy_hands","iron_chin","cardio_king","mat_wizard","sniper","natural_athlete","iron_will","fast_hands"];
-  const trait_id = traits[Math.floor(Math.random() * traits.length)];
-  const personalities = ["charismatic","intimidating","humble","cocky","quiet","savage"];
-  const personality_id = personalities[Math.floor(Math.random() * personalities.length)];
-  
-  const btn = qs("#quickStartBtn");
-  if (btn) { btn.textContent = "Creating..."; btn.disabled = true; }
-  
-  try {
-    const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id });
-    if (resp.success) {
-      state = resp.state;
-      if (state.strategies) STRATS = state.strategies;
-      qs("#screen-create").classList.add("hidden");
-      qs("#screen-game").classList.remove("hidden");
-      updateAllUI();
-      toast("Welcome to the pros, " + name + "!", "success");
-    } else {
-      toast("Error: " + (resp.error || "Unknown"), "error");
-    }
-  } catch(e) {
-    toast("Error: " + e.message, "error");
-  }
-  
-  if (btn) { btn.textContent = "START CAREER"; btn.disabled = false; }
-}
 
 async function createFighter() {
   const name = qs("#fName").value.trim() || "";
