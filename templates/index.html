@@ -247,7 +247,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div style="margin-top:12px;text-align:center">
-        <a href="/create?age=25&weight_class=3&background=mma&nationality=American&region=California&trait_id=heavy_hands&personality_id=humble" class="btn btn-primary" style="font-size:16px;padding:12px 40px;text-decoration:none;display:inline-block">START CAREER</a>
+        <button id="quickStartBtn" onclick="quickStartCareer()" class="btn btn-primary" style="font-size:16px;padding:12px 40px;">START CAREER</button>
       </div>
     </div>
   </div>
@@ -701,6 +701,78 @@ function updateRegions() {
 }
 
 init();
+
+async function quickStartCareer() {
+  // Generate random name
+  const names = ["Alex Torres","Jordan Lee","Mike Santos","Chris Kim","James Chen","Ryan Silva","Dan Williams","Tom Johnson","Sam Jackson","Carlos Rivera"];
+  const name = names[Math.floor(Math.random() * names.length)];
+  const nationalities = ["American","Brazilian","Russian","Japanese","British","Canadian","French","Dutch","Australian","Polish","Korean","Mexican","Chinese","Swedish","Irish","Nigerian","New Zealander","German","Italian","Spanish","Ukrainian","Cuban","Jamaican","South African","Swiss","Belgian","Norwegian","Finnish","Danish","Icelandic"];
+  const nationality = nationalities[Math.floor(Math.random() * nationalities.length)];
+  const regions = {
+    "American":["California","Texas","New York","Florida","Ohio","Colorado","Nevada","Arizona"],
+    "Brazilian":["Rio de Janeiro","Sao Paulo","Bahia","Minas Gerais","Ceara"],
+    "Russian":["Moscow","St. Petersburg","Dagestan","Chechnya","Siberia"],
+    "Japanese":["Tokyo","Osaka","Yokohama","Nagoya","Okinawa"],
+    "British":["London","Manchester","Liverpool","Birmingham","Scotland"],
+    "Canadian":["Ontario","Quebec","British Columbia","Alberta","Nova Scotia"],
+    "French":["Paris","Lyon","Marseille","Bordeaux","Toulouse"],
+    "Dutch":["Amsterdam","Rotterdam","Utrecht","The Hague","Eindhoven"],
+    "Australian":["Sydney","Melbourne","Brisbane","Perth","Gold Coast"],
+    "Polish":["Warsaw","Krakow","Gdansk","Wroclaw","Poznan"],
+    "Korean":["Seoul","Busan","Incheon","Daegu","Ulsan"],
+    "Mexican":["Mexico City","Guadalajara","Monterrey","Tijuana","Puebla"],
+    "Chinese":["Beijing","Shanghai","Shenzhen","Guangzhou","Chengdu"],
+    "Swedish":["Stockholm","Gothenburg","Malmo","Uppsala","Linkoping"],
+    "Irish":["Dublin","Cork","Galway","Limerick","Belfast"],
+    "Nigerian":["Lagos","Abuja","Port Harcourt","Ibadan","Kano"],
+    "New Zealander":["Auckland","Wellington","Christchurch","Hamilton","Tauranga"],
+    "German":["Berlin","Munich","Hamburg","Cologne","Frankfurt"],
+    "Italian":["Rome","Milan","Naples","Turin","Florence"],
+    "Spanish":["Madrid","Barcelona","Valencia","Seville","Bilbao"],
+    "Ukrainian":["Kyiv","Kharkiv","Odessa","Dnipro","Lviv"],
+    "Cuban":["Havana","Santiago","Camaguey","Holguin","Santa Clara"],
+    "Jamaican":["Kingston","Montego Bay","Ocho Rios","Negril","Spanish Town"],
+    "South African":["Johannesburg","Cape Town","Durban","Pretoria","Port Elizabeth"],
+    "Swiss":["Zurich","Geneva","Basel","Bern","Lausanne"],
+    "Belgian":["Brussels","Antwerp","Ghent","Bruges","Liege"],
+    "Norwegian":["Oslo","Bergen","Trondheim","Stavanger","Tromso"],
+    "Finnish":["Helsinki","Espoo","Tampere","Turku","Oulu"],
+    "Danish":["Copenhagen","Aarhus","Odense","Aalborg","Esbjerg"],
+    "Icelandic":["Reykjavik","Kopavogur","Hafnarfjordur","Akureyri","Gardabaer"]
+  };
+  const regionList = regions[nationality] || ["Capital"];
+  const region = regionList[0];
+  const backgrounds = ["mma","wrestling","bjj","muay_thai","boxing","judo","taekwondo","karate","sambo","kickboxing","capoeira"];
+  const bg = backgrounds[Math.floor(Math.random() * backgrounds.length)];
+  const age = Math.floor(Math.random() * 10) + 22; // 22-32
+  const weightClasses = [115,125,135,145,155,170,185,205,265];
+  const wc = 4; // Lightweight
+  const traits = [null,"heavy_hands","iron_chin","cardio_king","mat_wizard","sniper","natural_athlete","iron_will","fast_hands"];
+  const trait_id = traits[Math.floor(Math.random() * traits.length)];
+  const personalities = ["charismatic","intimidating","humble","cocky","quiet","savage"];
+  const personality_id = personalities[Math.floor(Math.random() * personalities.length)];
+  
+  const btn = qs("#quickStartBtn");
+  if (btn) { btn.textContent = "Creating..."; btn.disabled = true; }
+  
+  try {
+    const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id });
+    if (resp.success) {
+      state = resp.state;
+      if (state.strategies) STRATS = state.strategies;
+      qs("#screen-create").classList.add("hidden");
+      qs("#screen-game").classList.remove("hidden");
+      updateAllUI();
+      toast("Welcome to the pros, " + name + "!", "success");
+    } else {
+      toast("Error: " + (resp.error || "Unknown"), "error");
+    }
+  } catch(e) {
+    toast("Error: " + e.message, "error");
+  }
+  
+  if (btn) { btn.textContent = "START CAREER"; btn.disabled = false; }
+}
 
 async function createFighter() {
   const name = qs("#fName").value.trim() || "";
