@@ -257,8 +257,13 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
   const bg = ['mma','wrestling','bjj','muay_thai','boxing','judo','taekwondo','karate','sambo','kickboxing','capoeira'][Math.floor(Math.random() * 11)];
   const btn = document.querySelector('#quickStartBtn');
   if(btn){btn.textContent='Creating...';btn.disabled=true;}
-  const resp = await api('/api/create_fighter',{name,age:Math.floor(Math.random()*10)+22,background:bg,weight_class:4,sid,nationality,region,trait_id:null,personality_id:['charismatic','intimidating','humble','cocky','quiet','savage'][Math.floor(Math.random()*6)]});
-  if(resp && resp.success){state=resp.state;if(state.strategies)STRATS=state.strategies;document.querySelector('#screen-create').classList.add('hidden');document.querySelector('#screen-game').classList.remove('hidden');updateAllUI();alert('Welcome to the pros, '+name+'!');}else{alert('Error: '+(resp&&resp.error)||'Unknown');}
+  try {
+    const resp = await api('/api/create_fighter',{name,age:Math.floor(Math.random()*10)+22,background:bg,weight_class:4,sid,nationality,region,trait_id:null,personality_id:['charismatic','intimidating','humble','cocky','quiet','savage'][Math.floor(Math.random()*6)]});
+    alert('Response: ' + JSON.stringify(resp));
+    if(resp && resp.success){state=resp.state;if(state.strategies)STRATS=state.strategies;document.querySelector('#screen-create').classList.add('hidden');document.querySelector('#screen-game').classList.remove('hidden');updateAllUI();alert('Welcome to the pros, '+name+'!');}else{alert('Error: '+(resp&&resp.error)||'Unknown');}
+  } catch(e) {
+    alert('Exception: ' + e.message);
+  }
   if(btn){btn.textContent='START CAREER';btn.disabled=false;}
 })()" class="btn btn-primary" style="font-size:16px;padding:12px 40px;">START CAREER</button>
       </div>
