@@ -1452,17 +1452,10 @@ function updateHealthBars(f1Health, f2Health) {
     qs("#f2HpBar").style.background = overall > 60 ? "#e62400" : (overall > 30 ? "#ff6a00" : "#ff0000");
     qs("#f2StamBar").style.width = stamina + "%";
     qs("#f2StamBar").style.background = stamina > 50 ? "#4a9eff" : (stamina > 25 ? "#ff9a4a" : "#ff4a4a");
-  }
-}
-  if (f2Health) {
-    const f2 = f2Health;
-    qs("#f2HpBar").style.width = Math.max(0, f2.overall || 100) + "%";
-    const hp2 = f2.overall || 100;
-    qs("#f2HpBar").style.background = hp2 > 60 ? "#e62400" : (hp2 > 30 ? "#ff6a00" : "#ff0000");
-    qs("#f2HeadBar").style.width = Math.max(0, f2.head || 100) + "%";
-    qs("#f2BodyBar").style.width = Math.max(0, f2.body || 100) + "%";
-    qs("#f2LegBar").style.width = Math.max(0, f2.legs || 100) + "%";
-    qs("#f2BloodBar").style.width = Math.min(100, f2.blood || 0) + "%";
+    qs("#f2HeadBar").style.width = Math.max(0, f2Health.head || 100) + "%";
+    qs("#f2BodyBar").style.width = Math.max(0, f2Health.body || 100) + "%";
+    qs("#f2LegBar").style.width = Math.max(0, f2Health.legs || 100) + "%";
+    qs("#f2BloodBar").style.width = Math.min(100, f2Health.blood || 0) + "%";
   }
 }
 
