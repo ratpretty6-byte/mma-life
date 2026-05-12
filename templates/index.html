@@ -247,7 +247,20 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div style="margin-top:12px;text-align:center">
-        <button id="quickStartBtn" onclick="(async function(){ alert('TEST2'); await quickStartCareer(); })()" class="btn btn-primary" style="font-size:16px;padding:12px 40px;">START CAREER</button>
+        <button id="quickStartBtn" onclick="(async function(){ 
+  const names = ['Alex Torres','Jordan Lee','Mike Santos','Chris Kim','James Chen','Ryan Silva','Dan Williams','Tom Johnson','Sam Jackson','Carlos Rivera'];
+  const name = names[Math.floor(Math.random() * names.length)];
+  const nationalities = ['American','Brazilian','Russian','Japanese','British','Canadian','French','Dutch','Australian','Polish','Korean','Mexican','Chinese','Swedish','Irish','Nigerian','New Zealander','German','Italian','Spanish','Ukrainian','Cuban','Jamaican','South African','Swiss','Belgian','Norwegian','Finnish','Danish','Icelandic'];
+  const nationality = nationalities[Math.floor(Math.random() * nationalities.length)];
+  const regionList = {'American':['California','Texas','New York','Florida','Ohio','Colorado','Nevada','Arizona'],'Brazilian':['Rio de Janeiro','Sao Paulo','Bahia','Minas Gerais','Ceara'],'Russian':['Moscow','St. Petersburg','Dagestan','Chechnya','Siberia'],'Japanese':['Tokyo','Osaka','Yokohama','Nagoya','Okinawa'],'British':['London','Manchester','Liverpool','Birmingham','Scotland'],'Canadian':['Ontario','Quebec','British Columbia','Alberta','Nova Scotia'],'French':['Paris','Lyon','Marseille','Bordeaux','Toulouse'],'Dutch':['Amsterdam','Rotterdam','Utrecht','The Hague','Eindhoven'],'Australian':['Sydney','Melbourne','Brisbane','Perth','Gold Coast'],'Polish':['Warsaw','Krakow','Gdansk','Wroclaw','Poznan'],'Korean':['Seoul','Busan','Incheon','Daegu','Ulsan'],'Mexican':['Mexico City','Guadalajara','Monterrey','Tijuana','Puebla'],'Chinese':['Beijing','Shanghai','Shenzhen','Guangzhou','Chengdu'],'Swedish':['Stockholm','Gothenburg','Malmo','Uppsala','Linkoping'],'Irish':['Dublin','Cork','Galway','Limerick','Belfast'],'Nigerian':['Lagos','Abuja','Port Harcourt','Ibadan','Kano'],'New Zealander':['Auckland','Wellington','Christchurch','Hamilton','Tauranga'],'German':['Berlin','Munich','Hamburg','Cologne','Frankfurt'],'Italian':['Rome','Milan','Naples','Turin','Florence'],'Spanish':['Madrid','Barcelona','Valencia','Seville','Bilbao'],'Ukrainian':['Kyiv','Kharkiv','Odessa','Dnipro','Lviv'],'Cuban':['Havana','Santiago','Camaguey','Holguin','Santa Clara'],'Jamaican':['Kingston','Montego Bay','Ocho Rios','Negril','Spanish Town'],'South African':['Johannesburg','Cape Town','Durban','Pretoria','Port Elizabeth'],'Swiss':['Zurich','Geneva','Basel','Bern','Lausanne'],'Belgian':['Brussels','Antwerp','Ghent','Bruges','Liege'],'Norwegian':['Oslo','Bergen','Trondheim','Stavanger','Tromso'],'Finnish':['Helsinki','Espoo','Tampere','Turku','Oulu'],'Danish':['Copenhagen','Aarhus','Odense','Aalborg','Esbjerg'],'Icelandic':['Reykjavik','Kopavogur','Hafnarfjordur','Akureyri','Gardabaer']};
+  const region = regionList[nationality] ? regionList[nationality][0] : 'Capital';
+  const bg = ['mma','wrestling','bjj','muay_thai','boxing','judo','taekwondo','karate','sambo','kickboxing','capoeira'][Math.floor(Math.random() * 11)];
+  const btn = document.querySelector('#quickStartBtn');
+  if(btn){btn.textContent='Creating...';btn.disabled=true;}
+  const resp = await api('/api/create_fighter',{name,age:Math.floor(Math.random()*10)+22,background:bg,weight_class:4,sid,nationality,region,trait_id:null,personality_id:['charismatic','intimidating','humble','cocky','quiet','savage'][Math.floor(Math.random()*6)]});
+  if(resp && resp.success){state=resp.state;if(state.strategies)STRATS=state.strategies;document.querySelector('#screen-create').classList.add('hidden');document.querySelector('#screen-game').classList.remove('hidden');updateAllUI();alert('Welcome to the pros, '+name+'!');}else{alert('Error: '+(resp&&resp.error)||'Unknown');}
+  if(btn){btn.textContent='START CAREER';btn.disabled=false;}
+})()" class="btn btn-primary" style="font-size:16px;padding:12px 40px;">START CAREER</button>
       </div>
     </div>
   </div>
