@@ -248,6 +248,8 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 
       <div style="margin-top:12px;text-align:center">
         <button id="quickStartBtn" onclick="(async function(){ 
+  const urlParams = new URLSearchParams(window.location.search);
+  const curSid = urlParams.get('sid') || 'sess_' + Math.random().toString(36).slice(2);
   const names = ['Alex Torres','Jordan Lee','Mike Santos','Chris Kim','James Chen','Ryan Silva','Dan Williams','Tom Johnson','Sam Jackson','Carlos Rivera'];
   const name = names[Math.floor(Math.random() * names.length)];
   const nationalities = ['American','Brazilian','Russian','Japanese','British','Canadian','French','Dutch','Australian','Polish','Korean','Mexican','Chinese','Swedish','Irish','Nigerian','New Zealander','German','Italian','Spanish','Ukrainian','Cuban','Jamaican','South African','Swiss','Belgian','Norwegian','Finnish','Danish','Icelandic'];
@@ -258,13 +260,12 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
   const btn = document.querySelector('#quickStartBtn');
   if(btn){btn.textContent='Creating...';btn.disabled=true;}
   try {
-    const resp = await fetch('/api/create_fighter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,age:Math.floor(Math.random()*10)+22,background:bg,weight_class:4,sid,nationality,region,trait_id:null,personality_id:['charismatic','intimidating','humble','cocky','quiet','savage'][Math.floor(Math.random()*6)]})});
+    const resp = await fetch('/api/create_fighter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,age:Math.floor(Math.random()*10)+22,background:bg,weight_class:4,sid:curSid,nationality,region,trait_id:null,personality_id:['charismatic','intimidating','humble','cocky','quiet','savage'][Math.floor(Math.random()*6)]})});
     const json = await resp.json();
-    alert('Response: success=' + json.success);
-    if(json && json.success){state=json.state;if(state.strategies)STRATS=state.strategies;document.querySelector('#screen-create').classList.add('hidden');document.querySelector('#screen-game').classList.remove('hidden');updateAllUI();alert('Welcome to the pros, '+name+'!');}else{alert('Error: '+(json&&json.error)||'Unknown');}
-  } catch(e) {
-    alert('Exception: ' + e.message);
-  }
+    if(json && json.success){
+      state=json.state;if(state.strategies)STRATS=state.strategies;document.querySelector('#screen-create').classList.add('hidden');document.querySelector('#screen-game').classList.remove('hidden');updateAllUI();alert('Welcome to the pros, '+name+'!');history.pushState(null,'','/?sid='+curSid);
+    }else{alert('Error: '+(json&&json.error)||'Unknown');}
+  } catch(e) {alert('Exception: ' + e.message);}
   if(btn){btn.textContent='START CAREER';btn.disabled=false;}
 })()" class="btn btn-primary" style="font-size:16px;padding:12px 40px;">START CAREER</button>
       </div>
