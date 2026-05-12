@@ -517,7 +517,10 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/create_fighter":
                 ensure_initialized()
-                name = body.get("name", "Fighter")
+                name = body.get("name", "")
+                if not name or name.strip() == "":
+                    first, last = utils.generate_name()
+                    name = f"{first} {last}"
                 age = body.get("age", 25)
                 bg = body.get("background", "mma")
                 wc_param = body.get("weight_class", 3)

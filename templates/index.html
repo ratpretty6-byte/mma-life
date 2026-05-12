@@ -720,47 +720,7 @@ function updateRegions() {
 }
 
 document.getElementById('startCareerBtn').addEventListener('click', async function() {
-  const btn = this;
-  btn.textContent = 'Creating...';
-  btn.disabled = true;
-  const firsts = ["James","John","Mike","Chris","Dave","Alex","Max","Ray","Jake","Cole","Kai","Zion","Rex","Ash","Blake","Drew","Kurt","Ross","Sean","Wade","Marcus","Adrian","Erik","Andre","Tyler"];
-  const lasts = ["Smith","Jones","Miller","Garcia","Lee","Kim","Brown","Davis","Wilson","Taylor","Anderson","Thomas","Jackson","White","Harris","Martin","Thompson","Moore","Allen","King","Walker","Wright","Hill","Green","Adams"];
-  const nicks = ["The Viper","Iron","Destroyer","Phoenix","Nightmare","Predator","Beast","Dragon","Renegade","Warrior","Samurai","Gladiator","Hurricane","Avalanche","Titan","Fury","Hammer","Blitz","Storm","Shadow"];
-  const name = firsts[Math.floor(Math.random()*firsts.length)] + ' "' + nicks[Math.floor(Math.random()*nicks.length)] + '" ' + lasts[Math.floor(Math.random()*lasts.length)];
-  try {
-    const resp = await fetch('/api/create_fighter', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        name: name,
-        age: 25,
-        background: 'mma',
-        weight_class: 3,
-        nationality: 'American',
-        region: 'California',
-        personality_id: 'humble',
-        sid: sid
-      })
-    });
-    const data = await resp.json();
-    if (data.success) {
-      state = data.state;
-      sid = data.sid || sid;
-      if (state.strategies) STRATS = state.strategies;
-      qs("#screen-create").classList.add("hidden");
-      qs("#screen-game").classList.remove("hidden");
-      updateAllUI();
-      toast('Fighter created! Welcome to the pros.', 'success');
-    } else {
-      toast('Error: ' + (data.error || 'Unknown'), 'error');
-      btn.textContent = 'START CAREER';
-      btn.disabled = false;
-    }
-  } catch(e) {
-    btn.textContent = 'START CAREER';
-    btn.disabled = false;
-    window.location.href = '/create';
-  }
+  createFighter();
 });
 
 init();
@@ -777,7 +737,7 @@ async function createFighter() {
   const persBtn = qs("#personalityGrid .selected");
   const personality_id = persBtn ? persBtn.dataset.pers || "humble" : "humble";
 
-  const btn = qs("#createBtn");
+  const btn = qs("#startCareerBtn");
   btn.textContent = "Creating...";
   btn.disabled = true;
   const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id });
