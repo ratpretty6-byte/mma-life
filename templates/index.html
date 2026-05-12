@@ -247,15 +247,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div style="margin-top:12px;text-align:center">
-        <form action="/api/create_fighter" method="POST" style="display:inline">
-          <input type="hidden" name="age" value="25">
-          <input type="hidden" name="background" value="mma">
-          <input type="hidden" name="weight_class" value="3">
-          <input type="hidden" name="nationality" value="American">
-          <input type="hidden" name="region" value="California">
-          <input type="hidden" name="personality_id" value="humble">
-          <button type="submit" class="btn btn-primary" style="font-size:16px;padding:12px 40px;border:none;cursor:pointer;">START CAREER</button>
-        </form>
+        <button id="startCareerBtn" class="btn btn-primary" style="font-size:16px;padding:12px 40px;border:none;cursor:pointer;">START CAREER</button>
       </div>
     </div>
   </div>
@@ -599,7 +591,8 @@ function initCreateForm() {
   NATIONALITIES.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; natSel.appendChild(o); });
   natSel.value = "American";
   updateRegions();
-  natSel.onchange = updateRegions;
+  natSel.addEventListener('change', updateRegions);
+  natSel.addEventListener('input', updateRegions);
 
   const tGrid = qs("#traitGrid");
   const TRAITS = [
@@ -696,6 +689,50 @@ function updateRegions() {
   // Auto-select first region
   if (regions.length > 0) rSel.value = regions[0];
 }
+
+document.getElementById('startCareerBtn').addEventListener('click', async function() {
+  const btn = this;
+  btn.textContent = 'Creating...';
+  btn.disabled = true;
+  const firsts = ["James","John","Mike","Chris","Dave","Alex","Max","Ray","Jake","Cole","Kai","Zion","Rex","Ash","Blake","Drew","Kurt","Ross","Sean","Wade","Marcus","Adrian","Erik","Andre","Tyler"];
+  const lasts = ["Smith","Jones","Miller","Garcia","Lee","Kim","Brown","Davis","Wilson","Taylor","Anderson","Thomas","Jackson","White","Harris","Martin","Thompson","Moore","Allen","King","Walker","Wright","Hill","Green","Adams"];
+  const nicks = ["The Viper","Iron","Destroyer","Phoenix","Nightmare","Predator","Beast","Dragon","Renegade","Warrior","Samurai","Gladiator","Hurricane","Avalanche","Titan","Fury","Hammer","Blitz","Storm","Shadow"];
+  const name = firsts[Math.floor(Math.random()*firsts.length)] + ' "' + nicks[Math.floor(Math.random()*nicks.length)] + '" ' + lasts[Math.floor(Math.random()*lasts.length)];
+  try {
+    const resp = await fetch('/api/create_fighter', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        name: name,
+        age: 25,
+        background: 'mma',
+        weight_class: 3,
+        nationality: 'American',
+        region: 'California',
+        personality_id: 'humble',
+        sid: sid
+      })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      state = data.state;
+      sid = data.sid || sid;
+      if (state.strategies) STRATS = state.strategies;
+      qs("#screen-create").classList.add("hidden");
+      qs("#screen-game").classList.remove("hidden");
+      updateAllUI();
+      toast('Fighter created! Welcome to the pros.', 'success');
+    } else {
+      toast('Error: ' + (data.error || 'Unknown'), 'error');
+      btn.textContent = 'START CAREER';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+    btn.textContent = 'START CAREER';
+    btn.disabled = false;
+  }
+});
 
 init();
 
