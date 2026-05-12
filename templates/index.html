@@ -6,16 +6,16 @@
 <title>MMA Life Simulator</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; padding-bottom: 60px; }
 .container { max-width: 960px; margin: 0 auto; padding: 10px; }
 .hidden { display: none !important; }
-.btn { display: inline-block; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s; -webkit-tap-highlight-color: transparent; }
+.btn { display: inline-block; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s; -webkit-tap-highlight-color: transparent; min-height: 44px; }
 .btn:active { transform: scale(0.97); }
 .btn-primary { background: #e62400; color: #fff; }
 .btn-primary:hover { background: #ff2e00; }
 .btn-secondary { background: #2a2a3a; color: #e0e0e0; }
 .btn-secondary:hover { background: #3a3a4a; }
-.btn-small { padding: 5px 12px; font-size: 12px; }
+.btn-small { padding: 5px 12px; font-size: 12px; min-height: 32px; }
 .btn-success { background: #1a8a3a; color: #fff; }
 .btn-danger { background: #8a1a1a; color: #fff; }
 .btn-gold { background: #b8860b; color: #fff; }
@@ -29,35 +29,53 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .stat-row:last-child { border-bottom: none; }
 .stat-label { color: #888; font-size: 13px; }
 .stat-value { color: #fff; font-weight: 600; font-size: 13px; }
-.header { background: #14141f; border-bottom: 2px solid #e62400; padding: 10px 0; margin-bottom: 12px; }
+.header { background: #14141f; border-bottom: 2px solid #e62400; padding: 10px 0; margin-bottom: 12px; position: sticky; top: 0; z-index: 50; }
 .header h1 { font-size: 17px; color: #e62400; }
 .header .sub { font-size: 11px; color: #888; }
-.tabs { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 10px; }
-.tab { padding: 7px 12px; background: #1a1a2a; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 12px; font-weight: 600; color: #888; border: 1px solid #2a2a3a; border-bottom: none; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+/* Desktop Tabs */
+.desktop-tabs { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 10px; }
+.tab { padding: 8px 14px; background: #1a1a2a; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 12px; font-weight: 600; color: #888; border: 1px solid #2a2a3a; border-bottom: none; -webkit-tap-highlight-color: transparent; user-select: none; transition: all .15s; }
+.tab:hover { color: #e0e0e0; background: #22223a; }
 .tab.active { background: #14141f; color: #e62400; border-color: #e62400; }
+
+/* Bottom Tab Bar (mobile) */
+.bottom-tabs { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #0d0d18; border-top: 2px solid #e62400; z-index: 200; padding: 4px 0 env(safe-area-inset-bottom, 4px); }
+.bottom-tab { flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 6px 4px; font-size: 10px; color: #666; -webkit-tap-highlight-color: transparent; user-select: none; transition: color .15s; border: none; background: none; }
+.bottom-tab .tab-icon { font-size: 18px; line-height: 1.2; }
+.bottom-tab.active { color: #e62400; }
+.bottom-tab.active .tab-icon { color: #e62400; }
+
 .scroll { max-height: 70vh; overflow-y: auto; }
 .screen-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 12px; text-align: center; }
-.fight-log { background: #07070c; border: 1px solid #2a2a3a; border-radius: 6px; padding: 10px; height: 240px; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
-.fight-log .action { color: #ccc; }
-.fight-log .damage { color: #e62400; font-style: italic; }
-.fight-log .big { color: #ffd700; font-weight: 700; font-size: 14px; }
-.fight-log .info { color: #4a9eff; }
-.fight-log .round { color: #fff; font-weight: 700; font-size: 14px; text-align: center; }
-.fight-log .round-summary { color: #b0b0ff; font-style: italic; font-size: 12px; text-align: center; }
+
+/* Fight Log - enhanced */
+.fight-log { background: #07070c; border: 1px solid #2a2a3a; border-radius: 6px; padding: 8px; height: 280px; overflow-y: auto; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; line-height: 1.5; }
+.fight-log .ev { padding: 2px 6px; margin: 1px 0; border-radius: 3px; }
+.fight-log .ev:nth-child(odd) { background: rgba(255,255,255,0.02); }
+.fight-log .ev-action { color: #ccc; font-size: 12.5px; }
+.fight-log .ev-round { color: #fff; font-weight: 700; font-size: 13px; text-align: center; padding: 6px; background: rgba(230,36,0,0.08); border-radius: 4px; margin: 4px 0; }
+.fight-log .ev-summary { color: #888; font-style: italic; font-size: 12px; text-align: center; }
+.fight-log .ev-big { color: #ffd700; font-weight: 700; font-size: 14px; padding: 4px 6px; background: rgba(255,215,0,0.06); border-radius: 4px; }
+.fight-log .ev-info { color: #4a9eff; font-size: 12px; }
+.fight-log .ev-score { color: #aaa; font-size: 11px; padding-left: 8px; }
 .fight-log .fn { color: #ff9a4a; font-weight: 600; }
 .fight-log .act { color: #4aff6a; font-weight: 500; }
-.fight-log .dmg { color: #ff4a4a; font-weight: 700; }
 .fight-log .ko-word { color: #ffd700; font-weight: 900; font-size: 15px; text-shadow: 0 0 8px rgba(255,215,0,0.4); }
 .fight-log .sub-word { color: #4a9eff; font-weight: 900; font-size: 15px; }
-.fight-log .score-num { color: #ffd700; font-weight: 700; }
+.fight-log .time-tag { color: #555; font-size: 10px; margin-right: 6px; font-family: monospace; }
+.fight-log .ts { color: #444; font-size: 10px; font-family: monospace; margin-right: 4px; user-select: none; }
+.fight-log .dmg { color: #ff4a4a; font-weight: 600; }
+
+/* Strategy selector */
 .strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-.strategy-btn { padding: 7px; background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 6px; cursor: pointer; color: #e0e0e0; font-size: 12px; text-align: left; -webkit-tap-highlight-color: transparent; }
+.strategy-btn { padding: 8px; background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 6px; cursor: pointer; color: #e0e0e0; font-size: 12px; text-align: left; -webkit-tap-highlight-color: transparent; min-height: 44px; }
 .strategy-btn:hover { border-color: #e62400; background: #2a1a1a; }
 .strategy-btn.selected { border-color: #e62400; background: #3a2020; }
-.strategy-btn.small { font-size: 11px; padding: 5px 8px; }
-.strategy-btn input { display: none; }
-.strategy-btn:has(input:checked) { border-color: #e62400; background: #3a2020; }
-.opponent-card { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #1a1a2a; border-radius: 6px; margin-bottom: 5px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.strategy-btn.small { font-size: 11px; padding: 5px 8px; min-height: 36px; }
+
+/* Opponent cards */
+.opponent-card { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #1a1a2a; border-radius: 6px; margin-bottom: 5px; cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 44px; }
 .opponent-card:hover { background: #2a2a3a; }
 .opponent-card:active { background: #3a3a4a; }
 .opponent-card .name { font-weight: 700; font-size: 13px; }
@@ -67,28 +85,45 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .diff-medium { background: #4a4a1a; color: #ffd700; }
 .diff-hard { background: #4a1a1a; color: #ff4a4a; }
 .diff-pick { background: #2a2a4a; color: #4a9eff; }
-select, input { background: #1a1a2a; color: #e0e0e0; border: 1px solid #2a2a3a; padding: 7px 10px; border-radius: 6px; font-size: 13px; width: 100%; }
+
+/* Health Bars - redesigned */
+.health-bar-outer { height: 16px; background: #1a1a2a; border-radius: 8px; overflow: hidden; position: relative; }
+.health-bar-inner { height: 100%; border-radius: 8px; transition: width .4s ease; }
+.stamina-bar-outer { height: 10px; background: #1a1a2a; border-radius: 5px; overflow: hidden; }
+.stamina-bar-inner { height: 100%; border-radius: 5px; transition: width .4s ease; }
+.blood-bar-outer { height: 6px; background: #1a1a2a; border-radius: 3px; overflow: hidden; }
+.blood-bar-inner { height: 100%; border-radius: 3px; background: #8b0000; transition: width .4s ease; }
+.hp-label { font-size: 10px; color: #888; margin-top: 2px; }
+
+select, input { background: #1a1a2a; color: #e0e0e0; border: 1px solid #2a2a3a; padding: 7px 10px; border-radius: 6px; font-size: 13px; width: 100%; min-height: 44px; }
 select option { background: #1a1a2a; }
 label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin-top: 6px; }
+
 .fade-in { animation: fadeIn .25s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.pulse { animation: pulse 1s ease infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .modal { background: #14141f; border: 1px solid #2a2a3a; border-radius: 12px; padding: 20px; max-width: 560px; width: 92%; max-height: 85vh; overflow-y: auto; }
 .modal h2 { color: #fff; margin-bottom: 10px; font-size: 16px; }
 .modal h3 { color: #e62400; font-size: 14px; margin: 8px 0 4px; }
-.list-item { padding: 7px 10px; background: #1a1a2a; border-radius: 6px; margin-bottom: 4px; cursor: pointer; font-size: 13px; -webkit-tap-highlight-color: transparent; }
+.list-item { padding: 10px; background: #1a1a2a; border-radius: 6px; margin-bottom: 4px; cursor: pointer; font-size: 13px; -webkit-tap-highlight-color: transparent; min-height: 44px; }
 .list-item:hover { background: #2a2a3a; }
 .list-item:active { background: #3a3a4a; }
+
 .attr-bar { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 .attr-bar .label { width: 140px; font-size: 12px; color: #aaa; text-align: right; flex-shrink: 0; }
-.attr-bar .track { flex: 1; height: 14px; background: #1a1a2a; border-radius: 7px; overflow: hidden; position: relative; }
+.attr-bar .track { flex: 1; height: 14px; background: #1a1a2a; border-radius: 7px; overflow: hidden; }
 .attr-bar .fill { height: 100%; border-radius: 7px; transition: width .3s; }
 .attr-bar .fill.phys { background: linear-gradient(90deg, #4a9eff, #e62400); }
 .attr-bar .fill.ment { background: linear-gradient(90deg, #8a4aff, #ff6a4a); }
 .attr-bar .val { width: 30px; font-size: 11px; color: #fff; text-align: right; flex-shrink: 0; }
-.speed-btn { padding: 4px 10px; font-size: 11px; background: #1a1a2a; border: 1px solid #333; border-radius: 4px; color: #888; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+.speed-btn { padding: 4px 10px; font-size: 11px; background: #1a1a2a; border: 1px solid #333; border-radius: 4px; color: #888; cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 32px; }
 .speed-btn.active { border-color: #e62400; color: #e62400; background: #2a1515; }
 .speed-btn:hover { border-color: #e62400; }
+
 .schedule-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 8px 0; }
 .sched-day { text-align: center; padding: 6px 2px; background: #1a1a2a; border-radius: 4px; font-size: 11px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .sched-day:active { background: #2a2a3a; }
@@ -96,7 +131,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 .sched-day .day-name { color: #888; font-size: 10px; }
 .sched-day .day-drill { color: #fff; font-size: 10px; margin-top: 2px; }
 .sched-day .day-drill.rest { color: #4a9eff; }
-.speed-row { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+.speed-row { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
 .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .compare-col { background: #1a1a2a; border-radius: 6px; padding: 10px; }
 .compare-col h4 { color: #e62400; font-size: 13px; margin-bottom: 6px; }
@@ -107,27 +142,36 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 .tag-loss { background: #4a1a1a; color: #ff4a4a; }
 .tag-promo { background: #2a2a4a; color: #4a9eff; }
 .tag-champ { background: #4a4a1a; color: #ffd700; }
-.toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
-.toast { background: #1a1a2a; border: 1px solid #e62400; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; animation: toastIn .3s ease, toastOut .3s ease 2.7s; max-width: 90vw; text-align: center; pointer-events: auto; }
+
+.toast-container { position: fixed; top: 60px; right: 10px; z-index: 200; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.toast { background: #14141f; border: 1px solid #e62400; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; animation: toastIn .3s ease, toastOut .3s ease 2.7s; max-width: 300px; text-align: center; pointer-events: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
 .toast.success { border-color: #4aff6a; }
 .toast.error { border-color: #ff4a4a; }
-@keyframes toastIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
 .next-action { background: linear-gradient(135deg, #1a2a1a, #14141f); border: 1px solid #4aff6a; border-radius: 8px; padding: 12px; margin-bottom: 8px; text-align: center; }
 .next-action .action-label { color: #4aff6a; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
 .next-action .action-text { color: #fff; font-size: 14px; font-weight: 600; margin-top: 4px; }
-@media (max-width: 600px) {
+.next-action .action-btn { margin-top: 8px; }
+
+.spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #333; border-top-color: #e62400; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .desktop-tabs { display: none; }
+  .bottom-tabs { display: flex; }
+  body { padding-bottom: 56px; }
   .strategy-grid { grid-template-columns: 1fr; }
-  .tabs { font-size: 10px; }
-  .tab { padding: 5px 8px; flex: 1; text-align: center; }
   .compare-grid { grid-template-columns: 1fr; }
-  .attr-bar .label { width: 100px; }
+  .attr-bar .label { width: 90px; font-size: 11px; }
   .schedule-grid { grid-template-columns: repeat(7, 1fr); font-size: 10px; }
   .header h1 { font-size: 14px; }
   .container { padding: 6px; }
   .card { padding: 10px; }
   .screen-title { font-size: 17px; }
-  .fight-log { height: 280px; font-size: 12px; }
+  .fight-log { height: 260px; font-size: 12px; }
 }
 </style>
 </head>
@@ -253,7 +297,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
   </div>
 
   <div id="screen-game" class="hidden">
-    <div class="tabs" id="mainTabs">
+    <div class="desktop-tabs" id="mainTabs">
       <div class="tab active" data-tab="home" onclick="switchTab('home')">Home</div>
       <div class="tab" data-tab="gym" onclick="switchTab('gym')">Gym</div>
       <div class="tab" data-tab="fight" onclick="switchTab('fight')">Fight</div>
@@ -362,68 +406,38 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div id="fightLive" class="hidden">
-        <div id="fightHealthBars" class="card" style="margin-bottom:6px;padding:8px">
-          <div style="display:grid;grid-template-columns:1fr 30px 1fr;gap:8px;align-items:center">
-            <div style="text-align:right">
-              <div id="f1NameBar" style="font-weight:700;font-size:14px;color:#e0e0e0"></div>
-              <div id="f1StateBar" style="font-size:11px;margin-top:2px"></div>
-              <div id="f1RoundInfo" style="font-size:10px;color:#888;margin-top:4px"></div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:4px">
-              <div>
-                <div style="font-size:9px;color:#888;text-align:center;margin-bottom:2px">DMG</div>
-                <div style="height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden;width:24px">
-                  <div id="f1HpBar" style="height:100%;width:100%;background:#e62400;border-radius:4px;transition:width .3s"></div>
-                </div>
-              </div>
-              <div>
-                <div style="font-size:9px;color:#888;text-align:center;margin-bottom:2px">ST</div>
-                <div style="height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden;width:24px">
-                  <div id="f1StamBar" style="height:100%;width:100%;background:#4a9eff;border-radius:4px;transition:width .3s"></div>
-                </div>
+        <div id="fightHealthBars" class="card" style="margin-bottom:6px;padding:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <div class="flex-between"><span id="f1NameBar" style="font-weight:700;font-size:14px;color:#e0e0e0"></span><span id="f1StateBar" style="font-size:11px"></span></div>
+              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f1HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,#ff9a4a,#4aff6a)"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f1StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,#4a9eff)"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Blood</div><div class="blood-bar-outer"><div id="f1BloodBar" class="blood-bar-inner" style="width:0%"></div></div></div>
+              <div class="flex-row" style="margin-top:3px;gap:4px">
+                <span style="font-size:9px;color:#888">H:<span id="f1HeadBar" style="color:#e62400">100</span></span>
+                <span style="font-size:9px;color:#888">B:<span id="f1BodyBar" style="color:#e62400">100</span></span>
+                <span style="font-size:9px;color:#888">L:<span id="f1LegBar" style="color:#e62400">100</span></span>
               </div>
             </div>
-            <div style="text-align:left">
-              <div id="f2NameBar" style="font-weight:700;font-size:14px;color:#e0e0e0"></div>
-              <div id="f2StateBar" style="font-size:11px;margin-top:2px"></div>
-              <div id="f2RoundInfo" style="font-size:10px;color:#888;margin-top:4px"></div>
-              <div style="display:flex;gap:8px;margin-top:4px">
-                <div>
-                  <div style="font-size:9px;color:#888;text-align:center;margin-bottom:2px">DMG</div>
-                  <div style="height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden;width:24px">
-                    <div id="f2HpBar" style="height:100%;width:100%;background:#e62400;border-radius:4px;transition:width .3s"></div>
-                  </div>
-                </div>
-                <div>
-                  <div style="font-size:9px;color:#888;text-align:center;margin-bottom:2px">ST</div>
-                  <div style="height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden;width:24px">
-                    <div id="f2StamBar" style="height:100%;width:100%;background:#4a9eff;border-radius:4px;transition:width .3s"></div>
-                  </div>
-                </div>
+            <div>
+              <div class="flex-between"><span id="f2NameBar" style="font-weight:700;font-size:14px;color:#e0e0e0"></span><span id="f2StateBar" style="font-size:11px"></span></div>
+              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f2HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,#4aff6a,#ff9a4a,#ff4a4a);float:right"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f2StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,#4a9eff,#ff4a4a);float:right"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Blood</div><div class="blood-bar-outer"><div id="f2BloodBar" class="blood-bar-inner" style="width:0%;float:right"></div></div></div>
+              <div class="flex-row" style="margin-top:3px;gap:4px;justify-content:flex-end">
+                <span style="font-size:9px;color:#888">H:<span id="f2HeadBar" style="color:#e62400">100</span></span>
+                <span style="font-size:9px;color:#888">B:<span id="f2BodyBar" style="color:#e62400">100</span></span>
+                <span style="font-size:9px;color:#888">L:<span id="f2LegBar" style="color:#e62400">100</span></span>
               </div>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 30px 30px 30px 30px 1fr;gap:4px;align-items:center;margin-top:4px">
-            <div style="text-align:right;font-size:9px;color:#888">Head</div>
-            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f1HeadBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
-            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f1BodyBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
-            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f1LegBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
-            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f1BloodBar" style="height:100%;width:0%;background:#8b0000;border-radius:3px;transition:width .3s"></div></div>
-            <div style="font-size:9px;color:#888">Blood</div>
-            <div style="text-align:right;font-size:9px;color:#888">Head</div>
-            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f2HeadBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
-            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f2BodyBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
-            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f2LegBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
-            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f2BloodBar" style="height:100%;width:0%;background:#8b0000;border-radius:3px;transition:width .3s"></div></div>
-            <div style="font-size:9px;color:#888">Blood</div>
-          </div>
-          <div id="fightScoreBars" style="margin-top:6px;display:none">
+          <div id="fightScoreBars" style="margin-top:8px;display:none">
             <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px">
-              <div id="f1ScoreBar" style="flex:1;height:12px;background:#1a2a1a;border-radius:3px;overflow:hidden">
+              <div id="f1ScoreBar" style="flex:1;height:10px;background:#1a2a1a;border-radius:3px;overflow:hidden">
                 <div id="f1ScoreFill" style="height:100%;width:50%;background:#ffd700;border-radius:3px;transition:width .3s"></div>
               </div>
-              <span id="scoreText" style="font-size:11px;color:#ffd700;min-width:30px;text-align:center">0-0</span>
-              <div id="f2ScoreBar" style="flex:1;height:12px;background:#2a1a1a;border-radius:3px;overflow:hidden">
+              <span id="scoreText" style="font-size:11px;color:#ffd700;min-width:30px;text-align:center;font-weight:700">0-0</span>
+              <div id="f2ScoreBar" style="flex:1;height:10px;background:#2a1a1a;border-radius:3px;overflow:hidden">
                 <div id="f2ScoreFill" style="height:100%;width:50%;background:#ffd700;border-radius:3px;transition:width .3s;float:right"></div>
               </div>
             </div>
@@ -434,6 +448,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
             <div class="card-title" style="margin-bottom:0">LIVE FIGHT</div>
             <div class="speed-row" id="speedControls">
               <span style="font-size:11px;color:#888">Speed:</span>
+              <button class="speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5x</button>
               <button class="speed-btn active" data-speed="1" onclick="setSpeed(1)">1x</button>
               <button class="speed-btn" data-speed="2" onclick="setSpeed(2)">2x</button>
               <button class="speed-btn" data-speed="4" onclick="setSpeed(4)">4x</button>
@@ -507,20 +522,33 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
         <div class="stat-row"><span class="stat-label">Sponsorship</span><span class="stat-value" id="fSponsor">$0/mo</span></div>
         <div class="stat-row"><span class="stat-label">Monthly Living</span><span class="stat-value">$1,000/mo</span></div>
       </div>
+      <div class="card">
+        <div class="card-title">Management</div>
+        <div class="flex-row">
+          <button class="btn btn-secondary btn-small" onclick="showAgentList()">Hire/Fire Agent</button>
+          <button class="btn btn-secondary btn-small" onclick="showGymList()">Change Gym</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
+<div class="bottom-tabs" id="bottomTabs">
+  <button class="bottom-tab active" data-tab="home" onclick="switchTab('home')"><span class="tab-icon">&#x1F3E0;</span>Home</button>
+  <button class="bottom-tab" data-tab="gym" onclick="switchTab('gym')"><span class="tab-icon">&#x1F4AA;</span>Gym</button>
+  <button class="bottom-tab" data-tab="fight" onclick="switchTab('fight')"><span class="tab-icon">&#x1F94A;</span>Fight</button>
+  <button class="bottom-tab" data-tab="career" onclick="switchTab('career')"><span class="tab-icon">&#x1F3C6;</span>Career</button>
+  <button class="bottom-tab" data-tab="finance" onclick="switchTab('finance')"><span class="tab-icon">&#x1F4B0;</span>Finance</button>
+</div>
+
+<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">">
   <div class="modal" id="modalContent"></div>
 </div>
 
 <div id="toastContainer" class="toast-container"></div>
 
 <script>
-console.log("JS loaded");
 const BASE = "";
-// Get sid from URL if present
 const urlParams = new URLSearchParams(window.location.search);
 const urlSid = urlParams.get("sid");
 let sid = urlSid || "sess_" + Math.random().toString(36).slice(2);
@@ -561,13 +589,27 @@ function toast(msg, type) {
   setTimeout(() => el.remove(), 3000);
 }
 
+function setLoading(btn, loading) {
+  if (loading) {
+    btn._origText = btn.textContent;
+    btn.innerHTML = '<span class="spinner"></span>Loading...';
+    btn.disabled = true;
+  } else {
+    btn.innerHTML = btn._origText || btn.textContent;
+    btn.disabled = false;
+  }
+}
+
 function switchTab(tab) {
   qsa(".tab-content").forEach(e => e.classList.add("hidden"));
   qsa(".tab").forEach(e => e.classList.remove("active"));
+  qsa(".bottom-tab").forEach(e => e.classList.remove("active"));
   const tc = qs(`#tab-${tab}`);
   if (tc) tc.classList.remove("hidden");
   const tb = qs(`[data-tab="${tab}"]`);
   if (tb) tb.classList.add("active");
+  const bt = qs(`.bottom-tab[data-tab="${tab}"]`);
+  if (bt) bt.classList.add("active");
   if (tab === "home") refreshHomeTab();
   else if (tab === "gym") refreshGymTab();
   else if (tab === "fight") refreshFightTab();
@@ -613,7 +655,6 @@ async function init() {
 }
 
 function initCreateForm() {
-  console.log("initCreateForm called");
   const natSel = qs("#fNationality");
   natSel.innerHTML = "";
   const NATIONALITIES = ["American","Brazilian","Russian","Japanese","British","Canadian","French","Dutch","Australian","Polish","Korean","Mexican","Chinese","Swedish","Irish","Nigerian","New Zealander","German","Italian","Spanish","Ukrainian","Cuban","Jamaican","South African","Swiss","Belgian","Norwegian","Finnish","Danish","Icelandic"];
@@ -764,9 +805,6 @@ function updateAllUI() {
   const car = state.career;
   const fb = state.fight_booking;
   const gd = state.game_date;
-  _f1Name = escHtml(f.name);
-  _f2Name = fb && fb.opponent ? escHtml(fb.opponent.name) : "";
-
   qs("#headerStatus").textContent = `${f.name} | ${f.record} | #${f.rank} | ${p ? p.name : "FA"}`;
 
   qs("#hRecord").textContent = f.record;
@@ -872,18 +910,15 @@ async function refreshHomeTab() {
 
 async function advanceDay() {
   const btn = qs("#btnAdvanceDay");
-  btn.textContent = "Advancing...";
-  btn.disabled = true;
+  setLoading(btn, true);
   const timeout = setTimeout(() => {
-    btn.textContent = "ADVANCE DAY";
-    btn.disabled = false;
+    setLoading(btn, false);
     toast("Request timed out — server busy, try again", "error");
   }, 20000);
   try {
     const resp = await api("/api/advance_day", { sid });
     clearTimeout(timeout);
-    btn.textContent = "ADVANCE DAY";
-    btn.disabled = false;
+    setLoading(btn, false);
     if (resp.success) {
       state = resp.state;
       if (state && state.strategies) STRATS = state.strategies;
@@ -913,26 +948,22 @@ async function advanceDay() {
     }
   } catch(e) {
     clearTimeout(timeout);
-    btn.textContent = "ADVANCE DAY";
-    btn.disabled = false;
+    setLoading(btn, false);
     toast("Request failed — try again", "error");
   }
 }
 
 async function advanceSkip(days) {
   const btn = qs("#btnAdvanceDay");
-  btn.textContent = "Advancing...";
-  btn.disabled = true;
+  setLoading(btn, true);
   const timeout = setTimeout(() => {
-    btn.textContent = "ADVANCE DAY";
-    btn.disabled = false;
+    setLoading(btn, false);
     toast("Request timed out — server busy, try again", "error");
   }, 30000);
   try {
     const resp = await api("/api/advance_time", { sid, days });
     clearTimeout(timeout);
-    btn.textContent = "ADVANCE DAY";
-    btn.disabled = false;
+    setLoading(btn, false);
     if (resp.success) {
       state = resp.state;
       if (state && state.strategies) STRATS = state.strategies;
@@ -1390,9 +1421,7 @@ function setSpeed(s) {
 }
 
 async function startFight() {
-  console.log("startFight called, strategy:", selectedStrategy);
   const resp = await api("/api/start_fight", { sid, strategy: selectedStrategy });
-  console.log("startFight resp:", resp);
   if (!resp.success) { toast(resp.error || "Failed", "error"); return; }
   qs("#fightReady").classList.add("hidden");
   qs("#fightPre").classList.add("hidden");
@@ -1403,7 +1432,6 @@ async function startFight() {
   qs("#fightRoundReports").classList.add("hidden");
   qs("#fightHeader").textContent = `${state.fighter.name} vs ${resp.opponent} | ${state.fight_booking.is_title ? "TITLE FIGHT" : "3 Rounds"}`;
 
-  // Initialize health bars
   const f1Name = state.fighter.name;
   const f2Name = resp.opponent;
   qs("#f1NameBar").textContent = f1Name;
@@ -1411,14 +1439,12 @@ async function startFight() {
   qs("#f1StateBar").textContent = "";
   qs("#f2StateBar").textContent = "";
 
-  // Initialize health from the fight result's starting health if available
   if (resp.fight_result && resp.fight_result.f1_health) {
     updateHealthBars(resp.fight_result.f1_health, resp.fight_result.f2_health);
   } else {
-    updateHealthBars({head:100,body:100,legs:100,overall:100}, {head:100,body:100,legs:100,overall:100});
+    updateHealthBars({head:100,body:100,legs:100,overall:100,stamina:100,blood:0}, {head:100,body:100,legs:100,overall:100,stamina:100,blood:0});
   }
 
-  // Show score bars for title fights or regular fights
   qs("#fightScoreBars").style.display = "block";
   updateScoreBars(0, 0);
 
@@ -1428,24 +1454,24 @@ async function startFight() {
 
 function updateHealthBars(f1Health, f2Health) {
   if (f1Health) {
-    const overall = Math.max(0, f1Health.overall || 100);
-    const stamina = Math.max(0, f1Health.stamina || 100);
-    qs("#f1HpBar").style.width = overall + "%";
-    qs("#f1HpBar").style.background = overall > 60 ? "#e62400" : (overall > 30 ? "#ff6a00" : "#ff0000");
-    qs("#f1StamBar").style.width = stamina + "%";
-    qs("#f1StamBar").style.background = stamina > 50 ? "#4a9eff" : (stamina > 25 ? "#ff9a4a" : "#ff4a4a");
+    const h = Math.max(0, f1Health.overall || 100);
+    const s = Math.max(0, f1Health.stamina || 100);
+    qs("#f1HpBar").style.width = h + "%";
+    qs("#f1StamBar").style.width = s + "%";
+    qs("#f1BloodBar").style.width = Math.min(100, f1Health.blood || 0) + "%";
+    qs("#f1HeadBar").textContent = Math.max(0, f1Health.head || 100).toFixed(0);
+    qs("#f1BodyBar").textContent = Math.max(0, f1Health.body || 100).toFixed(0);
+    qs("#f1LegBar").textContent = Math.max(0, f1Health.legs || 100).toFixed(0);
   }
   if (f2Health) {
-    const overall = Math.max(0, f2Health.overall || 100);
-    const stamina = Math.max(0, f2Health.stamina || 100);
-    qs("#f2HpBar").style.width = overall + "%";
-    qs("#f2HpBar").style.background = overall > 60 ? "#e62400" : (overall > 30 ? "#ff6a00" : "#ff0000");
-    qs("#f2StamBar").style.width = stamina + "%";
-    qs("#f2StamBar").style.background = stamina > 50 ? "#4a9eff" : (stamina > 25 ? "#ff9a4a" : "#ff4a4a");
-    qs("#f2HeadBar").style.width = Math.max(0, f2Health.head || 100) + "%";
-    qs("#f2BodyBar").style.width = Math.max(0, f2Health.body || 100) + "%";
-    qs("#f2LegBar").style.width = Math.max(0, f2Health.legs || 100) + "%";
+    const h = Math.max(0, f2Health.overall || 100);
+    const s = Math.max(0, f2Health.stamina || 100);
+    qs("#f2HpBar").style.width = h + "%";
+    qs("#f2StamBar").style.width = s + "%";
     qs("#f2BloodBar").style.width = Math.min(100, f2Health.blood || 0) + "%";
+    qs("#f2HeadBar").textContent = Math.max(0, f2Health.head || 100).toFixed(0);
+    qs("#f2BodyBar").textContent = Math.max(0, f2Health.body || 100).toFixed(0);
+    qs("#f2LegBar").textContent = Math.max(0, f2Health.legs || 100).toFixed(0);
   }
 }
 
@@ -1475,17 +1501,10 @@ function updateFighterState(nameBar, stateBar, state) {
   }
 }
 
-let _lastF1Health = null, _lastF2Health = null;
-let _lastF1State = null, _lastF2State = null;
-let _f1TotalScore = 0, _f2TotalScore = 0;
 let _roundScores = [];
 
 async function replayFightEvents(fightResult) {
-  console.log("replayFightEvents called with:", fightResult);
-  if (!fightResult) { console.error("fightResult is null/undefined"); return; }
-  if (!fightResult.events) { console.error("fightResult.events is missing"); return; }
-  if (fightResult.events.length === 0) { console.error("events array is empty"); return; }
-  console.log("events count:", fightResult.events.length);
+  if (!fightResult || !fightResult.events || !fightResult.events.length) return;
   const log = qs("#fightLog");
   const events = fightResult.events || [];
   for (let i = 0; i < events.length; i++) {
@@ -1493,52 +1512,41 @@ async function replayFightEvents(fightResult) {
     const ev = events[i];
 
     const el = document.createElement("div");
-    el.className = "fade-in";
-    let cls = "action";
-    if (ev.type === "damage") cls = "damage";
-    else if (ev.type === "knockout" || ev.type === "submission" || ev.type === "decision" || ev.type === "post_fight") cls = "big";
-    else if (ev.type === "pre_fight" || ev.type === "walkout" || ev.type === "score_update" || ev.type === "between_round") cls = "info";
-    else if (ev.type === "round_start" || ev.type === "round_end") cls = "round";
-    else if (ev.type === "round_summary") cls = "round-summary";
+    el.className = "ev fade-in";
+    let cls = "ev-action";
+    if (ev.type === "knockout" || ev.type === "submission" || ev.type === "decision" || ev.type === "post_fight") cls = "ev-big";
+    else if (ev.type === "pre_fight" || ev.type === "walkout" || ev.type === "score_update" || ev.type === "between_round") cls = "ev-info";
+    else if (ev.type === "round_start" || ev.type === "round_end") cls = "ev-round";
+    else if (ev.type === "round_summary") cls = "ev-summary";
     el.className += " " + cls;
 
     if (ev.type === "round_start") {
-      el.innerHTML = '<span class="round">--- ' + formatCommentary(ev.text) + ' ---</span>';
-    } else if (ev.type === "score_update") {
-      el.innerHTML = "  Score: " + formatCommentary(ev.score);
-    } else if (ev.type === "between_round") {
-      el.innerHTML = "<i>" + formatCommentary(ev.text).replace(/\n/g, "<br>") + "</i>";
-    } else if (ev.type === "strategy_prompt") {
-      el.textContent = "--- BETWEEN ROUND " + ev.round + " ---";
-      log.appendChild(el);
-      log.scrollTop = log.scrollHeight;
-      // Update health/scores from the strategy prompt state
-      if (ev.f1_health) {
-        updateHealthBars(ev.f1_health, ev.f2_health);
-        updateFighterState(qs("#f1NameBar"), qs("#f1StateBar"), ev.f1_state);
-        updateFighterState(qs("#f2NameBar"), qs("#f2StateBar"), ev.f2_state);
-        if (ev.f1_total_score != null) updateScoreBars(ev.f1_total_score, ev.f2_total_score);
-      }
-      if (fightSpeed === 0) {
-        const scoreDetail = ev.score_detail || "";
-        qs("#stratPromptTitle").textContent = `Between Round ${ev.round} — ${scoreDetail}`;
-        showStrategyPrompt(ev);
-        return;
-      }
-      fightPaused = true;
-      showStrategyPrompt(ev);
-      return;
+      el.innerHTML = '--- ' + escHtml(ev.text) + ' ---';
     } else if (ev.type === "round_end" || ev.type === "round_summary") {
-      // Update scores after round ends
       if (ev.scores) {
         _roundScores = ev.scores;
         const f1r = _roundScores.reduce((s, r) => s + r[0], 0);
         const f2r = _roundScores.reduce((s, r) => s + r[1], 0);
         updateScoreBars(f1r, f2r);
       }
-      el.innerHTML = formatCommentary(ev.text || "");
+      el.innerHTML = escHtml(ev.text || "");
+    } else if (ev.type === "score_update") {
+      el.innerHTML = "Score: " + escHtml(ev.score);
+    } else if (ev.type === "between_round") {
+      el.innerHTML = escHtml(ev.text || "").replace(/\n/g, "<br>");
+    } else if (ev.type === "strategy_prompt") {
+      if (ev.f1_health) {
+        updateHealthBars(ev.f1_health, ev.f2_health);
+        updateFighterState(qs("#f1NameBar"), qs("#f1StateBar"), ev.f1_state);
+        updateFighterState(qs("#f2NameBar"), qs("#f2StateBar"), ev.f2_state);
+        if (ev.f1_total_score != null) updateScoreBars(ev.f1_total_score, ev.f2_total_score);
+      }
+      if (fightSpeed === 0) { showStrategyPrompt(ev); return; }
+      fightPaused = true;
+      showStrategyPrompt(ev);
+      return;
     } else {
-      el.innerHTML = formatCommentary(ev.text || "");
+      el.innerHTML = escHtml(ev.text || "");
     }
 
     if (el.textContent || el.innerHTML) {
@@ -1546,7 +1554,6 @@ async function replayFightEvents(fightResult) {
       log.scrollTop = log.scrollHeight;
     }
 
-    // Update health bars from action events that carry health data
     if (ev.f1_health && ev.type === "action") {
       updateHealthBars(ev.f1_health, ev.f2_health);
       if (ev.f1_state) updateFighterState(qs("#f1NameBar"), qs("#f1StateBar"), ev.f1_state);
@@ -1555,31 +1562,22 @@ async function replayFightEvents(fightResult) {
     }
 
     if (fightSpeed > 0) {
-      let delay = 2000;
-      if (ev.type === "round_start" || ev.type === "round_end") delay = 3000;
-      else if (ev.type === "knockout" || ev.type === "submission") delay = 5000;
-      else if (ev.type === "decision") delay = 4000;
-      else if (ev.type === "damage") delay = 3000;
-      else if (ev.type === "action") delay = 3500;
-      else if (ev.type === "pre_fight" || ev.type === "walkout") delay = 4000;
-      else if (ev.type === "between_round") delay = 5000;
-      else if (ev.type === "score_update") delay = 1500;
-      else if (ev.type === "round_summary") delay = 3500;
-      await sleep(delay / fightSpeed);
+      const delays = {
+        action: 800, round_start: 1200, round_end: 1200, round_summary: 1000,
+        knockout: 2500, submission: 2500, decision: 2000, post_fight: 1500,
+        pre_fight: 1500, walkout: 1500, between_round: 2000, score_update: 600,
+        damage: 1000, post_fight_reaction: 1200,
+      };
+      await sleep((delays[ev.type] || 800) / fightSpeed);
     }
   }
 
-  // Use final health from complete event if available
-  if (fightResult.f1_health) {
-    updateHealthBars(fightResult.f1_health, fightResult.f2_health);
-  }
+  if (fightResult.f1_health) updateHealthBars(fightResult.f1_health, fightResult.f2_health);
   if (fightResult.total_scores) {
     const scores = fightResult.total_scores;
     const names = Object.keys(scores);
     if (names.length >= 2) {
-      const f1Score = scores[names[0]] || 0;
-      const f2Score = scores[names[1]] || 0;
-      updateScoreBars(f1Score, f2Score);
+      updateScoreBars(scores[names[0]] || 0, scores[names[1]] || 0);
     }
   }
 
@@ -1820,32 +1818,10 @@ async function fireAgent() {
   if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); }
 }
 
-let _f1Name = "";
-let _f2Name = "";
-
 function formatCommentary(text) {
   if (!text) return "";
-  let s = escHtml(text);
-  const names = [];
-  if (_f1Name) names.push(_f1Name);
-  if (_f2Name) names.push(_f2Name);
-  names.sort((a, b) => b.length - a.length);
-  const placeholders = {};
-  names.forEach((n, i) => {
-    const ph = `\x00FN${i}\x00`;
-    placeholders[ph] = n;
-    s = s.replaceAll(n, ph);
-  });
-  s = s.replace(/\b(KNOCKOUT!|KO!|Knockout!)\b/g, '<span class="ko-word">$1</span>');
-  s = s.replace(/\b(TAP!|SUBMISSION!|Submission!)\b/g, '<span class="sub-word">$1</span>');
-  s = s.replace(/\b(lands|drops|hurts|stuns|wobbles|rocks|tags|cracks|drills|unleashes|explodes|presses|swarms|batters|pummels|hammers|rips|bangs|clips|nails|punches|kicks|knees|elbows|unloads|unleashes|cracks|thuds|blasts|lights up|tees off|lets loose|uncorks)\b/gi, '<span class="act">$1</span>');
-  s = s.replace(/\b(heavy damage|significant damage|nasty cut|bad swelling|massive|devastating|brutal|vicious|nasty|savage|horrific|gruesome|explosive|tremendous|sickening|wicked|nasty|ugly)\b/gi, '<span class="dmg">$1</span>');
-  s = s.replace(/(\d+)[-–](\d+)/g, '<span class="score-num">$1</span>-<span class="score-num">$2</span>');
-  s = s.replace(/\b(gets back up|scrambles to feet|back to standing|stands back up|works back up|explodes up)\b/gi, '<span class="info">$1</span>');
-  s = s.replace(/\b(shoots|sprawls|stuff|level change|double leg|single leg|takedown|taken down)\b/gi, '<span class="act">$1</span>');
-  for (const [ph, n] of Object.entries(placeholders)) {
-    s = s.replaceAll(ph, `<span class="fn">${n}</span>`);
-  }
+  return escHtml(text);
+}
   return s;
 }
 
