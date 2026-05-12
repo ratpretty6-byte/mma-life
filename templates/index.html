@@ -263,7 +263,13 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
     const resp = await fetch('/api/create_fighter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,age:Math.floor(Math.random()*10)+22,background:bg,weight_class:4,sid:curSid,nationality,region,trait_id:null,personality_id:['charismatic','intimidating','humble','cocky','quiet','savage'][Math.floor(Math.random()*6)]})});
     const json = await resp.json();
     if(json && json.success){
-      state=json.state;if(state.strategies)STRATS=state.strategies;document.querySelector('#screen-create').classList.add('hidden');document.querySelector('#screen-game').classList.remove('hidden');updateAllUI();alert('Welcome to the pros, '+name+'!');history.pushState(null,'','/?sid='+curSid);
+      state=json.state;if(state.strategies)STRATS=state.strategies;
+      // Hide create screen, show game
+      document.getElementById('screen-create').style.display='none';
+      document.getElementById('screen-game').style.display='block';
+      // Update basic info
+      if(state.fighter){document.getElementById('hName').textContent=state.fighter.name;document.getElementById('hRecord').textContent=state.fighter.record;document.getElementById('hRank').textContent='#'+state.fighter.rank;}
+      alert('Welcome to the pros, '+name+'!');history.pushState(null,'','/?sid='+curSid);
     }else{alert('Error: '+(json&&json.error)||'Unknown');}
   } catch(e) {alert('Exception: ' + e.message);}
   if(btn){btn.textContent='START CAREER';btn.disabled=false;}
