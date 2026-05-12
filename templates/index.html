@@ -247,7 +247,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div style="margin-top:12px;text-align:center">
-        <a href="/create?name=&age=25&weight_class=3&background=mma&nationality=American&region=California&trait_id=heavy_hands&personality_id=humble" class="btn btn-primary" style="font-size:16px;padding:12px 40px;text-decoration:none;display:inline-block">START CAREER</a>
+        <a href="/create?age=25&weight_class=3&background=mma&nationality=American&region=California&trait_id=heavy_hands&personality_id=humble" class="btn btn-primary" style="font-size:16px;padding:12px 40px;text-decoration:none;display:inline-block">START CAREER</a>
       </div>
     </div>
   </div>
@@ -672,6 +672,8 @@ function updateRegions() {
   rSel.innerHTML = "";
   const regions = REGIONS[nat] || ["Capital"];
   regions.forEach(r => { const o = document.createElement("option"); o.value = r; o.textContent = r; rSel.appendChild(o); });
+  // Auto-select first region
+  if (regions.length > 0) rSel.value = regions[0];
 }
 
 init();

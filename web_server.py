@@ -399,7 +399,10 @@ class Handler(BaseHTTPRequestHandler):
 
             elif path == "/create":
                 ensure_initialized()
-                name = params.get("name", ["Fighter"])[0]
+                name = params.get("name", [""])[0]
+                if not name or name.strip() == "":
+                    first, last = utils.generate_name()
+                    name = f"{first} {last}"
                 try:
                     age = int(params.get("age", ["25"])[0])
                 except:
@@ -412,6 +415,8 @@ class Handler(BaseHTTPRequestHandler):
                 nationality = params.get("nationality", ["American"])[0]
                 region = params.get("region", ["California"])[0]
                 trait_id = params.get("trait_id", [None])[0]
+                if trait_id and trait_id[0] in ['None', '']:
+                    trait_id = None
                 personality_id = params.get("personality_id", ["humble"])[0]
                 
                 wc_data = utils.WEIGHT_CLASSES[wc]
