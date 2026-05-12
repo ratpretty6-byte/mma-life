@@ -247,7 +247,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div style="margin-top:12px;text-align:center">
-        <button id="quickStartBtn" onclick="alert('TEST'); quickStartCareer()" class="btn btn-primary" style="font-size:16px;padding:12px 40px;">START CAREER</button>
+        <button id="quickStartBtn" onclick="quickStartCareer()" class="btn btn-primary" style="font-size:16px;padding:12px 40px;">START CAREER</button>
       </div>
     </div>
   </div>
@@ -703,7 +703,8 @@ function updateRegions() {
 init();
 
 async function quickStartCareer() {
-  alert("Starting career...");
+  alert("Function called! sid=" + sid);
+  // Generate random name
   // Generate random name
   const names = ["Alex Torres","Jordan Lee","Mike Santos","Chris Kim","James Chen","Ryan Silva","Dan Williams","Tom Johnson","Sam Jackson","Carlos Rivera"];
   const name = names[Math.floor(Math.random() * names.length)];
