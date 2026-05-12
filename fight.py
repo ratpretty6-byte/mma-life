@@ -640,7 +640,7 @@ class Fight:
             if self.winner:
                 # Knockout/Submission finish
                 if "KO" in self.win_method or "TKO" in self.win_method:
-                    yield {"type": "knockout", "text": self.commentary.generate_knockout_commentary(self.winner),
+                    yield {"type": "knockout", "text": self.commentary.generate_knockout_commentary(self.loser),
                            "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
                            "time": self._get_time_str(),
                            "f1_health": self._get_display_health(self.fighter1),
@@ -1225,7 +1225,7 @@ class Fight:
         atk_state["combo_count"] += 1
 
         # Log the action (commentary will be generated)
-        log_entry = f"{severity_prefix} {strike_type} to {defender.name}'s {target}"
+        log_entry = f"{attacker.name} {severity_prefix} {strike_type} to {defender.name}'s {target}"
         if is_critical:
             log_entry += " — CRITICAL HIT!"
         self.fight_log.append(log_entry)
