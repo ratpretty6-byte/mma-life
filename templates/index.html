@@ -95,7 +95,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .blood-bar-inner { height: 100%; border-radius: 3px; background: #8b0000; transition: width .4s ease; }
 .hp-label { font-size: 10px; color: #888; margin-top: 2px; }
 
-select, input { background: #1a1a2a; color: #e0e0e0; border: 1px solid #2a2a3a; padding: 7px 10px; border-radius: 6px; font-size: 13px; width: 100%; min-height: 44px; }
+select, input:not([type="radio"]):not([type="checkbox"]) { background: #1a1a2a; color: #e0e0e0; border: 1px solid #2a2a3a; padding: 7px 10px; border-radius: 6px; font-size: 13px; width: 100%; min-height: 44px; }
 select option { background: #1a1a2a; }
 label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin-top: 6px; }
 
@@ -269,16 +269,10 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <label style="margin-top:10px">Trait (tap to select)</label>
-      <div id="traitGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px">
-        <label class="strategy-btn"><input type="radio" name="trait_id" value="heavy_hands"> <strong>Heavy Hands</strong><br><small>+5 striking power</small></label>
-        <label class="strategy-btn"><input type="radio" name="trait_id" value="iron_chin"> <strong>Iron Chin</strong><br><small>+5 durability</small></label>
-        <label class="strategy-btn"><input type="radio" name="trait_id" value="cardio_king"> <strong>Cardio King</strong><br><small>+5 cardio</small></label>
-        <label class="strategy-btn"><input type="radio" name="trait_id" value="mat_wizard"> <strong>Mat Wizard</strong><br><small>+5 wrestling defense</small></label>
-        <label class="strategy-btn"><input type="radio" name="trait_id" value="sniper"> <strong>Sniper</strong><br><small>+5 accuracy</small></label>
-        <label class="strategy-btn"><input type="radio" name="trait_id" value="natural_athlete"> <strong>Natural Athlete</strong><br><small>+3 all physical</small></label>
-        <label class="strategy-btn"><input type="radio" name="trait_id" value="iron_will"> <strong>Iron Will</strong><br><small>+5 mental toughness</small></label>
-        <label class="strategy-btn"><input type="radio" name="trait_id" value="fast_hands"> <strong>Fast Hands</strong><br><small>+5 hand speed</small></label>
-      </div>
+      <div id="traitGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px"></div>
+
+      <label style="margin-top:8px">Personality</label>
+      <div id="personalityGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px"></div>
 
       <label style="margin-top:8px">Personality</label>
       <div id="personalityGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px">
@@ -1821,8 +1815,6 @@ async function fireAgent() {
 function formatCommentary(text) {
   if (!text) return "";
   return escHtml(text);
-}
-  return s;
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
