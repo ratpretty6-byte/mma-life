@@ -166,26 +166,6 @@ class PositionSystem:
             return True
         return False
 
-    def break_clinch(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0) -> bool:
-        if self.current_position != Position.CLINCH:
-            return False
-
-        clinch_escapes = attacker.get_effective_attribute("clinch_escapes", fatigue)
-        clinch_control = defender.get_effective_attribute("clinch_control", fatigue)
-        strength_diff = (attacker.attributes.get("striking_power", 50) -
-                        defender.attributes.get("striking_power", 50)) * 0.003
-
-        success_chance = clinch_escapes * 0.6 - clinch_control * 0.4 + strength_diff
-        success_chance *= max(0.3, 1.0 - fatigue * 0.35)
-        success_chance = max(8, min(85, success_chance))
-
-        if utils.random_roll(1, 100) <= success_chance:
-            self.current_position = Position.POCKET
-            self.clinch_initiator = None
-            self.position_time = 0
-            return True
-        return False
-
     def takedown_from_clinch(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0) -> bool:
         if self.current_position != Position.CLINCH:
             return False

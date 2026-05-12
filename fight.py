@@ -57,11 +57,15 @@ COMBINATIONS = {
 class Referee:
     """MMA referee — no 8-count. Manages cage-side stoppages and standups."""
 
-    def __init__(self):
+    def __init__(self, fighter1=None, fighter2=None):
         self.standup_pending = False
         self.target_fighter = None
         self.warning_issued = False
-        self.consecutive_damage_count = 0  # Tracks unanswered damage on feet
+        self.consecutive_damage_count = 0
+        self.fighter_ref = fighter1
+        self.fighter2_ref = fighter2
+        self.f1_unanswered_strikes = 0
+        self.f2_unanswered_strikes = 0
         self.last_standup_round = 0
 
     def should_stand_up(self, fight, round_num) -> bool:
@@ -92,18 +96,15 @@ class Referee:
                     return True
         return False
 
-    def stop_for_standing_tko(self, fighter, state, consecutive_damage: int) -> bool:
-        """
-        Referee stops fight if a fighter is absorbing excessive unanswered
-        damage while on the feet. This is the TKO-by-referee.
-        """
-        if consecutive_damage >= 5:
+    def stop_for_standing_tko(self, fighter, state_name: str) -> bool:
+        unanswered = self.get_unanswered(fighter)
+        if unanswered >= 5:
             defense = utils.calculate_defense_score(
                 fighter.attributes.get("durability", 50),
                 fighter.attributes.get("composure", 50),
                 fighter.attributes.get("fight_iq", 50),
-                state == "HURT",
-                state == "STUNNED"
+                state_name == "HURT",
+                state_name == "STUNNED"
             )
             if defense < 45:
                 return True
@@ -116,16 +117,16 @@ class Referee:
         # Eye injuries: if eye is severely damaged
         for eye in ["left_eye", "right_eye"]:
             eye_health = fighter.get_zone_health_pct(eye)
-            if eye_health < 20:
+            if eye_health < 15:
                 return f"Doctor stoppage: {fighter.name}'s {eye.replace('_', ' ')} is too damaged"
 
         # Jaw injuries
         jaw_health = fighter.get_zone_health_pct("jaw")
-        if jaw_health < 15:
+        if jaw_health < 10:
             return f"Doctor stoppage: {fighter.name}'s jaw is broken"
 
         # Severe swelling
-        if state.get("swelling", 0) > 80:
+        if state.get("swelling", 0) > 90:
             return f"Doctor stoppage: Severe swelling on {fighter.name}"
 
         return None
@@ -138,12 +139,38 @@ class Referee:
 
     def reset_consecutive_damage(self):
         self.consecutive_damage_count = 0
+        self.f1_unanswered_strikes = 0
+        self.f2_unanswered_strikes = 0
 
-    def record_damage_taken(self, fighter, is_on_feet):
-        if is_on_feet:
-            self.consecutive_damage_count += 1
+    def record_damage_taken(self, fighter, is_on_feet, attacker=None):
+        if not is_on_feet:
+            self.f1_unanswered_strikes = 0
+            self.f2_unanswered_strikes = 0
+            return
+
+        # Track unanswered strikes per fighter
+        if fighter == self.fighter_ref:
+            other_unanswered = self.f2_unanswered_strikes
         else:
-            self.consecutive_damage_count = 0
+            other_unanswered = self.f1_unanswered_strikes
+
+        # When a fighter lands, reset the attacker's unanswered count
+        # and increment the defender's
+        if attacker:
+            if attacker == self.fighter_ref:
+                self.f1_unanswered_strikes = 0
+                self.f2_unanswered_strikes += 1
+            else:
+                self.f2_unanswered_strikes = 0
+                self.f1_unanswered_strikes += 1
+
+        # Global count = max of both fighters' unanswered
+        self.consecutive_damage_count = max(self.f1_unanswered_strikes, self.f2_unanswered_strikes)
+
+    def get_unanswered(self, fighter) -> int:
+        if fighter == self.fighter_ref:
+            return self.f1_unanswered_strikes
+        return self.f2_unanswered_strikes
 
 
 # ============================================================
@@ -252,11 +279,11 @@ class Judge:
 
         # Effective aggression (15%)
         agg_diff = rd["aggression_f1"] - rd["aggression_f2"]
-        agg_score = self.normalize(agg_diff, scale=0.15) * 0.15
+        agg_score = self.normalize(agg_diff) * 0.15
 
         # Octagon control (10%)
         cage_diff = rd["octagon_control_f1"] - rd["octagon_control_f2"]
-        cage_score = self.normalize(cage_diff, scale=0.10) * 0.10
+        cage_score = self.normalize(cage_diff) * 0.10
 
         # Knockdown bonus (applied as additive, overrides other scoring)
         kd_diff = rd["knockdowns_f1"] - rd["knockdowns_f2"]
@@ -272,7 +299,7 @@ class Judge:
         f1_round, f2_round = 10, 10
         diff = f1_raw - f2_raw
 
-        if abs(diff) < 0.3:
+        if abs(diff) < 0.15:
             f1_round, f2_round = 10, 10  # Draw round
         elif diff > 0:
             f1_round = 10
@@ -291,18 +318,18 @@ class Judge:
         return (f1_round, f2_round)
 
     @staticmethod
-    def normalize(value: float, scale: float = 0.40) -> float:
+    def normalize(value: float) -> float:
         """Normalize a difference to roughly -1.0 to 1.0 range."""
-        return clamp(value * 0.01, -1.0, 1.0) * scale
+        return utils.clamp(value * 0.01, -1.0, 1.0)
 
     @staticmethod
     def _score_diff_to_points(diff: float) -> int:
         """Convert raw score difference to point deduction."""
-        if diff < 1.0:
+        if diff < 0.3:
             return 1
-        elif diff < 2.5:
+        elif diff < 1.0:
             return 2
-        elif diff < 4.0:
+        elif diff < 2.5:
             return 3
         else:
             return 4
@@ -338,7 +365,7 @@ class Fight:
         self.f2_machine = FighterState(fighter2)
 
         # Referee
-        self.referee = Referee()
+        self.referee = Referee(fighter1, fighter2)
 
         # Judges
         self.judges = [
@@ -514,7 +541,7 @@ class Fight:
                 if recent_head_dmg > ko_threshold * 0.5:
                     self.win_method = "KO"
                 else:
-                    self.win_method = "TKO"
+                    self.win_method = "TKO (Strikes)"
                 self.win_round = self.current_round
                 self.fight_log.append(f"\n*** {self.fighter1.name} stops {self.fighter2.name}! {self.win_method} in round {self.current_round}! ***")
 
@@ -574,22 +601,24 @@ class Fight:
 
                 self._simulate_action(phase=phase)
 
-                # Check for doctor stoppage after each action
-                for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
-                    stop_reason = self.referee.check_doctor_stoppage(fighter, state, self)
-                    if stop_reason:
-                        self.winner = self.fighter2 if fighter == self.fighter1 else self.fighter1
-                        self.loser = fighter
-                        self.win_method = "TKO (Doctor Stoppage)"
-                        self.win_round = self.current_round
-                        yield {"type": "action", "text": stop_reason, "round": round_num,
-                               "time": self._get_time_str(),
-                               "f1_health": self.f1_state["health"], "f2_health": self.f2_state["health"]}
-                        yield {"type": "knockout" if "TKO" in self.win_method else "damage",
-                               "text": f"Doctor stoppage! {self.winner.name} wins by {self.win_method}!",
-                               "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
-                               "time": self._get_time_str()}
-                        return
+                # Mid-round doctor stoppage check (rare — only when significant)
+                if not self.winner and action_idx > 0 and action_idx % 15 == 0 and random.random() < 0.3:
+                    for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
+                        stop_reason = self.referee.check_doctor_stoppage(fighter, state, self)
+                        if stop_reason:
+                            self.winner = self.fighter2 if fighter == self.fighter1 else self.fighter1
+                            self.loser = fighter
+                            self.win_method = "TKO (Doctor Stoppage)"
+                            self.win_round = self.current_round
+                            yield {"type": "action", "text": stop_reason, "round": round_num,
+                                   "time": self._get_time_str(),
+                                   "f1_health": self._get_display_health(self.fighter1),
+                                   "f2_health": self._get_display_health(self.fighter2)}
+                            yield {"type": "knockout",
+                                   "text": f"Doctor stoppage! {self.winner.name} wins by {self.win_method}!",
+                                   "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
+                                   "time": self._get_time_str()}
+                            return
 
                 # Yield action result with time stamp
                 if self.fight_log:
@@ -603,11 +632,6 @@ class Fight:
                              "f2_total_score": self._get_total_score_for(2),
                              "time": self._get_time_str()}
                     yield event
-
-                    # Emit damage-type events for cuts/swelling
-                    f1_cuts = self.f1_state.get("cuts", [])
-                    f2_cuts = self.f2_state.get("cuts", [])
-                    # ... (emit cut/swelling commentary as damage events)
 
                 # Mid-round AI adaptation (every 6 actions)
                 if action_idx % 6 == 5 and round_num > 1 and not self.winner:
@@ -650,25 +674,29 @@ class Fight:
                         yield {"type": "post_fight_reaction", "text": loss_reaction}
                 return
 
-            # End of round — check for standing TKO
-            if self.referee.stop_for_standing_tko(self.fighter1, "HURT", self.referee.consecutive_damage_count):
-                self.winner = self.fighter2
-                self.loser = self.fighter1
-                self.win_method = "TKO (Referee Stoppage)"
-                self.win_round = self.current_round
-                yield {"type": "action", "text": "The referee jumps in and stops the fight!", "round": round_num, "time": self._get_time_str()}
-                yield {"type": "knockout",
-                       "text": f"TKO (Referee Stoppage)! {self.winner.name} wins!",
-                       "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
-                       "time": self._get_time_str(),
-                       "f1_health": self._get_display_health(self.fighter1),
-                       "f2_health": self._get_display_health(self.fighter2),
-                       "f1_state": self.f1_machine.get_state(),
-                       "f2_state": self.f2_machine.get_state(),
-                       "f1_total_score": self._get_total_score_for(1),
-                       "f2_total_score": self._get_total_score_for(2),
-                       "total_scores": self._get_total_scores()}
-                return
+            # End of round — check for standing TKO (check both fighters)
+            for fighter, machine, opponent in [
+                (self.fighter1, self.f1_machine, self.fighter2),
+                (self.fighter2, self.f2_machine, self.fighter1)
+            ]:
+                if self.referee.stop_for_standing_tko(fighter, machine.get_state()):
+                    self.winner = opponent
+                    self.loser = fighter
+                    self.win_method = "TKO (Referee Stoppage)"
+                    self.win_round = self.current_round
+                    yield {"type": "action", "text": "The referee jumps in and stops the fight!", "round": round_num, "time": self._get_time_str()}
+                    yield {"type": "knockout",
+                           "text": f"TKO (Referee Stoppage)! {self.winner.name} wins!",
+                           "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
+                           "time": self._get_time_str(),
+                           "f1_health": self._get_display_health(self.fighter1),
+                           "f2_health": self._get_display_health(self.fighter2),
+                           "f1_state": self.f1_machine.get_state(),
+                           "f2_state": self.f2_machine.get_state(),
+                           "f1_total_score": self._get_total_score_for(1),
+                           "f2_total_score": self._get_total_score_for(2),
+                           "total_scores": self._get_total_scores()}
+                    return
 
             # Round ending
             round_desc = self._describe_round(round_num)
@@ -681,7 +709,7 @@ class Fight:
                 yield {"type": "round_summary", "text": round_summary, "round": round_num}
 
             self._score_round(round_num)
-            self._apply_round_end_effects(round_num)
+            self._round_end_effects(round_num)
 
             # Emit score update after scoring
             f1_avg = sum(j.scores[-1][0] for j in self.judges) / 3.0
@@ -691,6 +719,25 @@ class Fight:
                    "f1_total_score": self._get_total_score_for(1),
                    "f2_total_score": self._get_total_score_for(2),
                    "scores": [[j.scores[r][0] for j in self.judges] for r in range(len(self.judges[0].scores))]}
+
+            # Between-round doctor check (doctor examines in corner)
+            if round_num < self.rounds and not self.winner:
+                for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
+                    stop_reason = self.referee.check_doctor_stoppage(fighter, state, self)
+                    if stop_reason and random.random() < 0.5:
+                        self.winner = self.fighter2 if fighter == self.fighter1 else self.fighter1
+                        self.loser = fighter
+                        self.win_method = "TKO (Doctor Stoppage)"
+                        self.win_round = self.current_round
+                        yield {"type": "action", "text": stop_reason, "round": round_num,
+                               "time": self._get_time_str(),
+                               "f1_health": self._get_display_health(self.fighter1),
+                               "f2_health": self._get_display_health(self.fighter2)}
+                        yield {"type": "knockout",
+                               "text": f"Doctor stoppage! {self.winner.name} wins by {self.win_method}!",
+                               "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
+                               "time": self._get_time_str()}
+                        return
 
             if round_num < self.rounds and not self.winner:
                 self._check_ai_adaptation(round_num)
@@ -776,6 +823,13 @@ class Fight:
             # Fighter is essentially out — skip
             return
 
+        # Ground game: use dedicated ground action system
+        if Position.is_ground(self.position_system.current_position):
+            self._simulate_ground_action(atk_state["fatigue_level"],
+                                         atk_strategy.get_action_weights(), atk_strategy)
+            self.referee.record_damage_taken(defender, False, attacker=attacker)
+            return
+
         # Determine if combo or single strike
         fight_iq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
         fatigue = atk_state["fatigue_level"]
@@ -796,7 +850,8 @@ class Fight:
 
         # Track consecutive unanswered damage
         self.referee.record_damage_taken(defender,
-            self.position_system.current_position in (Position.POCKET, Position.DISTANCE, Position.CLINCH))
+            self.position_system.current_position in (Position.POCKET, Position.DISTANCE, Position.CLINCH),
+            attacker=attacker)
 
     def _execute_single_strike(self, attacker, defender, atk_state, def_state, strategy, phase, state_mods):
         pos = self.position_system.current_position
@@ -806,7 +861,17 @@ class Fight:
             self.fight_log.append(f"{attacker.name} is too gassed to attack effectively!")
             return
 
-        strike_type = self._select_strike(pos, strategy, phase)
+        action_type = self._select_strike(pos, strategy, phase)
+
+        # Route non-strike actions to their handlers
+        if action_type == "takedown_attempt":
+            self._simulate_takedown(attacker, defender, atk_state["fatigue_level"], strategy)
+            return
+        elif action_type == "clinch_attempt":
+            self._simulate_clinch_attempt(attacker, defender, atk_state["fatigue_level"], strategy)
+            return
+
+        strike_type = action_type
         target = self._select_target(strike_type, pos, def_state)
 
         self._perform_strike(attacker, defender, atk_state, def_state, strike_type, target, strategy, phase, state_mods)
@@ -1093,14 +1158,16 @@ class Fight:
                 self.fight_log.append(f"Cut opens on {defender.name}'s {target}!")
 
         # Update body damage level effects
-        body_level = utils.get_body_damage_level(defender_state["body_fatigue"])
-        body_effects = utils.BODY_DAMAGE_LEVELS[[l["name"] for l in utils.BODY_DAMAGE_LEVELS].index(body_level) if body_level in [l["name"] for l in utils.BODY_DAMAGE_LEVELS] else 0]
-        if isinstance(body_effects, dict) and body_effects.get("desc"):
-            self.fight_log.append(body_effects["desc"].format(fighter=defender.name))
+        body_damage = defender_state["body_fatigue"]
+        for level in reversed(utils.BODY_DAMAGE_LEVELS):
+            if body_damage >= level["threshold"] and level.get("desc"):
+                self.fight_log.append(level["desc"].format(fighter=defender.name))
+                break
 
         # Stamina drain for defender from body damage
         if target == "body":
-            bd_effects = next((l for l in utils.BODY_DAMAGE_LEVELS if l["name"] == body_level), None)
+            body_damage = defender_state["body_fatigue"]
+            bd_effects = utils.get_body_damage_level(body_damage)
             if bd_effects:
                 stamina_drain_mod = bd_effects["stamina_drain"]
                 def_state["stamina"] = max(0, def_state["stamina"] - int(stamina_drain_mod * 15))
@@ -1288,7 +1355,11 @@ class Fight:
             attacker.get_effective_attribute("cardio", fatigue)
         )
 
-        success = self.position_system.attempt_takedown(attacker, defender, fatigue)
+        is_clinch = self.position_system.current_position == Position.CLINCH
+        if is_clinch:
+            success = self.position_system.takedown_from_clinch(attacker, defender, fatigue)
+        else:
+            success = self.position_system.attempt_takedown(attacker, defender, fatigue)
         text = self.commentary.generate_takedown_commentary(attacker, defender, success)
         self.fight_log.append(text)
 
@@ -1325,15 +1396,11 @@ class Fight:
         durability = defender.get_effective_attribute("durability", 1.0 - (def_state["stamina"] / 100))
         composure = defender.get_effective_attribute("composure", fatigue)
         raw = profile["base_damage"] * (power / 50)
-        # Defense reduces clinch damage
         raw *= (1.0 - min(0.35, (durability + composure) / 400))
         damage = max(1, int(raw))
-        def_state["health"][target] = max(0, def_state["health"][target] - damage)
-        def_state["accumulated_damage"] += damage
 
-        if target == "head" and random.random() < 0.05:
-            cut = {"severity": random.uniform(0.2, 0.5), "location": target}
-            def_state["cuts"].append(cut)
+        actual_damage = defender.apply_damage_to_zone(target, damage, self)
+        def_state["accumulated_damage"] += actual_damage
 
         cardio = attacker.get_effective_attribute("cardio", fatigue)
         self._apply_stamina_cost(atk_state, strike_type, fatigue, cardio)
@@ -1349,7 +1416,8 @@ class Fight:
             self.f2_actions_landed += 1
             self.f2_state["significant_strikes_landed"] += 1
 
-        if def_state["health"]["head"] <= 0:
+        head_pct = defender.get_group_health("head")
+        if head_pct <= 15:
             self._check_knockdown(attacker, defender, atk_state, def_state, target, damage, fatigue, strike_type)
 
     # ============================================================
@@ -1467,22 +1535,20 @@ class Fight:
         power = attacker.get_effective_attribute("striking_power", fatigue) * sp_mod
         durability = defender.get_effective_attribute("durability", 1.0 - (def_state["stamina"] / 100))
 
-        # Positional ground strike bonuses
         pos_power = {Position.GROUND_GUARD: 0.30, Position.GROUND_SIDE: 0.45,
                      Position.GROUND_MOUNT: 0.60, Position.GROUND_BACK: 0.35}
         pos_bonus = pos_power.get(pos, 0.3)
 
-        # Top control modifier from strategy
         tc_mod = self._get_mod("top_control", strategy)
         top_bonus = 1.0 + (tc_mod - 1.0) * 0.6
 
-        # Ground and pound strategy gets extra damage
         ground_strike_bonus = strategy.get_modifiers().get("ground_strike_damage", 1.0)
 
         raw = (power / 50) * 5 * pos_bonus * top_bonus * ground_strike_bonus
         damage = max(1, int(raw * (1 - durability / 200)))
-        def_state["health"][target] = max(0, def_state["health"][target] - damage)
-        def_state["accumulated_damage"] += damage
+
+        actual_damage = defender.apply_damage_to_zone(target, damage, self)
+        def_state["accumulated_damage"] += actual_damage
 
         def_state["unanswered_ground_strikes"] = def_state.get("unanswered_ground_strikes", 0) + 1
         if attacker == self.fighter1:
@@ -1522,7 +1588,7 @@ class Fight:
             self.fight_log.append(f"The referee steps in! {defender.name} is taking too much damage from mount!")
             return
 
-        if def_state["health"]["head"] <= 0:
+        if defender.get_group_health("head") <= 5:
             self.winner = attacker
             self.loser = defender
             self.win_method = "TKO (Ground Strikes)"
@@ -1635,6 +1701,25 @@ class Fight:
         else:
             self.f2_state["effective_grappling_points"] += grapple_pts
 
+    def _round_end_effects(self, round_num: int):
+        """Apply end-of-round effects: stamina recovery, injury checks."""
+        for state in [self.f1_state, self.f2_state]:
+            # Stamina recovery between rounds
+            stamina_recovery = 15 + state.get("stamina", 100) * 0.1
+            state["stamina"] = min(100, state["stamina"] + stamina_recovery)
+            state["fatigue_level"] = 1.0 - (state["stamina"] / 100)
+
+            # Reduce stun/hurt timers
+            state["stunned_timer"] = max(0, state["stunned_timer"] - 2)
+            if state["stunned_timer"] == 0:
+                state["stunned"] = False
+
+            # Reduce swelling slightly
+            state["swelling"] = max(0, state["swelling"] - 5)
+
+            # Reset combo tracking
+            state["combo_count"] = 0
+
     # ============================================================
     # STRIKE CHECKS
     # ============================================================
@@ -1703,9 +1788,6 @@ class Fight:
                 return True
             else:
                 self.fight_log.append(f"{defender.name} is trying to recover...")
-                def_state["health"]["recovering"] = True
-                if def_state["health"]["head"] < 10:
-                    def_state["health"]["head"] = 10
                 return True
         return False
 
@@ -1841,6 +1923,49 @@ class Fight:
                     total += j.scores[r][1]
         return total
 
+    def _determine_decision(self):
+        """Score the fight from all judges and determine the winner."""
+        f1_wins = 0
+        f2_wins = 0
+        draws = 0
+        for j in self.judges:
+            f1_total = sum(s[0] for s in j.scores)
+            f2_total = sum(s[1] for s in j.scores)
+            if f1_total > f2_total:
+                f1_wins += 1
+            elif f2_total > f1_total:
+                f2_wins += 1
+            else:
+                draws += 1
+
+        if f1_wins > f2_wins:
+            self.winner = self.fighter1
+            self.loser = self.fighter2
+            if draws > 0:
+                self.win_method = "Majority Decision"
+            elif f2_wins == 0:
+                self.win_method = "Unanimous Decision"
+            else:
+                self.win_method = "Split Decision"
+        elif f2_wins > f1_wins:
+            self.winner = self.fighter2
+            self.loser = self.fighter1
+            if draws > 0:
+                self.win_method = "Majority Decision"
+            elif f1_wins == 0:
+                self.win_method = "Unanimous Decision"
+            else:
+                self.win_method = "Split Decision"
+        else:
+            self.winner = None
+            self.loser = None
+            if draws == 3:
+                self.win_method = "Unanimous Draw"
+            elif draws >= 2:
+                self.win_method = "Majority Draw"
+            else:
+                self.win_method = "Split Draw"
+
     def _get_total_scores(self) -> dict:
         """Return cumulative scores for the decision."""
         f1_total = self._get_total_score_for(1)
@@ -1859,17 +1984,23 @@ class Fight:
             "blood": round(fighter._blood_level, 1),
         }
 
+    def _get_attacker_state(self, fighter):
+        return self.f1_state if fighter == self.fighter1 else self.f2_state
+
+    def _get_opponent_state(self, fighter):
+        return self.f2_state if fighter == self.fighter1 else self.f1_state
+
     def _get_mod(self, attr: str, strategy: StrategySystem) -> float:
         return strategy.get_modifier_for_attr(attr)
 
     def _get_hit_quality(self, accuracy: float, defense: float) -> tuple:
         roll = random.gauss(accuracy - defense, 15)
         if roll > 35:
-            return "flush", HIT_QUALITY["flush"]["mult"]
+            return "flush", utils.SEVERITY_TIERS[4]["mult"]
         elif roll > 10:
-            return "clean", HIT_QUALITY["clean"]["mult"]
+            return "clean", utils.SEVERITY_TIERS[2]["mult"]
         elif roll > -5:
-            return "glancing", HIT_QUALITY["glancing"]["mult"]
+            return "glancing", utils.SEVERITY_TIERS[1]["mult"]
         return "miss", 0.0
 
     # ============================================================

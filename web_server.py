@@ -42,6 +42,8 @@ def ensure_initialized():
         promotions = create_promotions(weight_classes)
         world, national, regional = promotions
         all_fighters = generate_fighter_pool(promotions, 500)
+        gs["sessions"] = {}
+        gs["sessions_lock"] = Lock()
         gs["promotions"] = promotions
         gs["world"] = world
         gs["national"] = national
@@ -51,28 +53,24 @@ def ensure_initialized():
         gs["world_news"] = []
         MAX_NEWS = 200
         gs["initialized"] = True
-        gs["sessions"] = {}
-        gs["sessions_lock"] = Lock()
         print("Game world ready!")
 
 def get_or_create_session(session_id):
     sl = gs.get("sessions_lock")
-    if sl:
-        with sl:
-            if session_id not in gs.get("sessions", {}):
-                gs["sessions"][session_id] = {}
-            return gs["sessions"][session_id]
-    if session_id not in gs.get("sessions", {}):
-        gs["sessions"][session_id] = {}
-    return gs["sessions"][session_id]
+    with sl:
+        if session_id not in gs["sessions"]:
+            gs["sessions"][session_id] = {"_created": time.time()}
+        return gs["sessions"][session_id]
 
 _world_sim_running = False
+_world_sim_lock = Lock()
 
 def run_world_sim(game_date, es):
     global _world_sim_running
-    if _world_sim_running:
-        return
-    _world_sim_running = True
+    with _world_sim_lock:
+        if _world_sim_running:
+            return
+        _world_sim_running = True
     try:
         ws = gs.get("world_sim")
         if ws and game_date:
@@ -83,7 +81,8 @@ def run_world_sim(game_date, es):
                 if len(news_list) > 200:
                     news_list[:] = news_list[-200:]
     finally:
-        _world_sim_running = False
+        with _world_sim_lock:
+            _world_sim_running = False
 
 def run_world_sim_async(game_date, es):
     Thread(target=run_world_sim, args=(game_date, es), daemon=True).start()
@@ -415,7 +414,7 @@ class Handler(BaseHTTPRequestHandler):
                 nationality = params.get("nationality", ["American"])[0]
                 region = params.get("region", ["California"])[0]
                 trait_id = params.get("trait_id", [None])[0]
-                if trait_id and trait_id[0] in ['None', '']:
+                if trait_id in (None, 'None', ''):
                     trait_id = None
                 personality_id = params.get("personality_id", ["humble"])[0]
                 
@@ -782,7 +781,13 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     "show_matchup": True,
                     "rivalry_info": rivalry_info,
                 }
-                fight = Fight(f, opponent, rounds=rounds, is_title_fight=is_title, context=fight_context)
+                try:
+                    fight = Fight(f, opponent, rounds=rounds, is_title_fight=is_title, context=fight_context)
+                except Exception as ex:
+                    print(f"FIGHT INIT ERROR: {ex}")
+                    traceback.print_exc()
+                    self.json_resp({"error": f"Fight init failed: {str(ex)[:100]}"})
+                    return
                 fight.strategy1.set_pre_fight_strategy(strat_id)
                 ai_map = {
                     "brawler": "aggressive_striking", "counter_striker": "defensive_striking",
@@ -798,6 +803,10 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 session["current_fight"] = fight
                 session["fight_started"] = True
                 result = fight.start_web_fight()
+                print(f"FIGHT RESULT: status={result.get('status')}, events={len(result.get('events', []))}")
+                if result.get('events'):
+                    for i, e in enumerate(result['events'][:5]):
+                        print(f"  event[{i}]: type={e.get('type')}, text={str(e.get('text',''))[:80]}")
                 self.json_resp({"success": True, "fight_result": result, "opponent": opponent.name})
 
             elif path == "/api/fight_action":
@@ -858,6 +867,17 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                             career.win_title()
                         else:
                             career.defend_title()
+                else:
+                    # Draw: still get base pay, contract fight still counts
+                    if career and career.contract:
+                        pi = finance.add_fight_pay(
+                            career.contract.base_pay,
+                            0,
+                            perf_bonus=0,
+                            game_date=game_date
+                        )
+                        career.contract.complete_fight(False, False)
+                        career.career_earnings += pi["net"]
                 milestones = []
                 if career:
                     milestones = career.check_milestones(won, method, fight.win_round or 0)
@@ -1109,6 +1129,21 @@ if __name__ == "__main__":
     HOST = "0.0.0.0"
     
     gs["start_time"] = time.time()
+    
+    def session_cleanup():
+        while True:
+            time.sleep(300)
+            sl = gs.get("sessions_lock")
+            if sl:
+                with sl:
+                    stale = [sid for sid, s in gs["sessions"].items()
+                             if time.time() - s.get("_created", 0) > 7200]
+                    for sid in stale:
+                        del gs["sessions"][sid]
+                    if stale:
+                        print(f"Cleaned {len(stale)} stale sessions")
+    
+    Thread(target=session_cleanup, daemon=True).start()
     
     print(f"Server starting on port {PORT}...")
     print("Initializing game world...")

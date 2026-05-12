@@ -19,7 +19,7 @@ class Fighter:
         "charisma", "aggression", "composure", "adaptability"
     ]
 
-    # 9 body zones — more granular than old head/body/legs model
+    # 10 body zones — more granular than old head/body/legs model
     BODY_ZONES = [
         "left_eye", "right_eye", "jaw", "temple", "nose",
         "chest", "solar_plexus", "liver",
@@ -158,8 +158,8 @@ class Fighter:
         self._zone_max_health = {}
         for zone in self.BODY_ZONES:
             max_h = base_health * zone_base.get(zone, 1.0)
-            # Random variance: ±8%
-            max_h *= (1.0 + random.uniform(-0.08, 0.08))
+            # Random variance: ±8% with a floor to prevent ZeroDivisionError
+            max_h = max(5.0, max_h * (1.0 + random.uniform(-0.08, 0.08)))
             self._zone_max_health[zone] = max_h
             self._zone_health[zone] = max_h
 
@@ -185,21 +185,29 @@ class Fighter:
 
     def apply_damage_to_zone(self, zone: str, raw_damage: float, fight) -> float:
         """Apply damage to a specific body zone. Returns actual damage dealt."""
-        zone_mult = self.ZONE_KO_MULTIPLIER.get(zone, 1.0)
-        # Temple and jaw have KO bonus — hits here contribute more to KO threshold
+        # Map group-level targets ("head", "body", "legs") to random specific zones
+        target_zone = zone
+        if zone == "head":
+            target_zone = random.choice(["left_eye", "right_eye", "jaw", "temple", "nose"])
+        elif zone == "body":
+            target_zone = random.choice(["chest", "solar_plexus", "liver"])
+        elif zone == "legs":
+            target_zone = random.choice(["lead_leg", "rear_leg"])
+
+        zone_mult = self.ZONE_KO_MULTIPLIER.get(target_zone, 1.0)
         effective_damage = raw_damage * zone_mult
 
-        current = self._zone_health.get(zone, 50)
+        current = self._zone_health.get(target_zone, 50)
         new_health = max(0, current - effective_damage)
         actual_damage = current - new_health
-        self._zone_health[zone] = new_health
+        self._zone_health[target_zone] = new_health
 
         # Damage to eyes causes vision impairment (blood)
-        if zone in ("left_eye", "right_eye"):
+        if target_zone in ("left_eye", "right_eye"):
             fight._add_blood(self, effective_damage)
 
         # Damage to jaw/temple contributes to head KO tracker
-        if zone in ("jaw", "temple", "left_eye", "right_eye", "nose"):
+        if target_zone in ("jaw", "temple", "left_eye", "right_eye", "nose"):
             fight._track_head_damage(self, effective_damage)
             fight._track_ko_accumulation(self, effective_damage, zone_mult)
 
@@ -289,7 +297,7 @@ class Fighter:
 
     def cut_weight(self, target_weight_lbs: float) -> bool:
         self.weight_cut_lbs = max(0, self.base_weight_lbs - target_weight_lbs)
-        if self.weight_cut_lbs > 10 and random.random() <= 10:
+        if self.weight_cut_lbs > 10 and random.random() < 0.3:
             self.weigh_in_pass = False
             return False
         self.current_weight_lbs = target_weight_lbs

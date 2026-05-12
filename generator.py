@@ -42,8 +42,12 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
     full_name = f"{first_name} {last_name}"
     age = random.randint(18, 38)
     archetype = random.choice(utils.ARCHETYPES)
+    trait = random.choice(utils.TRAITS) if random.random() < 0.6 else None
+    personality = random.choice(utils.PERSONALITIES)
 
-    fighter = Fighter(full_name, age, weight_lbs, background, archetype)
+    fighter = Fighter(full_name, age, weight_lbs, background, archetype,
+                      trait_id=trait["id"] if trait else None,
+                      personality_id=personality["id"])
     fighter.height = utils.gaussian_random(68, 4, 60, 84)
     fighter.reach = utils.gaussian_random(72, 4, 60, 88)
 

@@ -387,7 +387,35 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
               <div id="f2NameBar" style="font-weight:700;font-size:14px;color:#e0e0e0"></div>
               <div id="f2StateBar" style="font-size:11px;margin-top:2px"></div>
               <div id="f2RoundInfo" style="font-size:10px;color:#888;margin-top:4px"></div>
+              <div style="display:flex;gap:8px;margin-top:4px">
+                <div>
+                  <div style="font-size:9px;color:#888;text-align:center;margin-bottom:2px">DMG</div>
+                  <div style="height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden;width:24px">
+                    <div id="f2HpBar" style="height:100%;width:100%;background:#e62400;border-radius:4px;transition:width .3s"></div>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:9px;color:#888;text-align:center;margin-bottom:2px">ST</div>
+                  <div style="height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden;width:24px">
+                    <div id="f2StamBar" style="height:100%;width:100%;background:#4a9eff;border-radius:4px;transition:width .3s"></div>
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 30px 30px 30px 30px 1fr;gap:4px;align-items:center;margin-top:4px">
+            <div style="text-align:right;font-size:9px;color:#888">Head</div>
+            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f1HeadBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
+            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f1BodyBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
+            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f1LegBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
+            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f1BloodBar" style="height:100%;width:0%;background:#8b0000;border-radius:3px;transition:width .3s"></div></div>
+            <div style="font-size:9px;color:#888">Blood</div>
+            <div style="text-align:right;font-size:9px;color:#888">Head</div>
+            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f2HeadBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
+            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f2BodyBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
+            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f2LegBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div></div>
+            <div style="height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden"><div id="f2BloodBar" style="height:100%;width:0%;background:#8b0000;border-radius:3px;transition:width .3s"></div></div>
+            <div style="font-size:9px;color:#888">Blood</div>
           </div>
           <div id="fightScoreBars" style="margin-top:6px;display:none">
             <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px">
@@ -1405,7 +1433,7 @@ async function startFight() {
   console.log("startFight called, strategy:", selectedStrategy);
   const resp = await api("/api/start_fight", { sid, strategy: selectedStrategy });
   console.log("startFight resp:", resp);
-  if (!resp.success) { toast(resp.error || "Failed", "error"); alert("Fight error: " + (resp.error || "Failed")); return; }
+  if (!resp.success) { toast(resp.error || "Failed", "error"); return; }
   qs("#fightReady").classList.add("hidden");
   qs("#fightPre").classList.add("hidden");
   qs("#fightLive").classList.remove("hidden");
@@ -1494,9 +1522,9 @@ let _roundScores = [];
 
 async function replayFightEvents(fightResult) {
   console.log("replayFightEvents called with:", fightResult);
-  if (!fightResult) { console.error("fightResult is null/undefined"); alert("fightResult is null/undefined"); return; }
-  if (!fightResult.events) { console.error("fightResult.events is missing"); alert("events missing from fightResult: " + JSON.stringify(fightResult)); return; }
-  if (fightResult.events.length === 0) { console.error("events array is empty"); alert("events array is empty! fightResult: " + JSON.stringify(fightResult)); return; }
+  if (!fightResult) { console.error("fightResult is null/undefined"); return; }
+  if (!fightResult.events) { console.error("fightResult.events is missing"); return; }
+  if (fightResult.events.length === 0) { console.error("events array is empty"); return; }
   console.log("events count:", fightResult.events.length);
   const log = qs("#fightLog");
   const events = fightResult.events || [];
