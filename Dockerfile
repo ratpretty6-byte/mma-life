@@ -5,11 +5,12 @@ WORKDIR /app
 # Copy all game files
 COPY . .
 
-# No external dependencies - standard library only
-RUN pip install --no-cache-dir -r requirements.txt || true
+# Install Python and clean up
+RUN apt-get update && apt-get install -y python3 python3-pip && rm -rf /var/lib/apt/lists/*
 
-# Expose port (Railway will override with PORT env)
+# Expose port
+ENV PORT=8000
 EXPOSE 8000
 
-# Run the server - Railway sets PORT env var
-CMD ["python", "web_server.py"]
+# Run the server
+CMD ["python3", "web_server.py"]

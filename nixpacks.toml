@@ -1,0 +1,5 @@
+[build]
+cmd = "pip install -r requirements.txt || true"
+
+[start]
+cmd = "python3 web_server.py"
