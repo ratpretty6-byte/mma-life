@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 from threading import Lock, Thread
 import time
 
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
 from fighter import Fighter
 from training import TrainingSystem, TrainingCamp, DAYS_OF_WEEK
 from promotion import Promotion, create_promotions
@@ -378,7 +380,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-type", "text/html; charset=utf-8")
                 self.end_headers()
-                with open("/workspace/MMALIFE/templates/index.html", "rb") as f:
+                with open(os.path.join(APP_DIR, "templates", "index.html"), "rb") as f:
                     self.wfile.write(f.read())
 
             elif path == "/api/state":
