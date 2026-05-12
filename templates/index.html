@@ -247,27 +247,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div style="margin-top:12px;text-align:center">
-        <button id="quickStartBtn" type="button" onclick="(async function(){ 
-  const urlParams = new URLSearchParams(window.location.search);
-  const curSid = urlParams.get('sid') || 'sess_' + Math.random().toString(36).slice(2);
-  const names = ['Alex Torres','Jordan Lee','Mike Santos','Chris Kim','James Chen','Ryan Silva','Dan Williams','Tom Johnson','Sam Jackson','Carlos Rivera'];
-  const name = names[Math.floor(Math.random() * names.length)];
-  const nationalities = ['American','Brazilian','Russian','Japanese','British','Canadian','French','Dutch','Australian','Polish','Korean','Mexican','Chinese','Swedish','Irish','Nigerian','New Zealander','German','Italian','Spanish','Ukrainian','Cuban','Jamaican','South African','Swiss','Belgian','Norwegian','Finnish','Danish','Icelandic'];
-  const nationality = nationalities[Math.floor(Math.random() * nationalities.length)];
-  const regionList = {'American':['California','Texas','New York','Florida','Ohio','Colorado','Nevada','Arizona'],'Brazilian':['Rio de Janeiro','Sao Paulo','Bahia','Minas Gerais','Ceara'],'Russian':['Moscow','St. Petersburg','Dagestan','Chechnya','Siberia'],'Japanese':['Tokyo','Osaka','Yokohama','Nagoya','Okinawa'],'British':['London','Manchester','Liverpool','Birmingham','Scotland'],'Canadian':['Ontario','Quebec','British Columbia','Alberta','Nova Scotia'],'French':['Paris','Lyon','Marseille','Bordeaux','Toulouse'],'Dutch':['Amsterdam','Rotterdam','Utrecht','The Hague','Eindhoven'],'Australian':['Sydney','Melbourne','Brisbane','Perth','Gold Coast'],'Polish':['Warsaw','Krakow','Gdansk','Wroclaw','Poznan'],'Korean':['Seoul','Busan','Incheon','Daegu','Ulsan'],'Mexican':['Mexico City','Guadalajara','Monterrey','Tijuana','Puebla'],'Chinese':['Beijing','Shanghai','Shenzhen','Guangzhou','Chengdu'],'Swedish':['Stockholm','Gothenburg','Malmo','Uppsala','Linkoping'],'Irish':['Dublin','Cork','Galway','Limerick','Belfast'],'Nigerian':['Lagos','Abuja','Port Harcourt','Ibadan','Kano'],'New Zealander':['Auckland','Wellington','Christchurch','Hamilton','Tauranga'],'German':['Berlin','Munich','Hamburg','Cologne','Frankfurt'],'Italian':['Rome','Milan','Naples','Turin','Florence'],'Spanish':['Madrid','Barcelona','Valencia','Seville','Bilbao'],'Ukrainian':['Kyiv','Kharkiv','Odessa','Dnipro','Lviv'],'Cuban':['Havana','Santiago','Camaguey','Holguin','Santa Clara'],'Jamaican':['Kingston','Montego Bay','Ocho Rios','Negril','Spanish Town'],'South African':['Johannesburg','Cape Town','Durban','Pretoria','Port Elizabeth'],'Swiss':['Zurich','Geneva','Basel','Bern','Lausanne'],'Belgian':['Brussels','Antwerp','Ghent','Bruges','Liege'],'Norwegian':['Oslo','Bergen','Trondheim','Stavanger','Tromso'],'Finnish':['Helsinki','Espoo','Tampere','Turku','Oulu'],'Danish':['Copenhagen','Aarhus','Odense','Aalborg','Esbjerg'],'Icelandic':['Reykjavik','Kopavogur','Hafnarfjordur','Akureyri','Gardabaer']};
-  const region = regionList[nationality] ? regionList[nationality][0] : 'Capital';
-  const bg = ['mma','wrestling','bjj','muay_thai','boxing','judo','taekwondo','karate','sambo','kickboxing','capoeira'][Math.floor(Math.random() * 11)];
-  const btn = document.querySelector('#quickStartBtn');
-  if(btn){btn.textContent='Creating...';btn.disabled=true;}
-  try {
-    const resp = await fetch('/api/create_fighter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,age:Math.floor(Math.random()*10)+22,background:bg,weight_class:4,sid:curSid,nationality,region,trait_id:null,personality_id:['charismatic','intimidating','humble','cocky','quiet','savage'][Math.floor(Math.random()*6)]})});
-    const json = await resp.json();
-    if(json && json.success){
-      window.location.href='/?sid='+curSid;
-    }else{alert('Error: '+(json&&json.error)||'Unknown');}
-  } catch(e) {alert('Exception: ' + e.message);}
-  if(btn){btn.textContent='START CAREER';btn.disabled=false;}
-})(); return false;" class="btn btn-primary" style="font-size:16px;padding:12px 40px;">START CAREER</button>
+        <a href="#" id="quickStartBtn" class="btn btn-primary" style="font-size:16px;padding:12px 40px;text-decoration:none;display:inline-block">START CAREER</a>
       </div>
     </div>
   </div>
@@ -613,6 +593,47 @@ async function init() {
     alert("Error loading game: " + e.message);
   }
 }
+
+// Quick Start Career click handler
+document.addEventListener('DOMContentLoaded', function() {
+  const quickBtn = document.getElementById('quickStartBtn');
+  if(quickBtn) {
+    quickBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const urlParams = new URLSearchParams(window.location.search);
+      const curSid = urlParams.get('sid') || 'sess_' + Math.random().toString(36).slice(2);
+      const names = ['Alex Torres','Jordan Lee','Mike Santos','Chris Kim','James Chen'];
+      const name = names[Math.floor(Math.random() * names.length)];
+      const nationalities = ['American','Brazilian','Russian','Japanese','British','Canadian'];
+      const nationality = nationalities[Math.floor(Math.random() * nationalities.length)];
+      const region = nationality === 'American' ? 'California' : (nationality === 'Brazilian' ? 'Rio de Janeiro' : 'Capital');
+      const bg = 'mma';
+      const btn = document.getElementById('quickStartBtn');
+      btn.textContent = 'Creating...';
+      btn.style.pointerEvents = 'none';
+      try {
+        const resp = await fetch('/api/create_fighter', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name, age: 25, background: bg, weight_class: 4, sid: curSid, nationality, region, trait_id: null, personality_id: 'humble'})
+        });
+        const json = await resp.json();
+        if(json && json.success) {
+          window.location.href = '/?sid=' + curSid;
+        } else {
+          alert('Error: ' + (json && json.error) || 'Unknown');
+          btn.textContent = 'START CAREER';
+          btn.style.pointerEvents = 'auto';
+        }
+      } catch(err) {
+        alert('Error: ' + err.message);
+        btn.textContent = 'START CAREER';
+        btn.style.pointerEvents = 'auto';
+      }
+    });
+  }
+});
 
 function initCreateForm() {
   console.log("initCreateForm called");
