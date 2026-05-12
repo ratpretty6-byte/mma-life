@@ -491,9 +491,11 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 
 <script>
 console.log("JS loaded");
-alert("JS is running!");
 const BASE = "";
-let sid = "sess_" + Math.random().toString(36).slice(2);
+// Get sid from URL if present
+const urlParams = new URLSearchParams(window.location.search);
+const urlSid = urlParams.get("sid");
+let sid = urlSid || "sess_" + Math.random().toString(36).slice(2);
 let state = null;
 let selectedStrategy = "aggressive_striking";
 let STRATS = [];
@@ -550,6 +552,7 @@ function closeModal(e) { if (!e || e.target === qs("#modalOverlay")) qs("#modalO
 
 async function init() {
   console.log("init() starting...");
+  console.log("sid from URL:", sid);
   qs("#headerStatus").textContent = "Loading...";
   try {
     console.log("Calling /api/init...");
@@ -557,6 +560,27 @@ async function init() {
     console.log("Got response:", resp);
     if (resp && resp.ready) {
       qs("#headerStatus").textContent = `World loaded: ${resp.promotions.regional}R / ${resp.promotions.national}N / ${resp.promotions.world}W fighters`;
+      
+      // If we have a valid sid from URL, try to load the game
+      if (urlSid) {
+        console.log("Attempting to load game with sid:", sid);
+        try {
+          const stateResp = await api("/api/state?sid=" + encodeURIComponent(sid));
+          if (stateResp && stateResp.fighter) {
+            console.log("Game loaded successfully!");
+            state = stateResp;
+            if (state.strategies) STRATS = state.strategies;
+            qs("#screen-create").classList.add("hidden");
+            qs("#screen-game").classList.remove("hidden");
+            updateAllUI();
+            return; // Don't show create form
+          }
+        } catch(e) {
+          console.log("No existing session, showing create form");
+        }
+      }
+      
+      // No valid session, show create form
       console.log("Calling initCreateForm...");
       initCreateForm();
     } else {
