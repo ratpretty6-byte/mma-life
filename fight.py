@@ -1849,17 +1849,14 @@ class Fight:
 
     def _get_display_health(self, fighter: Fighter) -> dict:
         """Format health display for the frontend."""
+        f_state = self.f1_state if fighter == self.fighter1 else self.f2_state
         return {
             "head": round(fighter.get_group_health("head"), 1),
             "body": round(fighter.get_group_health("body"), 1),
             "legs": round(fighter.get_group_health("legs"), 1),
             "overall": round(fighter.get_overall_health_pct(), 1),
-            "left_eye": round(fighter.get_zone_health_pct("left_eye"), 1),
-            "right_eye": round(fighter.get_zone_health_pct("right_eye"), 1),
-            "jaw": round(fighter.get_zone_health_pct("jaw"), 1),
+            "stamina": round(f_state.get("stamina", 100), 1),
             "blood": round(fighter._blood_level, 1),
-            "body_level": utils.get_body_level(self.f1_state["body_fatigue"] if fighter == self.fighter1 else self.f2_state["body_fatigue"]),
-            "leg_level": utils.get_leg_level(self.f1_state["leg_damage"] if fighter == self.fighter1 else self.f2_state["leg_damage"]),
         }
 
     def _get_mod(self, attr: str, strategy: StrategySystem) -> float:

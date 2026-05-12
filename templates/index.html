@@ -319,52 +319,30 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 
       <div id="fightLive" class="hidden">
         <div id="fightHealthBars" class="card" style="margin-bottom:6px;padding:8px">
-          <div style="display:grid;grid-template-columns:1fr 40px 1fr;gap:6px;align-items:center">
+          <div style="display:grid;grid-template-columns:1fr 30px 1fr;gap:8px;align-items:center">
             <div style="text-align:right">
-              <div id="f1NameBar" style="font-weight:700;font-size:13px;color:#e0e0e0"></div>
+              <div id="f1NameBar" style="font-weight:700;font-size:14px;color:#e0e0e0"></div>
               <div id="f1StateBar" style="font-size:11px;margin-top:2px"></div>
+              <div id="f1RoundInfo" style="font-size:10px;color:#888;margin-top:4px"></div>
             </div>
-            <div id="f1HealthBars" style="display:flex;flex-direction:column;gap:2px">
-              <div style="display:flex;align-items:center;gap:3px">
-                <span style="font-size:9px;color:#888;width:22px">HP</span>
-                <div style="flex:1;height:10px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-                  <div id="f1HpBar" style="height:100%;width:100%;background:#e62400;border-radius:3px;transition:width .3s"></div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div>
+                <div style="font-size:9px;color:#888;text-align:center;margin-bottom:2px">DMG</div>
+                <div style="height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden;width:24px">
+                  <div id="f1HpBar" style="height:100%;width:100%;background:#e62400;border-radius:4px;transition:width .3s"></div>
                 </div>
               </div>
-              <div style="display:flex;align-items:center;gap:3px">
-                <span style="font-size:9px;color:#888;width:22px">HD</span>
-                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-                  <div id="f1HeadBar" style="height:100%;width:100%;background:#ff4a4a;border-radius:3px;transition:width .3s"></div>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:3px">
-                <span style="font-size:9px;color:#888;width:22px">BD</span>
-                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-                  <div id="f1BodyBar" style="height:100%;width:100%;background:#ff9a4a;border-radius:3px;transition:width .3s"></div>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:3px">
-                <span style="font-size:9px;color:#888;width:22px">LD</span>
-                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-                  <div id="f1LegBar" style="height:100%;width:100%;background:#4aff6a;border-radius:3px;transition:width .3s"></div>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:3px">
-                <span style="font-size:9px;color:#888;width:22px">BL</span>
-                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-                  <div id="f1BloodBar" style="height:100%;width:0%;background:#8b0000;border-radius:3px;transition:width .3s"></div>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:3px">
-                <span style="font-size:9px;color:#888;width:22px">ST</span>
-                <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-                  <div id="f1StamBar" style="height:100%;width:100%;background:#4a9eff;border-radius:3px;transition:width .3s"></div>
+              <div>
+                <div style="font-size:9px;color:#888;text-align:center;margin-bottom:2px">ST</div>
+                <div style="height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden;width:24px">
+                  <div id="f1StamBar" style="height:100%;width:100%;background:#4a9eff;border-radius:4px;transition:width .3s"></div>
                 </div>
               </div>
             </div>
             <div style="text-align:left">
-              <div id="f2NameBar" style="font-weight:700;font-size:13px;color:#e0e0e0"></div>
+              <div id="f2NameBar" style="font-weight:700;font-size:14px;color:#e0e0e0"></div>
               <div id="f2StateBar" style="font-size:11px;margin-top:2px"></div>
+              <div id="f2RoundInfo" style="font-size:10px;color:#888;margin-top:4px"></div>
             </div>
           </div>
           <div id="fightScoreBars" style="margin-top:6px;display:none">
@@ -393,6 +371,10 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
           <div id="fightHeader" style="font-size:12px;color:#888;margin-bottom:4px"></div>
         </div>
         <div class="fight-log" id="fightLog"></div>
+        <div id="fightRoundReports" class="card hidden" style="margin-top:6px;background:#0d0d1a">
+          <div class="card-title" style="font-size:12px;color:#aaa">Round Reports</div>
+          <div id="roundReports"></div>
+        </div>
         <div id="fightStratPrompt" class="hidden card" style="margin-top:6px">
           <div class="card-title" id="stratPromptTitle">Between Rounds — Adjust Strategy?</div>
           <div id="stratPromptGrid" class="strategy-grid"></div>
@@ -1300,6 +1282,7 @@ async function startFight() {
   qs("#fightLog").innerHTML = "";
   qs("#fightStratPrompt").classList.add("hidden");
   qs("#fightResult").classList.add("hidden");
+  qs("#fightRoundReports").classList.add("hidden");
   qs("#fightHeader").textContent = `${state.fighter.name} vs ${resp.opponent} | ${state.fight_booking.is_title ? "TITLE FIGHT" : "3 Rounds"}`;
 
   // Initialize health bars
@@ -1326,18 +1309,23 @@ async function startFight() {
 }
 
 function updateHealthBars(f1Health, f2Health) {
-  // f1Health / f2Health: {head, body, legs, overall, left_eye, right_eye, jaw, blood, body_level, leg_level}
   if (f1Health) {
-    const f1 = f1Health;
-    qs("#f1HpBar").style.width = Math.max(0, f1.overall || 100) + "%";
-    // Color gradient from green to red based on health
-    const hp1 = f1.overall || 100;
-    qs("#f1HpBar").style.background = hp1 > 60 ? "#e62400" : (hp1 > 30 ? "#ff6a00" : "#ff0000");
-    qs("#f1HeadBar").style.width = Math.max(0, f1.head || 100) + "%";
-    qs("#f1BodyBar").style.width = Math.max(0, f1.body || 100) + "%";
-    qs("#f1LegBar").style.width = Math.max(0, f1.legs || 100) + "%";
-    qs("#f1BloodBar").style.width = Math.min(100, f1.blood || 0) + "%";
+    const overall = Math.max(0, f1Health.overall || 100);
+    const stamina = Math.max(0, f1Health.stamina || 100);
+    qs("#f1HpBar").style.width = overall + "%";
+    qs("#f1HpBar").style.background = overall > 60 ? "#e62400" : (overall > 30 ? "#ff6a00" : "#ff0000");
+    qs("#f1StamBar").style.width = stamina + "%";
+    qs("#f1StamBar").style.background = stamina > 50 ? "#4a9eff" : (stamina > 25 ? "#ff9a4a" : "#ff4a4a");
   }
+  if (f2Health) {
+    const overall = Math.max(0, f2Health.overall || 100);
+    const stamina = Math.max(0, f2Health.stamina || 100);
+    qs("#f2HpBar").style.width = overall + "%";
+    qs("#f2HpBar").style.background = overall > 60 ? "#e62400" : (overall > 30 ? "#ff6a00" : "#ff0000");
+    qs("#f2StamBar").style.width = stamina + "%";
+    qs("#f2StamBar").style.background = stamina > 50 ? "#4a9eff" : (stamina > 25 ? "#ff9a4a" : "#ff4a4a");
+  }
+}
   if (f2Health) {
     const f2 = f2Health;
     qs("#f2HpBar").style.width = Math.max(0, f2.overall || 100) + "%";
@@ -1546,6 +1534,12 @@ async function completeFight() {
       if (bonuses.fight_of_night) extraHtml += `<div style="color:#daa520;margin-top:2px">🏆 Fight of the Night: ${escHtml(bonuses.fight_of_night)}</div>`;
       if (bonuses.perf_of_night) extraHtml += `<div style="color:#daa520;margin-top:2px">💥 Performance of the Night: ${escHtml(bonuses.perf_of_night)}</div>`;
       extraHtml += `</div>`;
+    }
+
+    // Include round reports in the result
+    const rrDiv = qs("#fightRoundReports");
+    if (rrDiv && !rrDiv.classList.contains("hidden")) {
+      extraHtml += `<div style="margin-top:8px">${rrDiv.innerHTML}</div>`;
     }
 
     resultDiv.innerHTML = `<div class="card-title" style="font-size:18px;color:${resp.won ? '#4aff6a' : '#e62400'}">${resp.won ? "VICTORY!" : "DEFEAT"}</div>
