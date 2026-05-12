@@ -1402,8 +1402,10 @@ function setSpeed(s) {
 }
 
 async function startFight() {
+  console.log("startFight called, strategy:", selectedStrategy);
   const resp = await api("/api/start_fight", { sid, strategy: selectedStrategy });
-  if (!resp.success) { toast(resp.error || "Failed", "error"); return; }
+  console.log("startFight resp:", resp);
+  if (!resp.success) { toast(resp.error || "Failed", "error"); alert("Fight error: " + (resp.error || "Failed")); return; }
   qs("#fightReady").classList.add("hidden");
   qs("#fightPre").classList.add("hidden");
   qs("#fightLive").classList.remove("hidden");
@@ -1491,6 +1493,11 @@ let _f1TotalScore = 0, _f2TotalScore = 0;
 let _roundScores = [];
 
 async function replayFightEvents(fightResult) {
+  console.log("replayFightEvents called with:", fightResult);
+  if (!fightResult) { console.error("fightResult is null/undefined"); alert("fightResult is null/undefined"); return; }
+  if (!fightResult.events) { console.error("fightResult.events is missing"); alert("events missing from fightResult: " + JSON.stringify(fightResult)); return; }
+  if (fightResult.events.length === 0) { console.error("events array is empty"); alert("events array is empty! fightResult: " + JSON.stringify(fightResult)); return; }
+  console.log("events count:", fightResult.events.length);
   const log = qs("#fightLog");
   const events = fightResult.events || [];
   for (let i = 0; i < events.length; i++) {
