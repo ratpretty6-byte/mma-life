@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 import json
+import os
 import urllib.parse
 import traceback
 import random
 import copy
 from datetime import datetime, timedelta
 from threading import Lock, Thread
+import time
 
 from fighter import Fighter
 from training import TrainingSystem, TrainingCamp, DAYS_OF_WEEK
@@ -32,11 +35,11 @@ def ensure_initialized():
     with init_lock:
         if gs.get("initialized"):
             return
-        print("Initializing game world with 5000 fighters...")
+        print("Initializing game world with 500 fighters...")
         weight_classes = [wc["name"] for wc in utils.WEIGHT_CLASSES]
         promotions = create_promotions(weight_classes)
         world, national, regional = promotions
-        all_fighters = generate_fighter_pool(promotions, 5000)
+        all_fighters = generate_fighter_pool(promotions, 500)
         gs["promotions"] = promotions
         gs["world"] = world
         gs["national"] = national
@@ -392,6 +395,58 @@ class Handler(BaseHTTPRequestHandler):
                     "world": len(gs["world"].fighters),
                 }})
 
+            elif path == "/create":
+                ensure_initialized()
+                name = params.get("name", ["Fighter"])[0]
+                try:
+                    age = int(params.get("age", ["25"])[0])
+                except:
+                    age = 25
+                try:
+                    wc = int(params.get("weight_class", ["3"])[0])
+                except:
+                    wc = 3
+                bg = params.get("background", ["mma"])[0]
+                nationality = params.get("nationality", ["American"])[0]
+                region = params.get("region", ["California"])[0]
+                trait_id = params.get("trait_id", [None])[0]
+                personality_id = params.get("personality_id", ["humble"])[0]
+                
+                wc_data = utils.WEIGHT_CLASSES[wc]
+                weight = random.randint(wc_data["min"], wc_data["max"])
+                
+                game_date = datetime(2025, 1, 6)
+                f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, game_date=game_date)
+                regional = gs["regional"]
+                career = CareerSystem(f)
+                career.sign_with_promotion(regional, 4, game_date)
+                training = TrainingSystem(f)
+                finance = FinancialSystem(f)
+                health = HealthSystem(f)
+                media = MediaSystem(f)
+                event_sys = EventSystem()
+                f.gym = None
+                f.net_worth = 5000
+                finance.net_worth = 5000
+                sid = "sess_" + str(random.randint(10000, 99999))
+                session = get_or_create_session(sid)
+                session["fighter"] = f
+                session["career"] = career
+                session["training"] = training
+                session["finance"] = finance
+                session["health"] = health
+                session["media"] = media
+                session["event_sys"] = event_sys
+                session["current_promotion"] = regional
+                session["current_event"] = None
+                session["current_fight_booking"] = None
+                session["current_fight"] = None
+                session["game_date"] = game_date
+                
+                self.send_response(302)
+                self.send_header("Location", f"/?sid={sid}")
+                self.end_headers()
+
             elif path == "/api/camps":
                 self.json_resp({"camps": get_available_camps_data()})
 
@@ -421,6 +476,14 @@ class Handler(BaseHTTPRequestHandler):
                 ensure_initialized()
                 self.json_resp({"news": format_news_items(gs.get("world_news", []))})
 
+            elif path == "/api/health":
+                self.json_resp({
+                    "status": "ok",
+                    "initialized": gs.get("initialized", False),
+                    "uptime": time.time() - gs.get("start_time", time.time()),
+                    "sessions": len(gs.get("sessions", {})),
+                })
+
             else:
                 self.send_error(404)
 
@@ -430,7 +493,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-length", 0))
-            body = json.loads(self.rfile.read(length)) if length else {}
+            content_type = self.headers.get("Content-Type", "")
+            raw_body = self.rfile.read(length) if length else b""
+            
+            # Handle both JSON and form-encoded data
+            if "application/json" in content_type:
+                body = json.loads(raw_body) if raw_body else {}
+            elif "application/x-www-form-urlencoded" in content_type:
+                body = urllib.parse.parse_qs(raw_body.decode("utf-8"))
+                # Convert lists to single values
+                body = {k: v[0] if len(v) == 1 else v for k, v in body.items()}
+            else:
+                body = {}
+                
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
 
@@ -439,8 +514,19 @@ class Handler(BaseHTTPRequestHandler):
                 name = body.get("name", "Fighter")
                 age = body.get("age", 25)
                 bg = body.get("background", "mma")
-                wc_idx = body.get("weight_class", 3)
-                wc = utils.WEIGHT_CLASSES[wc_idx]
+                wc_param = body.get("weight_class", 3)
+                
+                # Handle both string weight class names and integer indices
+                if isinstance(wc_param, str):
+                    # Find the weight class index by name
+                    wc_idx = 3  # Default to lightweight
+                    for i, wc in enumerate(utils.WEIGHT_CLASSES):
+                        if wc_param.lower().replace(" ", "_") in wc["name"].lower().replace(" ", "_"):
+                            wc_idx = i
+                            break
+                    wc = utils.WEIGHT_CLASSES[wc_idx]
+                else:
+                    wc = utils.WEIGHT_CLASSES[wc_param]
                 weight = random.randint(wc["min"], wc["max"])
                 sid = body.get("sid", "")
                 nationality = body.get("nationality", "American")
@@ -477,8 +563,38 @@ class Handler(BaseHTTPRequestHandler):
                 session["current_fight_booking"] = None
                 session["current_fight"] = None
                 session["game_date"] = game_date
-
-                self.json_resp({"success": True, "state": get_state_dict(session), "sid": sid})
+                
+                # Check if this is a form submission (not AJAX)
+                if "application/x-www-form-urlencoded" in content_type:
+                    # Return HTML page that loads the game
+                    state_json = json.dumps(get_state_dict(session))
+                    html = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MMA Life - Game</title>
+<meta http-equiv="refresh" content="0;url=/?sid={sid}">
+<style>
+body{{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a0f;color:#e0e0e0;padding:20px;text-align:center}}
+.btn{{display:inline-block;padding:10px 20px;background:#e62400;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:16px}}
+</style>
+<script>
+var sid = "{sid}";
+var state = {state_json};
+try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setItem("mma_sid", sid);}}catch(e){{}}
+</script>
+</head>
+<body>
+<h1>Fighter Created!</h1>
+<p>Welcome to the pros, {f.name}!</p>
+<p><a href="/?sid={sid}" class="btn">ENTER GAME</a></p>
+</body>
+</html>'''
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html")
+                    self.end_headers()
+                    self.wfile.write(html.encode())
+                else:
+                    self.json_resp({"success": True, "state": get_state_dict(session), "sid": sid})
 
             elif path == "/api/advance_day":
                 sid = body.get("sid", "")
@@ -978,12 +1094,20 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
 if __name__ == "__main__":
-    PORT = 8000
+    class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+        """Handle each request in a new thread"""
+        daemon_threads = True
+    
+    PORT = int(os.environ.get("PORT", 8000))
+    HOST = "0.0.0.0"
+    
+    gs["start_time"] = time.time()
+    
     print(f"Server starting on port {PORT}...")
     print("Initializing game world...")
     ensure_initialized()
     print("Game world ready!")
-    print(f"Open http://localhost:{PORT} in your browser")
-    server = HTTPServer(("0.0.0.0", PORT), Handler)
+    print(f"Open http://localhost:{PORT} in your browser" if PORT == 8000 else f"Server running on {HOST}:{PORT}")
+    server = ThreadedHTTPServer((HOST, PORT), Handler)
     server.allow_reuse_address = True
     server.serve_forever()

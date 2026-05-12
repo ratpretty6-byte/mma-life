@@ -55,6 +55,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .strategy-btn:hover { border-color: #e62400; background: #2a1a1a; }
 .strategy-btn.selected { border-color: #e62400; background: #3a2020; }
 .strategy-btn.small { font-size: 11px; padding: 5px 8px; }
+.strategy-btn input { display: none; }
+.strategy-btn:has(input:checked) { border-color: #e62400; background: #3a2020; }
 .opponent-card { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #1a1a2a; border-radius: 6px; margin-bottom: 5px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .opponent-card:hover { background: #2a2a3a; }
 .opponent-card:active { background: #3a3a4a; }
@@ -130,6 +132,12 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 </style>
 </head>
 <body>
+<noscript>
+<div style="background:#800;color:#fff;padding:20px;text-align:center">
+  <h2>JavaScript Required</h2>
+  <p>This game requires JavaScript to run. Please enable JavaScript in your browser settings.</p>
+</div>
+</noscript>
 <div class="header">
   <div class="container">
     <h1>MMA LIFE SIMULATOR</h1>
@@ -147,11 +155,11 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div>
           <label>Fighter Name</label>
-          <input id="fName" value="">
+          <input id="fName" name="name" value="">
         </div>
         <div>
           <label>Age</label>
-          <select id="fAge">
+          <select id="fAge" name="age">
             <option value="18">18</option><option value="19">19</option><option value="20">20</option>
             <option value="21">21</option><option value="22">22</option><option value="23">23</option>
             <option value="24">24</option><option value="25" selected>25</option>
@@ -163,7 +171,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
         </div>
         <div>
           <label>Weight Class</label>
-          <select id="fWeightClass">
+          <select id="fWeightClass" name="weight_class">
             <option value="0">Flyweight (125)</option><option value="1">Bantamweight (135)</option>
             <option value="2">Featherweight (145)</option><option value="3" selected>Lightweight (155)</option>
             <option value="4">Welterweight (170)</option><option value="5">Middleweight (185)</option>
@@ -172,7 +180,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
         </div>
         <div>
           <label>Background</label>
-          <select id="fBackground">
+          <select id="fBackground" name="background">
             <option value="mma" selected>MMA (All-Rounder)</option>
             <option value="wrestling">Wrestling</option>
             <option value="bjj">Brazilian Jiu-Jitsu</option>
@@ -188,22 +196,58 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
         </div>
         <div>
           <label>Nationality</label>
-          <select id="fNationality"></select>
+          <select id="fNationality" name="nationality">
+            <option value="American">American</option>
+            <option value="Brazilian">Brazilian</option>
+            <option value="Russian">Russian</option>
+            <option value="Japanese">Japanese</option>
+            <option value="British">British</option>
+            <option value="Canadian">Canadian</option>
+            <option value="French">French</option>
+            <option value="Dutch">Dutch</option>
+            <option value="Australian">Australian</option>
+            <option value="Polish">Polish</option>
+            <option value="Korean">Korean</option>
+            <option value="Mexican">Mexican</option>
+            <option value="German">German</option>
+            <option value="Italian">Italian</option>
+          </select>
         </div>
         <div>
           <label>Home Region</label>
-          <select id="fRegion"></select>
+          <select id="fRegion" name="region">
+            <option value="California">California</option>
+            <option value="Texas">Texas</option>
+            <option value="New York">New York</option>
+            <option value="Florida">Florida</option>
+          </select>
         </div>
       </div>
 
-      <label style="margin-top:10px">Trait (starting bonus)</label>
-      <div id="traitGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px"></div>
+      <label style="margin-top:10px">Trait (tap to select)</label>
+      <div id="traitGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px">
+        <label class="strategy-btn"><input type="radio" name="trait_id" value="heavy_hands"> <strong>Heavy Hands</strong><br><small>+5 striking power</small></label>
+        <label class="strategy-btn"><input type="radio" name="trait_id" value="iron_chin"> <strong>Iron Chin</strong><br><small>+5 durability</small></label>
+        <label class="strategy-btn"><input type="radio" name="trait_id" value="cardio_king"> <strong>Cardio King</strong><br><small>+5 cardio</small></label>
+        <label class="strategy-btn"><input type="radio" name="trait_id" value="mat_wizard"> <strong>Mat Wizard</strong><br><small>+5 wrestling defense</small></label>
+        <label class="strategy-btn"><input type="radio" name="trait_id" value="sniper"> <strong>Sniper</strong><br><small>+5 accuracy</small></label>
+        <label class="strategy-btn"><input type="radio" name="trait_id" value="natural_athlete"> <strong>Natural Athlete</strong><br><small>+3 all physical</small></label>
+        <label class="strategy-btn"><input type="radio" name="trait_id" value="iron_will"> <strong>Iron Will</strong><br><small>+5 mental toughness</small></label>
+        <label class="strategy-btn"><input type="radio" name="trait_id" value="fast_hands"> <strong>Fast Hands</strong><br><small>+5 hand speed</small></label>
+      </div>
 
       <label style="margin-top:8px">Personality</label>
-      <div id="personalityGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px"></div>
+      <div id="personalityGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px">
+        <label class="strategy-btn"><input type="radio" name="personality_id" value="charismatic" checked> <strong>Charismatic</strong></label>
+        <label class="strategy-btn"><input type="radio" name="personality_id" value="intimidating"> <strong>Intimidating</strong></label>
+        <label class="strategy-btn"><input type="radio" name="personality_id" value="humble"> <strong>Humble</strong></label>
+        <label class="strategy-btn"><input type="radio" name="personality_id" value="cocky"> <strong>Cocky</strong></label>
+        <label class="strategy-btn"><input type="radio" name="personality_id" value="quiet"> <strong>Quiet</strong></label>
+        <label class="strategy-btn"><input type="radio" name="personality_id" value="savage"> <strong>Savage</strong></label>
+      </div>
 
       <div style="margin-top:12px;text-align:center">
-        <button class="btn btn-primary" onclick="createFighter()" id="createBtn" style="font-size:16px;padding:12px 40px">START CAREER</button>
+        <a href="/create?name=&age=25&weight_class=3&background=mma&nationality=American&region=California&trait_id=heavy_hands&personality_id=humble" class="btn btn-primary" style="font-size:16px;padding:12px 40px;text-decoration:none;display:inline-block">START CAREER</a>
       </div>
     </div>
   </div>
@@ -446,6 +490,8 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 <div id="toastContainer" class="toast-container"></div>
 
 <script>
+console.log("JS loaded");
+alert("JS is running!");
 const BASE = "";
 let sid = "sess_" + Math.random().toString(36).slice(2);
 let state = null;
@@ -456,15 +502,21 @@ let fightReplaying = false;
 let fightPaused = false;
 
 async function api(path, data = {}) {
-  const url = path.startsWith("/") ? `${BASE}${path}` : `${BASE}/${path}`;
-  const opts = { method: "GET", headers: { "Accept": "application/json" } };
-  if (data && Object.keys(data).length) {
-    opts.method = "POST";
-    opts.headers["Content-Type"] = "application/json";
-    opts.body = JSON.stringify(data);
+  try {
+    const url = path.startsWith("/") ? `${BASE}${path}` : `${BASE}/${path}`;
+    const opts = { method: "GET", headers: { "Accept": "application/json" } };
+    if (data && Object.keys(data).length) {
+      opts.method = "POST";
+      opts.headers["Content-Type"] = "application/json";
+      opts.body = JSON.stringify(data);
+    }
+    const resp = await fetch(url, opts);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    return await resp.json();
+  } catch(e) {
+    console.error("API error:", path, e);
+    throw e;
   }
-  const resp = await fetch(url, opts);
-  return resp.json();
 }
 
 function qs(s) { return document.querySelector(s); }
@@ -497,14 +549,29 @@ function showModal(html) { qs("#modalContent").innerHTML = html; qs("#modalOverl
 function closeModal(e) { if (!e || e.target === qs("#modalOverlay")) qs("#modalOverlay").classList.add("hidden"); }
 
 async function init() {
-  const resp = await api("/api/init");
-  if (resp.ready) {
-    qs("#headerStatus").textContent = `World loaded: ${resp.promotions.regional}R / ${resp.promotions.national}N / ${resp.promotions.world}W fighters`;
-    initCreateForm();
+  console.log("init() starting...");
+  qs("#headerStatus").textContent = "Loading...";
+  try {
+    console.log("Calling /api/init...");
+    const resp = await api("/api/init");
+    console.log("Got response:", resp);
+    if (resp && resp.ready) {
+      qs("#headerStatus").textContent = `World loaded: ${resp.promotions.regional}R / ${resp.promotions.national}N / ${resp.promotions.world}W fighters`;
+      console.log("Calling initCreateForm...");
+      initCreateForm();
+    } else {
+      console.log("Init response not ready:", resp);
+      qs("#headerStatus").textContent = "Error: " + (resp ? resp.error : "Unknown");
+    }
+  } catch(e) {
+    console.error("Init error:", e);
+    qs("#headerStatus").textContent = "Error: " + e.message;
+    alert("Error loading game: " + e.message);
   }
 }
 
 function initCreateForm() {
+  console.log("initCreateForm called");
   const natSel = qs("#fNationality");
   natSel.innerHTML = "";
   const NATIONALITIES = ["American","Brazilian","Russian","Japanese","British","Canadian","French","Dutch","Australian","Polish","Korean","Mexican","Chinese","Swedish","Irish","Nigerian","New Zealander","German","Italian","Spanish","Ukrainian","Cuban","Jamaican","South African","Swiss","Belgian","Norwegian","Finnish","Danish","Icelandic"];
