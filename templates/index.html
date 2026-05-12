@@ -247,7 +247,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div style="margin-top:12px;text-align:center">
-        <button id="startCareerBtn" class="btn btn-primary" style="font-size:16px;padding:12px 40px;border:none;cursor:pointer;">START CAREER</button>
+        <button id="startCareerBtn" class="btn btn-primary" style="font-size:16px;padding:12px 40px;border:none;cursor:pointer;" onclick="window.location.href='/create'">START CAREER</button>
       </div>
     </div>
   </div>
@@ -572,14 +572,15 @@ async function init() {
           console.log("No existing session, showing create form");
         }
       }
-      
-      initCreateForm();
     } else {
       qs("#headerStatus").textContent = "Error: " + (resp ? resp.error : "Unknown");
     }
   } catch(e) {
     console.error("Init error:", e);
     qs("#headerStatus").textContent = "Error: " + e.message;
+  }
+  if (qs("#screen-game").classList.contains("hidden")) {
+    initCreateForm();
   }
 }
 
@@ -728,7 +729,7 @@ document.getElementById('startCareerBtn').addEventListener('click', async functi
       btn.disabled = false;
     }
   } catch(e) {
-    toast('Error: ' + e.message, 'error');
+    alert('START CAREER error: ' + e.message);
     btn.textContent = 'START CAREER';
     btn.disabled = false;
   }
