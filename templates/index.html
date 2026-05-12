@@ -247,7 +247,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       </div>
 
       <div style="margin-top:12px;text-align:center">
-        <a href="/create" class="btn btn-primary" style="font-size:16px;padding:12px 40px;text-decoration:none;display:inline-block;border:none;cursor:pointer;">START CAREER</a>
+        <a href="https://mma-life-production.up.railway.app/create" class="btn btn-primary" style="font-size:16px;padding:12px 40px;text-decoration:none;display:inline-block;border:none;cursor:pointer;">START CAREER</a>
       </div>
     </div>
   </div>
@@ -553,6 +553,7 @@ function closeModal(e) { if (!e || e.target === qs("#modalOverlay")) qs("#modalO
 async function init() {
   console.log("init() starting...");
   console.log("sid from URL:", sid);
+  alert("Loading... sid=" + sid);
   qs("#headerStatus").textContent = "Loading...";
   try {
     console.log("Calling /api/init...");
@@ -568,12 +569,15 @@ async function init() {
           const stateResp = await api("/api/state?sid=" + encodeURIComponent(sid));
           if (stateResp && stateResp.fighter) {
             console.log("Game loaded successfully!");
+            alert("Game loaded! Fighter: " + stateResp.fighter.name);
             state = stateResp;
             if (state.strategies) STRATS = state.strategies;
             qs("#screen-create").classList.add("hidden");
             qs("#screen-game").classList.remove("hidden");
             updateAllUI();
             return; // Don't show create form
+          } else {
+            alert("No fighter in session");
           }
         } catch(e) {
           console.log("No existing session, showing create form");
