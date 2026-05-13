@@ -1474,10 +1474,10 @@ if __name__ == "__main__":
     Thread(target=session_cleanup, daemon=True).start()
     
     print(f"Server starting on port {PORT}...")
-    print("Initializing game world...")
-    ensure_initialized()
-    print("Game world ready!")
-    print(f"Open http://localhost:{PORT} in your browser" if PORT == 8000 else f"Server running on {HOST}:{PORT}")
     server = ThreadedHTTPServer((HOST, PORT), Handler)
     server.allow_reuse_address = True
-    server.serve_forever()
+    server_thread = Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    print("Server listening, initializing game world in background...")
+    Thread(target=lambda: [ensure_initialized(), print("Game world ready!")], daemon=True).start()
+    server_thread.join()
