@@ -184,7 +184,9 @@ def assign_to_promotions(fighters: List[Fighter], promotions: List[Promotion]):
     for f in national.fighters:
         for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
             f.attributes[attr] = max(f.attributes[attr], 30)
-    # Regional fighters get no floor (more variance, can be elite or terrible)
+    for f in regional.fighters:
+        for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
+            f.attributes[attr] = max(f.attributes[attr], 25)
 
 def generate_fighters(total: int = 8000) -> List[Fighter]:
     weight_probs = [0.10, 0.12, 0.14, 0.18, 0.16, 0.14, 0.10, 0.06]

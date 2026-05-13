@@ -306,9 +306,9 @@ class Judge:
             f2_round = 10
             f1_round = max(7, 10 - self._score_diff_to_points(abs(diff)))
 
-        if kd_diff >= 2:
+        if kd_diff >= 3:
             f2_round = min(f2_round, 7)
-        elif kd_diff <= -2:
+        elif kd_diff <= -3:
             f1_round = min(f1_round, 7)
 
         self.scores.append([f1_round, f2_round])
@@ -322,12 +322,11 @@ class Judge:
 
     @staticmethod
     def _score_diff_to_points(diff: float) -> int:
-        """Convert raw score difference to point deduction."""
         if diff < 0.3:
             return 1
-        elif diff < 1.0:
+        elif diff < 1.2:
             return 2
-        elif diff < 2.5:
+        elif diff < 3.0:
             return 3
         else:
             return 4
@@ -405,6 +404,10 @@ class Fight:
         self.f2_round_snap_td = 0
         self.f1_round_snap_grapple = 0.0
         self.f2_round_snap_grapple = 0.0
+        self.f1_round_snap_sub = 0
+        self.f2_round_snap_sub = 0
+        self.f1_round_snap_dmg = 0
+        self.f2_round_snap_dmg = 0
 
     def _init_fighter_state(self) -> Dict:
         return {
@@ -582,6 +585,10 @@ class Fight:
             self.f2_round_snap_td = self.f2_state.get("takedowns_landed", 0)
             self.f1_round_snap_grapple = self.f1_state.get("effective_grappling_points", 0.0)
             self.f2_round_snap_grapple = self.f2_state.get("effective_grappling_points", 0.0)
+            self.f1_round_snap_sub = self.f1_state.get("submissions_attempted", 0)
+            self.f2_round_snap_sub = self.f2_state.get("submissions_attempted", 0)
+            self.f1_round_snap_dmg = len(self.f1_state.get("rounds_damage_dealt", []))
+            self.f2_round_snap_dmg = len(self.f2_state.get("rounds_damage_dealt", []))
 
             # Determine number of actions this round (~based on pace)
             total_actions = self._determine_actions_this_round(round_num)
@@ -742,9 +749,13 @@ class Fight:
                 f2_gp = self.f2_state.get("effective_grappling_points", 0.0) - self.f2_round_snap_grapple
                 f1_fat = self.f1_state.get("fatigue_level", 0) * 100
                 f2_fat = self.f2_state.get("fatigue_level", 0) * 100
+                f1_sub = self.f1_state.get("submissions_attempted", 0) - self.f1_round_snap_sub
+                f2_sub = self.f2_state.get("submissions_attempted", 0) - self.f2_round_snap_sub
+                f1_dmg = sum(self.f1_state.get("rounds_damage_dealt", [])[self.f1_round_snap_dmg:])
+                f2_dmg = sum(self.f2_state.get("rounds_damage_dealt", [])[self.f2_round_snap_dmg:])
                 yield {"type": "strategy_prompt", "round": round_num,
-                       "f1_stats": {"sig_strikes": f1_sig, "takedowns": f1_td, "grapple_points": round(f1_gp, 1), "fatigue": round(f1_fat)},
-                       "f2_stats": {"sig_strikes": f2_sig, "takedowns": f2_td, "grapple_points": round(f2_gp, 1), "fatigue": round(f2_fat)},
+                       "f1_stats": {"sig_strikes": f1_sig, "takedowns": f1_td, "grapple_points": round(f1_gp, 1), "fatigue": round(f1_fat), "sub_attempts": f1_sub, "damage": round(f1_dmg, 1)},
+                       "f2_stats": {"sig_strikes": f2_sig, "takedowns": f2_td, "grapple_points": round(f2_gp, 1), "fatigue": round(f2_fat), "sub_attempts": f2_sub, "damage": round(f2_dmg, 1)},
                        "f1_total_score": self._get_total_score_for(1),
                        "f2_total_score": self._get_total_score_for(2),
                        "f1_health": self._get_display_health(self.fighter1),
@@ -1257,7 +1268,7 @@ class Fight:
         atk_state["combo_count"] += 1
 
         # Log the action (commentary will be generated)
-        log_entry = f"{attacker.name} {severity_prefix} {strike_type} to {defender.name}'s {target}"
+        log_entry = f"{attacker.name} {severity_prefix} {strike_type.replace('_', ' ')} to {defender.name}'s {target}"
         if is_critical:
             log_entry += " — CRITICAL HIT!"
         self.fight_log.append(log_entry)

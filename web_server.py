@@ -364,8 +364,7 @@ def get_opponents_data(session):
             "difficulty": difficulty,
             "attributes": {k: round(v, 1) for k, v in opp.attributes.items()},
         })
-    f_rank = f.rank
-    result.sort(key=lambda x: (0 if x["nationality"] == f.nationality else 1, abs(x["rank"] - f_rank)))
+    result.sort(key=lambda x: x["rank"])
     return result
 
 class Handler(BaseHTTPRequestHandler):
@@ -743,10 +742,11 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     self.json_resp({"error": "Opponent not found"})
                     return
                 opponent = copy.deepcopy(target)
+                is_title = promo.champions.get(f.weight_class) is not None and opponent.name == promo.champions[f.weight_class].name
                 fight_date = game_date + timedelta(weeks=weeks_out)
                 es = session.get("event_sys")
                 event = es.create_event(f"Fight Night: {f.name} vs {opponent.name}", fight_date, promo)
-                fb = es.book_fight(event, f, opponent)
+                fb = es.book_fight(event, f, opponent, is_title_fight=is_title)
                 es.generate_card(event, f, promo)
                 session["current_event"] = event
                 session["current_fight_booking"] = fb

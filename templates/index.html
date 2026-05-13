@@ -1621,10 +1621,14 @@ async function showStrategyPrompt(data) {
       <div><strong style="color:#e62400">${escHtml(f1n)}</strong><br>
         Sig Strikes: ${s1.sig_strikes}<br>
         Takedowns: ${s1.takedowns}<br>
+        Damage: ${s1.damage || 0}<br>
+        Sub Attempts: ${s1.sub_attempts || 0}<br>
         Fatigue: ${s1.fatigue || 0}%</div>
       <div><strong style="color:#4a9eff">${escHtml(f2n)}</strong><br>
         Sig Strikes: ${s2.sig_strikes}<br>
         Takedowns: ${s2.takedowns}<br>
+        Damage: ${s2.damage || 0}<br>
+        Sub Attempts: ${s2.sub_attempts || 0}<br>
         Fatigue: ${s2.fatigue || 0}%</div>
     </div>`;
   }

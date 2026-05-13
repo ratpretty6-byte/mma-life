@@ -23,7 +23,7 @@ class Contract:
             pay += self.win_bonus
         if perf_bonus:
             pay += self.performance_bonus
-        self.fights_remaining -= 1
+        self.fights_remaining = max(0, self.fights_remaining - 1)
         return pay
 
     def is_expired(self) -> bool:
@@ -160,7 +160,13 @@ class Promotion:
                     difficulty = "even matchup"
                 opponents.append((opp, difficulty))
 
-        # Add cross-tier opponents: if player is rank 1-5 in Regional, show top National fighters
+        # Champion fight: if fighter is rank 1 or 2 and a champion exists
+        champion = self.champions.get(fighter.weight_class)
+        if champion and champion.is_available() and champion != fighter and champion not in [o[0] for o in opponents]:
+            if fighter.rank <= 2 or (self.tier_name == "Regional" and fighter.rank <= 5):
+                opponents.append((champion, "title shot"))
+
+        # Cross-tier opponents: if player is rank 1-5 in Regional, show top National fighters
         if all_promotions and self.tier_name == "Regional" and fighter.rank <= 5:
             for promo in all_promotions:
                 if promo.tier_name == "National" and fighter.weight_class in promo.rankings:
@@ -169,15 +175,12 @@ class Promotion:
                         if opp.is_available() and opp not in [o[0] for o in opponents]:
                             opponents.append((opp, "prestige fight"))
 
-        if self.tier_name == "Regional":
-            same_nat = [o for o in opponents if o[0].nationality == fighter.nationality]
-            other_nat = [o for o in opponents if o[0].nationality != fighter.nationality]
-            if len(same_nat) >= 5:
-                opponents = same_nat + other_nat
-            else:
-                opponents.sort(key=lambda x: (0 if x[0].nationality == fighter.nationality else 1, x[0].rank))
+        same_nat = [o for o in opponents if o[0].nationality == fighter.nationality]
+        other_nat = [o for o in opponents if o[0].nationality != fighter.nationality]
+        if self.tier_name == "Regional" and len(same_nat) >= 4:
+            opponents = same_nat[:12]
         else:
-            opponents.sort(key=lambda x: (0 if x[0].nationality == fighter.nationality else 1, x[0].rank))
+            opponents = same_nat + other_nat
         return opponents[:12]
 
 def create_promotions(weight_classes: List[str]) -> List[Promotion]:
