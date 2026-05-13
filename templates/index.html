@@ -66,6 +66,16 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .fight-log .time-tag { color: #555; font-size: 10px; margin-right: 6px; font-family: monospace; }
 .fight-log .ts { color: #444; font-size: 10px; font-family: monospace; margin-right: 4px; user-select: none; }
 .fight-log .dmg { color: #ff4a4a; font-weight: 600; }
+.fight-log .ev-strike { color: #e0e0e0; }
+.fight-log .ev-takedown { color: #ff9a4a; }
+.fight-log .ev-clinch { color: #4a9eff; }
+.fight-log .ev-ground { color: #b07cff; }
+.fight-log .ev-sub-attempt { color: #4affda; }
+.fight-log .ev-heavy { color: #ff4a4a; font-weight: 700; }
+.fight-log .ev-critical { color: #ffd700; font-weight: 800; text-shadow: 0 0 4px rgba(255,215,0,0.3); }
+.fight-log .ev-defensive { color: #888; }
+.fight-log .ev-hurt { color: #ffd700; font-weight: 600; }
+.fight-log .ev-stunned { color: #ff4a4a; font-weight: 700; }
 
 /* Strategy selector */
 .strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
@@ -1533,6 +1543,21 @@ async function replayFightEvents(fightResult) {
       el.innerHTML = escHtml(ev.text || "");
     }
 
+    if (ev.type === "action") {
+      const t = ev.text || "";
+      if (/CRITICAL|DEVASTATES|DEVASTATING/i.test(t)) el.className += " ev-critical";
+      else if (/knockdown|goes down|dropped|staggered/i.test(t)) el.className += " ev-heavy";
+      else if (/takedown|slam|takes .+ down|puts .+ on the canvas|sprawl/i.test(t)) el.className += " ev-takedown";
+      else if (/clinch|knee|elbow|tie up|dirty box/i.test(t)) el.className += " ev-clinch";
+      else if (/hammerfist|ground|mount|side control|guard|pass/i.test(t)) el.className += " ev-ground";
+      else if (/submission|kimura|choke|armbar|triangle|tap/i.test(t)) el.className += " ev-sub-attempt";
+      else if (/blocks|slips|parries|defends/i.test(t)) el.className += " ev-defensive";
+      else if (/HURT|ROCKED|is hurt|is rocked/i.test(t)) el.className += " ev-hurt";
+      else if (/STUNNED|stunned/i.test(t)) el.className += " ev-stunned";
+      else if (/crushing|heavy|big |hard |flush|wobble/i.test(t)) el.className += " ev-heavy";
+      else el.className += " ev-strike";
+    }
+
     if (el.textContent || el.innerHTML) {
       log.appendChild(el);
       log.scrollTop = log.scrollHeight;
@@ -1577,7 +1602,24 @@ async function showStrategyPrompt(data) {
   container.innerHTML = "";
   prompt.classList.remove("hidden");
   const scoreDetail = data.score_detail || "";
-  qs("#stratPromptTitle").textContent = `Between Round ${data.round} — ${scoreDetail}`;
+  let statsHtml = "";
+  if (data.f1_stats) {
+    const s1 = data.f1_stats;
+    const s2 = data.f2_stats;
+    const f1n = state.fighter.name;
+    const f2n = data.f2Name || "Opponent";
+    statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;background:#1a1a2a;border-radius:6px;padding:8px;font-size:11px">
+      <div><strong style="color:#e62400">${escHtml(f1n)}</strong><br>
+        Sig Strikes: ${s1.sig_strikes}<br>
+        Takedowns: ${s1.takedowns}<br>
+        Fatigue: ${s1.fatigue || 0}%</div>
+      <div><strong style="color:#4a9eff">${escHtml(f2n)}</strong><br>
+        Sig Strikes: ${s2.sig_strikes}<br>
+        Takedowns: ${s2.takedowns}<br>
+        Fatigue: ${s2.fatigue || 0}%</div>
+    </div>`;
+  }
+  qs("#stratPromptTitle").innerHTML = `Round ${data.round} Stats — ${scoreDetail}${statsHtml}`;
   STRATS.forEach(s => {
     const btn = document.createElement("div");
     btn.className = "strategy-btn small";

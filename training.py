@@ -16,18 +16,20 @@ class TrainingDrill:
         self.injury_risk = injury_risk
 
 DRILLS = [
-    TrainingDrill("Hand Speed Drills", "striking", ["hand_speed", "striking_accuracy"], 7, 0.5, 0.05, 0.01),
-    TrainingDrill("Footwork Drills", "striking", ["athleticism", "composure"], 7, 0.4, 0.04, 0.005),
-    TrainingDrill("Combination Work", "striking", ["striking_power", "hand_speed"], 10, 0.6, 0.07, 0.02),
-    TrainingDrill("Takedown Chains", "grappling", ["takedown_power", "takedown_accuracy"], 10, 0.7, 0.08, 0.03),
-    TrainingDrill("Sprawl Drills", "grappling", ["wrestling_defense", "athleticism"], 7, 0.5, 0.06, 0.02),
-    TrainingDrill("Clinch Control", "clinch", ["clinch_control", "clinch_strikes"], 7, 0.6, 0.07, 0.02),
-    TrainingDrill("Clinch Throws", "clinch", ["clinch_throws", "takedown_power"], 7, 0.5, 0.08, 0.03),
-    TrainingDrill("Ground and Pound", "grappling", ["top_control", "striking_power"], 10, 0.7, 0.09, 0.03),
-    TrainingDrill("Submission Defense", "grappling", ["submission_defense", "bottom_control"], 10, 0.6, 0.07, 0.02),
-    TrainingDrill("Sparring (Striking)", "sparring", ["striking_power", "striking_accuracy", "hand_speed", "composure"], 5, 1.0, 0.15, 0.05),
-    TrainingDrill("Sparring (Grappling)", "sparring", ["takedown_accuracy", "submission_offense", "top_control", "bottom_control"], 5, 1.0, 0.15, 0.05),
-    TrainingDrill("General Maintenance", "general", ["striking_power", "striking_accuracy", "hand_speed", "kick_power", "kick_accuracy", "kick_speed", "takedown_power", "takedown_accuracy", "wrestling_defense", "clinch_control", "clinch_escapes", "clinch_strikes", "clinch_throws", "top_control", "bottom_control", "submission_offense", "submission_defense", "cardio", "durability", "athleticism", "mental_toughness", "fight_iq", "heart", "discipline", "charisma", "aggression", "composure", "adaptability"], 1, 0.15, 0.02, 0.005),
+    TrainingDrill("Hand Speed Drills", "striking", ["hand_speed", "striking_accuracy", "kick_speed"], 7, 0.5, 0.05, 0.01),
+    TrainingDrill("Footwork & Movement", "striking", ["athleticism", "adaptability", "composure"], 7, 0.4, 0.04, 0.005),
+    TrainingDrill("Combination Work", "striking", ["striking_power", "hand_speed", "fight_iq"], 10, 0.6, 0.07, 0.02),
+    TrainingDrill("Takedown Chains", "grappling", ["takedown_power", "takedown_accuracy", "athleticism"], 10, 0.7, 0.08, 0.03),
+    TrainingDrill("Wrestling & Sprawl", "grappling", ["wrestling_defense", "clinch_escapes", "cardio", "durability"], 7, 0.5, 0.06, 0.02),
+    TrainingDrill("Clinch Control", "clinch", ["clinch_control", "clinch_strikes", "clinch_escapes"], 7, 0.6, 0.07, 0.02),
+    TrainingDrill("Clinch Throws", "clinch", ["clinch_throws", "clinch_strikes", "takedown_power"], 7, 0.5, 0.08, 0.03),
+    TrainingDrill("Ground and Pound", "grappling", ["top_control", "striking_power", "submission_offense"], 10, 0.7, 0.09, 0.03),
+    TrainingDrill("Submission Defense", "grappling", ["submission_defense", "submission_offense", "bottom_control", "mental_toughness"], 10, 0.6, 0.07, 0.02),
+    TrainingDrill("Sparring (Striking)", "sparring", ["striking_power", "striking_accuracy", "hand_speed", "composure", "kick_power", "aggression", "charisma"], 5, 1.0, 0.15, 0.05),
+    TrainingDrill("Sparring (Grappling)", "sparring", ["takedown_accuracy", "submission_offense", "top_control", "bottom_control", "adaptability", "submission_defense"], 5, 1.0, 0.15, 0.05),
+    TrainingDrill("Kick Conditioning", "kick", ["kick_power", "kick_accuracy", "kick_speed", "athleticism"], 7, 0.6, 0.06, 0.02),
+    TrainingDrill("Fight Conditioning", "conditioning", ["cardio", "durability", "mental_toughness", "heart"], 7, 0.5, 0.04, 0.01),
+    TrainingDrill("Mental Training", "mental", ["fight_iq", "discipline", "charisma", "composure", "adaptability", "aggression"], 7, 0.5, 0.03, 0.005),
 ]
 
 CAMP_TEMPLATES = [
@@ -49,17 +51,17 @@ class TrainingCamp:
         self.duration_weeks = duration_weeks
         self.cost = cost
         self.coach_bonus = coach_bonus
-        self.available_drills = []
+        always = ["conditioning", "mental"]
         if camp_type == "muay_thai":
-            self.available_drills = [d for d in DRILLS if d.drill_type in ["striking", "clinch"]]
+            self.available_drills = [d for d in DRILLS if d.drill_type in ["striking", "clinch", "kick"] + always]
         elif camp_type == "bjj":
-            self.available_drills = [d for d in DRILLS if d.drill_type == "grappling"]
+            self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling"] + always]
         elif camp_type == "wrestling":
-            self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling", "clinch"]]
+            self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling", "clinch"] + always]
         elif camp_type == "striking":
-            self.available_drills = [d for d in DRILLS if d.drill_type in ["striking", "sparring"]]
+            self.available_drills = [d for d in DRILLS if d.drill_type in ["striking", "sparring", "kick"] + always]
         elif camp_type == "grappling":
-            self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling"]]
+            self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling"] + always]
         else:  # MMA camp
             self.available_drills = DRILLS.copy()
 
@@ -174,16 +176,13 @@ class TrainingSystem:
             self.fatigue = max(0.0, self.fatigue - 0.35)
             result["status"] = "rest"
             result["fatigue"] = self.fatigue
-            # Light upkeep on rest days for all trained attributes
             for attr in self.fighter.PHYSICAL_ATTRS + self.fighter.MENTAL_ATTRS:
-                last_used = self.fighter.last_training_dates.get(attr)
-                if last_used and game_date and (game_date - last_used).days <= 60:
-                    old_val = self.fighter.attributes[attr]
-                    upkeep = 0.1  # small daily maintenance gain
-                    new_val = utils.clamp(old_val + upkeep, utils.ATTR_MIN, utils.ATTR_MAX)
-                    self.fighter.attributes[attr] = new_val
-                    if new_val - old_val > 0:
-                        result["gains"][attr] = new_val - old_val
+                old_val = self.fighter.attributes[attr]
+                upkeep = 0.05
+                new_val = utils.clamp(old_val + upkeep, utils.ATTR_MIN, utils.ATTR_MAX)
+                self.fighter.attributes[attr] = new_val
+                if new_val - old_val > 0:
+                    result["gains"][attr] = new_val - old_val
             self._advance_week_day()
             return result
 

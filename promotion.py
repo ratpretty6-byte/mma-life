@@ -169,6 +169,7 @@ class Promotion:
                         if opp.is_available() and opp not in [o[0] for o in opponents]:
                             opponents.append((opp, "prestige fight"))
 
+        opponents.sort(key=lambda x: (0 if x[0].nationality == fighter.nationality else 1, x[0].rank))
         return opponents[:12]
 
 def create_promotions(weight_classes: List[str]) -> List[Promotion]:

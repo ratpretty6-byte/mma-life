@@ -399,6 +399,12 @@ class Fight:
         self.f2_actions_landed = 0
 
         self._web_gen = None
+        self.f1_round_snap_sig = 0
+        self.f2_round_snap_sig = 0
+        self.f1_round_snap_td = 0
+        self.f2_round_snap_td = 0
+        self.f1_round_snap_grapple = 0.0
+        self.f2_round_snap_grapple = 0.0
 
     def _init_fighter_state(self) -> Dict:
         return {
@@ -564,6 +570,18 @@ class Fight:
             self.f2_actions_landed = 0
             self.action_count = 0
             self.referee.reset_consecutive_damage()
+            self.position_system.current_position = Position.DISTANCE
+            self.position_system.top_fighter = None
+            self.position_system.bottom_fighter = None
+            self.position_system.clinch_initiator = None
+            self.position_system.position_time = 0
+            self.position_system.cage_position = None
+            self.f1_round_snap_sig = self.f1_state.get("significant_strikes_landed", 0)
+            self.f2_round_snap_sig = self.f2_state.get("significant_strikes_landed", 0)
+            self.f1_round_snap_td = self.f1_state.get("takedowns_landed", 0)
+            self.f2_round_snap_td = self.f2_state.get("takedowns_landed", 0)
+            self.f1_round_snap_grapple = self.f1_state.get("effective_grappling_points", 0.0)
+            self.f2_round_snap_grapple = self.f2_state.get("effective_grappling_points", 0.0)
 
             # Determine number of actions this round (~based on pace)
             total_actions = self._determine_actions_this_round(round_num)
@@ -714,6 +732,26 @@ class Fight:
                    "f1_total_score": self._get_total_score_for(1),
                    "f2_total_score": self._get_total_score_for(2),
                    "scores": [[j.scores[r][0] for j in self.judges] for r in range(len(self.judges[0].scores))]}
+
+            if round_num < self.rounds and not self.winner:
+                f1_sig = self.f1_state.get("significant_strikes_landed", 0) - self.f1_round_snap_sig
+                f2_sig = self.f2_state.get("significant_strikes_landed", 0) - self.f2_round_snap_sig
+                f1_td = self.f1_state.get("takedowns_landed", 0) - self.f1_round_snap_td
+                f2_td = self.f2_state.get("takedowns_landed", 0) - self.f2_round_snap_td
+                f1_gp = self.f1_state.get("effective_grappling_points", 0.0) - self.f1_round_snap_grapple
+                f2_gp = self.f2_state.get("effective_grappling_points", 0.0) - self.f2_round_snap_grapple
+                f1_fat = self.f1_state.get("fatigue_level", 0) * 100
+                f2_fat = self.f2_state.get("fatigue_level", 0) * 100
+                yield {"type": "strategy_prompt", "round": round_num,
+                       "f1_stats": {"sig_strikes": f1_sig, "takedowns": f1_td, "grapple_points": round(f1_gp, 1), "fatigue": round(f1_fat)},
+                       "f2_stats": {"sig_strikes": f2_sig, "takedowns": f2_td, "grapple_points": round(f2_gp, 1), "fatigue": round(f2_fat)},
+                       "f1_total_score": self._get_total_score_for(1),
+                       "f2_total_score": self._get_total_score_for(2),
+                       "f1_health": self._get_display_health(self.fighter1),
+                       "f2_health": self._get_display_health(self.fighter2),
+                       "f1Name": self.fighter1.name,
+                       "f2Name": self.fighter2.name,
+                       "score_detail": f"{int(f1_avg)}-{int(f2_avg)}"}
 
             if round_num >= 2 and round_num < self.rounds and not self.winner:
                 for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
@@ -1699,7 +1737,7 @@ class Fight:
         """Apply end-of-round effects: stamina recovery, injury checks."""
         for state in [self.f1_state, self.f2_state]:
             # Stamina recovery between rounds
-            stamina_recovery = 15 + state.get("stamina", 100) * 0.1
+            stamina_recovery = 20 + state.get("stamina", 100) * 0.15
             state["stamina"] = min(100, state["stamina"] + stamina_recovery)
             state["fatigue_level"] = 1.0 - (state["stamina"] / 100)
 
