@@ -408,6 +408,10 @@ class Fight:
         self.f2_round_snap_sub = 0
         self.f1_round_snap_dmg = 0
         self.f2_round_snap_dmg = 0
+        self.f1_round_attempts = 0
+        self.f2_round_attempts = 0
+        self.f1_start_attempts = 0
+        self.f2_start_attempts = 0
 
     def _init_fighter_state(self) -> Dict:
         return {
@@ -589,6 +593,8 @@ class Fight:
             self.f2_round_snap_sub = self.f2_state.get("submissions_attempted", 0)
             self.f1_round_snap_dmg = len(self.f1_state.get("rounds_damage_dealt", []))
             self.f2_round_snap_dmg = len(self.f2_state.get("rounds_damage_dealt", []))
+            self.f1_start_attempts = self.f1_round_attempts
+            self.f2_start_attempts = self.f2_round_attempts
 
             # Determine number of actions this round (~based on pace)
             total_actions = self._determine_actions_this_round(round_num)
@@ -751,11 +757,13 @@ class Fight:
                 f2_fat = self.f2_state.get("fatigue_level", 0) * 100
                 f1_sub = self.f1_state.get("submissions_attempted", 0) - self.f1_round_snap_sub
                 f2_sub = self.f2_state.get("submissions_attempted", 0) - self.f2_round_snap_sub
-                f1_dmg = sum(self.f1_state.get("rounds_damage_dealt", [])[self.f1_round_snap_dmg:])
-                f2_dmg = sum(self.f2_state.get("rounds_damage_dealt", [])[self.f2_round_snap_dmg:])
+                f1_att = self.f1_round_attempts - self.f1_start_attempts
+                f2_att = self.f2_round_attempts - self.f2_start_attempts
+                f1_td_att = self.f1_state.get("takedowns_landed", 0) - self.f1_round_snap_td
+                f2_td_att = self.f2_state.get("takedowns_landed", 0) - self.f2_round_snap_td
                 yield {"type": "strategy_prompt", "round": round_num,
-                       "f1_stats": {"sig_strikes": f1_sig, "takedowns": f1_td, "grapple_points": round(f1_gp, 1), "fatigue": round(f1_fat), "sub_attempts": f1_sub, "damage": round(f1_dmg, 1)},
-                       "f2_stats": {"sig_strikes": f2_sig, "takedowns": f2_td, "grapple_points": round(f2_gp, 1), "fatigue": round(f2_fat), "sub_attempts": f2_sub, "damage": round(f2_dmg, 1)},
+                       "f1_stats": {"sig_strikes": f1_sig, "strikes_attempted": f1_att, "takedowns": f1_td, "takedowns_attempted": max(f1_td, f1_att // 6), "fatigue": round(f1_fat), "sub_attempts": f1_sub, "grapple_points": round(f1_gp, 1)},
+                       "f2_stats": {"sig_strikes": f2_sig, "strikes_attempted": f2_att, "takedowns": f2_td, "takedowns_attempted": max(f2_td, f2_att // 6), "fatigue": round(f2_fat), "sub_attempts": f2_sub, "grapple_points": round(f2_gp, 1)},
                        "f1_total_score": self._get_total_score_for(1),
                        "f2_total_score": self._get_total_score_for(2),
                        "f1_health": self._get_display_health(self.fighter1),
@@ -860,7 +868,11 @@ class Fight:
             attacker, defender, atk_state, def_state, atk_strategy, df_strategy = \
                 atk2, def2, atk_state2, def_state2, strat2, strat1
 
-        # Check state-based accuracy/power modifiers
+        if attacker == self.fighter1:
+            self.f1_round_attempts += 1
+        else:
+            self.f2_round_attempts += 1
+
         state_mods = self.f1_machine.get_stat_modifier() if attacker == self.fighter1 else self.f2_machine.get_stat_modifier()
         if state_mods["accuracy"] <= 0.4:
             # Fighter is essentially out — skip
@@ -1010,17 +1022,19 @@ class Fight:
         choice = utils.weighted_random_choice(normalized)
 
         if choice == "strike":
-            return self._select_specific_strike(pos)
+            fight_iq = 50
+            return self._select_specific_strike(pos, fight_iq)
         elif choice == "takedown":
             return "takedown_attempt"
         elif choice == "clinch":
             return "clinch_attempt"
         return "jab"
 
-    def _select_specific_strike(self, pos) -> str:
-        """Select from specific strikes based on position."""
+    def _select_specific_strike(self, pos, fight_iq=50) -> str:
         if pos == Position.DISTANCE:
-            return random.choice(["jab", "cross", "kick", "superman_punch"])
+            if random.random() < 0.15 + fight_iq / 500:
+                return random.choice(["jab", "cross", "kick", "superman_punch"])
+            return random.choice(["jab", "cross", "kick"])
         elif pos == Position.POCKET:
             return random.choice(["jab", "cross", "hook", "uppercut", "knee", "elbow"])
         elif pos in (Position.CLINCH,):
@@ -1249,20 +1263,21 @@ class Fight:
             self.position_system.current_position)
 
         # Prefix with severity descriptor
-        severity_prefix = {
-            "Blocked": "blocks",
-            "Glancing": "glances off",
-            "Clean": "lands a clean",
-            "Solid": "lands a solid",
-            "Flush": "cracks in with a flush",
-            "Devastating": "DEVASTATES with a",
-            "CRITICAL Blocked": "blocks desperately",
-            "CRITICAL Glancing": "barely grazes",
-            "CRITICAL Clean": "SMASHES a critical",
-            "CRITICAL Solid": "THUNDERS home a critical",
-            "CRITICAL Flush": "DELIVERS a devastating critical",
-            "CRITICAL Devastating": "UNLEASHES a fight-ending critical",
-        }.get(tier["name"], "lands a")
+        _pref = {
+            "Blocked": ["blocks", "smothers", "deflects"],
+            "Glancing": ["glances off", "grazes", "barely clips"],
+            "Clean": ["lands a clean", "connects with a", "stings with a", "finds the mark with a", "touches up with a"],
+            "Solid": ["lands a solid", "cracks with a", "hammers home a", "rips a", "unloads a"],
+            "Flush": ["cracks with a flush", "hits flush with a", "buries a", "drills a", "catches with a clean"],
+            "Devastating": ["DEVASTATES with a", "DESTROYS with a", "OBLITERATES with a", "UNLEASHES a", "CRUSHES with a"],
+            "CRITICAL Glancing": ["barely grazes but CRITICAL", "magically clips"],
+            "CRITICAL Clean": ["SMASHES a critical", "DETONATES a", "EXPLODES with a"],
+            "CRITICAL Solid": ["THUNDERS home a critical", "ANNIHILATES with a perfect"],
+            "CRITICAL Flush": ["DELIVERS a devastating critical", "OBLITERATES with a perfect"],
+            "CRITICAL Devastating": ["UNLEASHES a fight-ending", "LANDS THE SHOT OF THE NIGHT"],
+        }
+        prefix_opts = _pref.get(tier["name"], ["lands a"])
+        severity_prefix = random.choice(prefix_opts)
 
         # Update combo tracking
         atk_state["combo_count"] += 1

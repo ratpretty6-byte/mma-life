@@ -175,12 +175,23 @@ class Promotion:
                         if opp.is_available() and opp not in [o[0] for o in opponents]:
                             opponents.append((opp, "prestige fight"))
 
-        same_nat = [o for o in opponents if o[0].nationality == fighter.nationality]
-        other_nat = [o for o in opponents if o[0].nationality != fighter.nationality]
-        if self.tier_name == "Regional" and len(same_nat) >= 4:
-            opponents = same_nat[:12]
-        else:
-            opponents = same_nat + other_nat
+        if self.tier_name in ("Regional", "National"):
+            opponents = [o for o in opponents if o[0].nationality == fighter.nationality]
+        # Fill gaps with closest-ranked same-nat fighters from deeper rankings
+        if self.tier_name in ("Regional", "National") and len(opponents) < 4:
+            for opp in ranked:
+                if opp.nationality == fighter.nationality and opp.is_available() and opp != fighter and (opp, "") not in opponents and opp not in [o[0] for o in opponents]:
+                    if opp.rank < fighter.rank:
+                        diff_pts = fighter.rank - opp.rank
+                        d = "step up" if diff_pts >= 5 else ("tough test" if diff_pts >= 2 else "even matchup")
+                    elif opp.rank > fighter.rank:
+                        diff_pts = opp.rank - fighter.rank
+                        d = "should win" if diff_pts >= 5 else ("pick em" if diff_pts >= 2 else "even matchup")
+                    else:
+                        d = "even matchup"
+                    opponents.append((opp, d))
+                    if len(opponents) >= 12:
+                        break
         return opponents[:12]
 
 def create_promotions(weight_classes: List[str]) -> List[Promotion]:

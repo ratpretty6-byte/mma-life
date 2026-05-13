@@ -302,6 +302,11 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
     </div>
 
     <div id="tab-home" class="tab-content fade-in">
+      <div id="freeAgentBanner" class="hidden card" style="border-color:#ffd700;text-align:center">
+        <div class="card-title" style="color:#ffd700">FREE AGENT</div>
+        <p style="font-size:13px;color:#ccc;margin-bottom:6px">You are not signed with any promotion. Sign a contract to start your career!</p>
+        <button class="btn btn-gold" onclick="showContractOffers()">VIEW CONTRACT OFFERS</button>
+      </div>
       <div class="card">
         <div class="flex-between">
           <div><span class="stat-label">Record</span> <span class="stat-value" id="hRecord" style="font-size:18px">0-0-0</span></div>
@@ -596,6 +601,33 @@ function setLoading(btn, loading) {
   }
 }
 
+async function showContractOffers() {
+  const resp = await api("/api/free_agent_offers");
+  if (!resp.promotions) return;
+  let html = '<div class="card-title" style="font-size:16px">Available Promotions</div>';
+  html += '<div style="font-size:12px;color:#888;margin-bottom:8px">Review the offers below and sign with a promotion to begin your career.</div>';
+  resp.promotions.forEach(p => {
+    html += `<div style="margin-bottom:8px;padding:10px;background:#1a1a2a;border-radius:6px">
+      <strong style="font-size:15px">${escHtml(p.name)}</strong> <span class="tag tag-promo">${escHtml(p.tier)}</span><br>
+      <span style="color:#888;font-size:12px">Base Pay: $${p.base_pay.toLocaleString()} | Win Bonus: $${p.win_bonus.toLocaleString()} | Perf Bonus: $${p.perf_bonus.toLocaleString()}</span><br>
+      <button class="btn btn-primary btn-small" style="margin-top:4px" onclick="signFreeAgent('${escHtml(p.tier)}')">Sign Contract</button></div>`;
+  });
+  showModal(html);
+}
+
+async function signFreeAgent(tier) {
+  const resp = await api("/api/sign_free_agent", { sid, tier });
+  closeModal(null);
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateAllUI();
+    toast("Contract signed! Welcome to the " + tier + " circuit!", "success");
+  } else {
+    toast(resp.error || "Failed to sign", "error");
+  }
+}
+
 function switchTab(tab) {
   qsa(".tab-content").forEach(e => e.classList.add("hidden"));
   qsa(".tab").forEach(e => e.classList.remove("active"));
@@ -801,7 +833,10 @@ function updateAllUI() {
   const car = state.career;
   const fb = state.fight_booking;
   const gd = state.game_date;
-  qs("#headerStatus").textContent = `${f.name} | ${f.record} | #${f.rank} | ${p ? p.name : "FA"}`;
+  const isFA = state.free_agent || !p;
+  qs("#freeAgentBanner").classList.toggle("hidden", !isFA);
+  qs("#advanceCard").style.display = isFA ? "none" : "";
+  qs("#headerStatus").textContent = `${f.name} | ${f.record} | #${f.rank} | ${isFA ? "Free Agent" : p.name}`;
 
   qs("#hRecord").textContent = f.record;
   qs("#hRank").textContent = `#${f.rank}`;
@@ -1619,16 +1654,14 @@ async function showStrategyPrompt(data) {
     const f2n = data.f2Name || "Opponent";
     statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;background:#1a1a2a;border-radius:6px;padding:8px;font-size:11px">
       <div><strong style="color:#e62400">${escHtml(f1n)}</strong><br>
-        Sig Strikes: ${s1.sig_strikes}<br>
-        Takedowns: ${s1.takedowns}<br>
-        Damage: ${s1.damage || 0}<br>
-        Sub Attempts: ${s1.sub_attempts || 0}<br>
+        Strikes: ${s1.sig_strikes}/${s1.strikes_attempted || s1.sig_strikes}<br>
+        Takedowns: ${s1.takedowns}/${s1.takedowns_attempted || s1.takedowns}<br>
+        Sub Att: ${s1.sub_attempts || 0}<br>
         Fatigue: ${s1.fatigue || 0}%</div>
       <div><strong style="color:#4a9eff">${escHtml(f2n)}</strong><br>
-        Sig Strikes: ${s2.sig_strikes}<br>
-        Takedowns: ${s2.takedowns}<br>
-        Damage: ${s2.damage || 0}<br>
-        Sub Attempts: ${s2.sub_attempts || 0}<br>
+        Strikes: ${s2.sig_strikes}/${s2.strikes_attempted || s2.sig_strikes}<br>
+        Takedowns: ${s2.takedowns}/${s2.takedowns_attempted || s2.takedowns}<br>
+        Sub Att: ${s2.sub_attempts || 0}<br>
         Fatigue: ${s2.fatigue || 0}%</div>
     </div>`;
   }

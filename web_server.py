@@ -102,6 +102,7 @@ def get_state_dict(session):
     training = session.get("training")
     game_date = session.get("game_date", datetime.now())
     return {
+        "free_agent": promo is None,
         "fighter": {
             "name": f.name,
             "age": f.age,
@@ -464,6 +465,13 @@ class Handler(BaseHTTPRequestHandler):
                 session = get_or_create_session(sid)
                 self.json_resp({"opponents": get_opponents_data(session)})
 
+            elif path == "/api/free_agent_offers":
+                ensure_initialized()
+                promos = []
+                for p in gs["promotions"]:
+                    promos.append({"name": p.name, "tier": p.tier_name, "base_pay": p.base_pay, "win_bonus": p.win_bonus, "perf_bonus": p.perf_bonus})
+                self.json_resp({"promotions": promos})
+
             elif path == "/api/fight_state":
                 ensure_initialized()
                 sid = params.get("sid", [""])[0]
@@ -547,10 +555,21 @@ class Handler(BaseHTTPRequestHandler):
                 game_date = datetime(2025, 1, 6)
 
                 f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, game_date=game_date)
+
+                # Age-scaled starting stats: 18yo starts ~25% below base, 35yo starts at base+5%
+                age_min = 18
+                age_max = 35
+                age_range = age_max - age_min
+                age_pct = (age - age_min) / max(1, age_range)
+                stat_mod = -15 + (age_pct * 20)  # -15 at 18, +5 at 35
+                for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
+                    f.attributes[attr] = utils.clamp(f.attributes[attr] + stat_mod, utils.ATTR_MIN, utils.ATTR_MAX)
+
                 regional = gs["regional"]
+                national = gs["national"]
+                world = gs["world"]
 
                 career = CareerSystem(f)
-                career.sign_with_promotion(regional, 4, game_date)
                 training = TrainingSystem(f)
                 finance = FinancialSystem(f)
                 health = HealthSystem(f)
@@ -569,7 +588,7 @@ class Handler(BaseHTTPRequestHandler):
                 session["health"] = health
                 session["media"] = media
                 session["event_sys"] = event_sys
-                session["current_promotion"] = regional
+                session["current_promotion"] = None
                 session["current_event"] = None
                 session["current_fight_booking"] = None
                 session["current_fight"] = None
@@ -911,6 +930,25 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     "milestones": milestones,
                     "bonuses": bonuses,
                 })
+
+            elif path == "/api/sign_free_agent":
+                sid = body.get("sid", "")
+                tier_name = body.get("tier", "Regional")
+                session = get_or_create_session(sid)
+                career = session.get("career")
+                f = session.get("fighter")
+                game_date = session.get("game_date")
+                promo = None
+                for p in gs["promotions"]:
+                    if p.tier_name == tier_name:
+                        promo = p
+                        break
+                if not career or not promo or not f:
+                    self.json_resp({"error": "Cannot sign"})
+                    return
+                career.sign_with_promotion(promo, 4, game_date)
+                session["current_promotion"] = promo
+                self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/accept_promotion":
                 sid = body.get("sid", "")
