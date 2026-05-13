@@ -27,6 +27,7 @@ DRILLS = [
     TrainingDrill("Submission Defense", "grappling", ["submission_defense", "bottom_control"], 10, 0.6, 0.07, 0.02),
     TrainingDrill("Sparring (Striking)", "sparring", ["striking_power", "striking_accuracy", "hand_speed", "composure"], 5, 1.0, 0.15, 0.05),
     TrainingDrill("Sparring (Grappling)", "sparring", ["takedown_accuracy", "submission_offense", "top_control", "bottom_control"], 5, 1.0, 0.15, 0.05),
+    TrainingDrill("General Maintenance", "general", ["striking_power", "striking_accuracy", "hand_speed", "kick_power", "kick_accuracy", "kick_speed", "takedown_power", "takedown_accuracy", "wrestling_defense", "clinch_control", "clinch_escapes", "clinch_strikes", "clinch_throws", "top_control", "bottom_control", "submission_offense", "submission_defense", "cardio", "durability", "athleticism", "mental_toughness", "fight_iq", "heart", "discipline", "charisma", "aggression", "composure", "adaptability"], 1, 0.15, 0.02, 0.005),
 ]
 
 CAMP_TEMPLATES = [
@@ -170,9 +171,19 @@ class TrainingSystem:
             return result
 
         if is_rest:
-            self.fatigue = max(0.0, self.fatigue - 0.25)  # Better rest recovery
+            self.fatigue = max(0.0, self.fatigue - 0.35)
             result["status"] = "rest"
             result["fatigue"] = self.fatigue
+            # Light upkeep on rest days for all trained attributes
+            for attr in self.fighter.PHYSICAL_ATTRS + self.fighter.MENTAL_ATTRS:
+                last_used = self.fighter.last_training_dates.get(attr)
+                if last_used and game_date and (game_date - last_used).days <= 60:
+                    old_val = self.fighter.attributes[attr]
+                    upkeep = 0.1  # small daily maintenance gain
+                    new_val = utils.clamp(old_val + upkeep, utils.ATTR_MIN, utils.ATTR_MAX)
+                    self.fighter.attributes[attr] = new_val
+                    if new_val - old_val > 0:
+                        result["gains"][attr] = new_val - old_val
             self._advance_week_day()
             return result
 
@@ -197,7 +208,7 @@ class TrainingSystem:
 
         gains = {}
         for attr in drill.affected_attrs:
-            gain = drill.base_gain * intensity_mult * gain_mult * overtraining_mult
+            gain = drill.base_gain * intensity_mult * gain_mult * overtraining_mult * 1.5
             old_val = self.fighter.attributes[attr]
             new_val = utils.clamp(old_val + gain, utils.ATTR_MIN, utils.ATTR_MAX)
             self.fighter.attributes[attr] = new_val

@@ -228,7 +228,7 @@ class Fighter:
         )
         # Age factor: older fighters have lower chin resistance
         age_mod = 1.0 - max(0, (self.age - 30)) * 0.005
-        return base * age_mod * 1.5  # Scale factor so values are in 30-120 range
+        return base * age_mod * 2.0
 
     def get_effective_attribute(self, attr: str, fatigue: float = 0.0) -> int:
         base = self.attributes.get(attr, 50)
@@ -282,9 +282,9 @@ class Fighter:
             if last_used is None:
                 continue
             months_unused = (now - last_used).days / 30
-            if months_unused >= 2:
-                excess_months = months_unused - 1
-                decay = 0.02 * excess_months
+            if months_unused >= 3:
+                excess_months = months_unused - 2
+                decay = 0.008 * excess_months
                 self.attributes[attr] = utils.clamp(
                     self.attributes[attr] * (1 - decay),
                     utils.ATTR_MIN,

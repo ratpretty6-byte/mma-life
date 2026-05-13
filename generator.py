@@ -36,6 +36,47 @@ def assign_archetype_strategy(fighter: Fighter):
     strat_id = ARCHETYPE_STRATEGY_MAP.get(fighter.archetype)
     return strat_id
 
+ATTRIBUTE_GROUPS = {
+    "striking": ["striking_power", "striking_accuracy", "hand_speed"],
+    "kicking": ["kick_power", "kick_accuracy", "kick_speed"],
+    "takedown": ["takedown_power", "takedown_accuracy", "wrestling_defense"],
+    "clinch": ["clinch_control", "clinch_escapes", "clinch_strikes", "clinch_throws"],
+    "ground": ["top_control", "bottom_control", "submission_offense", "submission_defense"],
+    "physical": ["cardio", "durability", "athleticism"],
+    "mental": ["mental_toughness", "fight_iq", "heart", "discipline", "composure", "adaptability"],
+    "personality": ["charisma", "aggression"],
+}
+
+ARCHETYPE_PROFILES = {
+    "brawler": {"striking": {"power": 8, "accuracy": -5}, "physical": {"durability": 5, "cardio": -3}},
+    "counter_striker": {"striking": {"accuracy": 8, "power": -5}, "mental": {"composure": 5}, "hand_speed": 5},
+    "wrestler": {"takedown": {"power": 8, "accuracy": 5}, "clinch": {"control": 3, "throws": 3}, "kicking": {"power": -5, "accuracy": -3}},
+    "submission_artist": {"ground": {"offense": 8, "defense": 5}, "takedown": {"accuracy": 3}, "striking": {"power": -5}},
+    "kickboxer": {"kicking": {"power": 8, "accuracy": 5, "speed": 5}, "striking": {"accuracy": -3}},
+    "boxer": {"striking": {"power": 5, "accuracy": 8, "hand_speed": 8}, "kicking": {"power": -8, "accuracy": -5}},
+    "muay_thai": {"clinch": {"control": 8, "strikes": 8, "throws": 5}, "kicking": {"power": 5}, "striking": {"accuracy": -3}},
+    "clinch_fighter": {"clinch": {"control": 10, "throws": 8, "escapes": 5}, "takedown": {"power": 5}},
+    "balanced": {},
+}
+
+NATIONALITY_WEIGHTS = {
+    "American": 35, "Brazilian": 10, "Russian": 8, "Japanese": 6, "British": 6,
+    "Canadian": 4, "French": 3, "Dutch": 3, "Australian": 3, "Polish": 2,
+    "Korean": 2, "Mexican": 4, "Chinese": 2, "Swedish": 2, "Irish": 2,
+    "Nigerian": 2, "German": 2, "Italian": 2, "Spanish": 1, "Ukrainian": 1,
+    "Cuban": 1, "Jamaican": 1, "South African": 1, "Swiss": 1, "Belgian": 1,
+    "Norwegian": 1, "Finnish": 1, "Danish": 1, "Icelandic": 1, "New Zealander": 1,
+}
+
+def pick_nationality_and_region():
+    """Pick a nationality weighted by real-world MMA representation, and return a matching region."""
+    nations = list(NATIONALITY_WEIGHTS.keys())
+    weights = list(NATIONALITY_WEIGHTS.values())
+    nat = random.choices(nations, weights=weights, k=1)[0]
+    regions = utils.REGIONS.get(nat, ["Capital"])
+    region = random.choice(regions)
+    return nat, region
+
 def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_std: float = 15.0) -> Fighter:
     background = random.choice(["mma", "wrestling", "bjj", "muay_thai", "boxing", "judo", "taekwondo", "karate", "sambo", "kickboxing", "capoeira"])
     first_name, last_name = utils.generate_name()
@@ -44,20 +85,59 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
     archetype = random.choice(utils.ARCHETYPES)
     trait = random.choice(utils.TRAITS) if random.random() < 0.6 else None
     personality = random.choice(utils.PERSONALITIES)
+    nationality, home_region = pick_nationality_and_region()
 
     fighter = Fighter(full_name, age, weight_lbs, background, archetype,
+                      nationality=nationality, home_region=home_region,
                       trait_id=trait["id"] if trait else None,
                       personality_id=personality["id"])
     fighter.height = utils.gaussian_random(68, 4, 60, 84)
     fighter.reach = utils.gaussian_random(72, 4, 60, 88)
 
-    talent_bias = utils.gaussian_random(0, 15, -30, 30)
+    # Use skill_mean and skill_std as baseline — this is the key fix
+    base_val = utils.clamp(utils.gaussian_random(skill_mean, skill_std, 15, 95), 15, 95)
+
+    # Generate group-level talent modifiers (correlated attributes within groups)
+    group_mods = {}
+    for group_name, attrs in ATTRIBUTE_GROUPS.items():
+        group_mods[group_name] = utils.gaussian_random(0, 8, -15, 15)
+
     for attr in fighter.PHYSICAL_ATTRS + fighter.MENTAL_ATTRS:
-        if attr in fighter.attributes:
-            attr_roll = random.uniform(-1, 1)
-            burst = 15 if attr_roll > 0.85 else (15 if attr_roll < -0.85 else 0)
-            adjustment = talent_bias + utils.gaussian_random(0, 25, -45, 45) + burst
-            fighter.attributes[attr] = utils.clamp(fighter.attributes[attr] + adjustment, utils.ATTR_MIN, utils.ATTR_MAX)
+        if attr not in fighter.attributes:
+            continue
+
+        # Find which group this attr belongs to
+        attr_group = None
+        for gname, gattrs in ATTRIBUTE_GROUPS.items():
+            if attr in gattrs:
+                attr_group = gname
+                break
+
+        group_mod = group_mods.get(attr_group, 0)
+        # Per-attribute variance ±5 around the group baseline
+        per_attr_var = utils.gaussian_random(0, 5, -10, 10)
+        new_val = utils.clamp(base_val + group_mod + per_attr_var, utils.ATTR_MIN, utils.ATTR_MAX)
+        fighter.attributes[attr] = new_val
+
+    # Apply archetype stat profile
+    profile = ARCHETYPE_PROFILES.get(archetype, {})
+    for group_or_attr, adjustments in profile.items():
+        if group_or_attr in ATTRIBUTE_GROUPS:
+            for adj_attr, delta in adjustments.items():
+                full_attr = f"{group_or_attr}_{adj_attr}" if "_" not in adj_attr else adj_attr
+                if full_attr in fighter.attributes:
+                    fighter.attributes[full_attr] = utils.clamp(
+                        fighter.attributes[full_attr] + delta, utils.ATTR_MIN, utils.ATTR_MAX)
+        elif "_" in group_or_attr:
+            if group_or_attr in fighter.attributes:
+                fighter.attributes[group_or_attr] = utils.clamp(
+                    fighter.attributes[group_or_attr] + adjustments, utils.ATTR_MIN, utils.ATTR_MAX)
+
+    # Cherry-pick direct flat adjustments (hand_speed, etc.)
+    for attr_spec, val in profile.items():
+        if isinstance(val, int) and attr_spec in fighter.attributes:
+            fighter.attributes[attr_spec] = utils.clamp(
+                fighter.attributes[attr_spec] + val, utils.ATTR_MIN, utils.ATTR_MAX)
 
     fighter.archetype = pick_archetype(fighter.attributes)
 
@@ -92,12 +172,21 @@ def assign_to_promotions(fighters: List[Fighter], promotions: List[Promotion]):
         win_pct = fighter.wins / max(1, fighter.wins + fighter.losses)
         if rating >= 68 and win_pct >= 0.60:
             world.sign_fighter(fighter)
-        elif rating >= 42:
+        elif rating >= 35:  # Lowered from 42 to increase National pool depth
             national.sign_fighter(fighter)
         else:
             regional.sign_fighter(fighter)
 
-def generate_fighters(total: int = 5000) -> List[Fighter]:
+    # Apply tier-based stat floors — elite fighters should be clearly better
+    for f in world.fighters:
+        for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
+            f.attributes[attr] = max(f.attributes[attr], 45)
+    for f in national.fighters:
+        for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
+            f.attributes[attr] = max(f.attributes[attr], 30)
+    # Regional fighters get no floor (more variance, can be elite or terrible)
+
+def generate_fighters(total: int = 8000) -> List[Fighter]:
     weight_probs = [0.10, 0.12, 0.14, 0.18, 0.16, 0.14, 0.10, 0.06]
     fighters = []
     weight_classes = utils.WEIGHT_CLASSES
@@ -107,7 +196,12 @@ def generate_fighters(total: int = 5000) -> List[Fighter]:
         weight_lbs = random.randint(wc["min"], wc["max"])
         skill_mean = utils.gaussian_random(50, 10, 25, 75)
         skill_std = utils.gaussian_random(15, 3, 8, 22)
-        fighter = generate_single_fighter(weight_lbs, skill_mean, skill_std)
+        # Reject extreme stat variance — max-min difference must be <= 50
+        for attempt in range(3):
+            fighter = generate_single_fighter(weight_lbs, skill_mean, skill_std)
+            vals = list(fighter.attributes.values())
+            if max(vals) - min(vals) <= 50:
+                break
         fighters.append(fighter)
     return fighters
 

@@ -114,19 +114,18 @@ class Referee:
         """
         Doctor intervenes for severe injuries — MMA style.
         """
-        # Eye injuries: if eye is severely damaged
+        # Eye injuries
         for eye in ["left_eye", "right_eye"]:
             eye_health = fighter.get_zone_health_pct(eye)
-            if eye_health < 15:
+            if eye_health < 8:
                 return f"Doctor stoppage: {fighter.name}'s {eye.replace('_', ' ')} is too damaged"
 
         # Jaw injuries
         jaw_health = fighter.get_zone_health_pct("jaw")
-        if jaw_health < 10:
+        if jaw_health < 5:
             return f"Doctor stoppage: {fighter.name}'s jaw is broken"
 
-        # Severe swelling
-        if state.get("swelling", 0) > 90:
+        if state.get("swelling", 0) > 95:
             return f"Doctor stoppage: Severe swelling on {fighter.name}"
 
         return None
@@ -221,10 +220,9 @@ class FighterState:
                 self.stunned_timer = 3
 
         elif self.state == "STUNNED":
-            self.stunned_timer -= 1
+            self.stunned_timer -= 2
             if self.stunned_timer <= 0:
-                if head_health_pct < 20:
-                    # Falls down — KO sequence
+                if head_health_pct < 12:
                     self.state = "DOWN"
                 elif head_health_pct < 40:
                     self.state = "ROCKED"
@@ -232,7 +230,7 @@ class FighterState:
                 else:
                     self.state = "HURT"
             elif is_struck:
-                self.stunned_timer += 1  # Reset timer on additional hits
+                self.stunned_timer += 1
 
     def get_state(self) -> str:
         return self.state
@@ -499,19 +497,17 @@ class Fight:
     # ============================================================
 
     def _track_head_damage(self, fighter: Fighter, damage: float):
-        """Track cumulative head damage for KO/thrashing detection."""
         if fighter == self.fighter1:
-            self.f1_head_damage += damage
+            self.f1_head_damage += damage / 1.5
             self.f1_state["damage_taken_log"].append({"type": "head", "damage": damage, "round": self.current_round})
         else:
-            self.f2_head_damage += damage
+            self.f2_head_damage += damage / 1.5
             self.f2_state["damage_taken_log"].append({"type": "head", "damage": damage, "round": self.current_round})
 
     def _track_ko_accumulation(self, fighter: Fighter, damage: float, zone_mult: float):
-        """
-        Track accumulated concussive damage.
-        When it exceeds the chin resistance threshold — KO/TKO.
-        """
+        # No KOs in round 1 to prevent instant finishes
+        if self.current_round < 2:
+            return
         chin_resistance = fighter.get_chin_resistance()
         ko_threshold = chin_resistance
 
@@ -601,8 +597,7 @@ class Fight:
 
                 self._simulate_action(phase=phase)
 
-                # Mid-round doctor stoppage check (rare — only when significant)
-                if not self.winner and action_idx > 0 and action_idx % 15 == 0 and random.random() < 0.3:
+                if not self.winner and round_num >= 2 and action_idx > 0 and action_idx % 15 == 0 and random.random() < 0.3:
                     for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
                         stop_reason = self.referee.check_doctor_stoppage(fighter, state, self)
                         if stop_reason:
@@ -674,29 +669,29 @@ class Fight:
                         yield {"type": "post_fight_reaction", "text": loss_reaction}
                 return
 
-            # End of round — check for standing TKO (check both fighters)
-            for fighter, machine, opponent in [
-                (self.fighter1, self.f1_machine, self.fighter2),
-                (self.fighter2, self.f2_machine, self.fighter1)
-            ]:
-                if self.referee.stop_for_standing_tko(fighter, machine.get_state()):
-                    self.winner = opponent
-                    self.loser = fighter
-                    self.win_method = "TKO (Referee Stoppage)"
-                    self.win_round = self.current_round
-                    yield {"type": "action", "text": "The referee jumps in and stops the fight!", "round": round_num, "time": self._get_time_str()}
-                    yield {"type": "knockout",
-                           "text": f"TKO (Referee Stoppage)! {self.winner.name} wins!",
-                           "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
-                           "time": self._get_time_str(),
-                           "f1_health": self._get_display_health(self.fighter1),
-                           "f2_health": self._get_display_health(self.fighter2),
-                           "f1_state": self.f1_machine.get_state(),
-                           "f2_state": self.f2_machine.get_state(),
-                           "f1_total_score": self._get_total_score_for(1),
-                           "f2_total_score": self._get_total_score_for(2),
-                           "total_scores": self._get_total_scores()}
-                    return
+            if round_num >= 2:
+                for fighter, machine, opponent in [
+                    (self.fighter1, self.f1_machine, self.fighter2),
+                    (self.fighter2, self.f2_machine, self.fighter1)
+                ]:
+                    if self.referee.stop_for_standing_tko(fighter, machine.get_state()):
+                        self.winner = opponent
+                        self.loser = fighter
+                        self.win_method = "TKO (Referee Stoppage)"
+                        self.win_round = self.current_round
+                        yield {"type": "action", "text": "The referee jumps in and stops the fight!", "round": round_num, "time": self._get_time_str()}
+                        yield {"type": "knockout",
+                               "text": f"TKO (Referee Stoppage)! {self.winner.name} wins!",
+                               "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
+                               "time": self._get_time_str(),
+                               "f1_health": self._get_display_health(self.fighter1),
+                               "f2_health": self._get_display_health(self.fighter2),
+                               "f1_state": self.f1_machine.get_state(),
+                               "f2_state": self.f2_machine.get_state(),
+                               "f1_total_score": self._get_total_score_for(1),
+                               "f2_total_score": self._get_total_score_for(2),
+                               "total_scores": self._get_total_scores()}
+                        return
 
             # Round ending
             round_desc = self._describe_round(round_num)
@@ -720,8 +715,7 @@ class Fight:
                    "f2_total_score": self._get_total_score_for(2),
                    "scores": [[j.scores[r][0] for j in self.judges] for r in range(len(self.judges[0].scores))]}
 
-            # Between-round doctor check (doctor examines in corner)
-            if round_num < self.rounds and not self.winner:
+            if round_num >= 2 and round_num < self.rounds and not self.winner:
                 for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
                     stop_reason = self.referee.check_doctor_stoppage(fighter, state, self)
                     if stop_reason and random.random() < 0.5:
@@ -1195,8 +1189,8 @@ class Fight:
             defender_state["stunned"] = True
             defender_state["stunned_timer"] = random.randint(2, 4)
 
-        # Check for knockdown (KO threshold)
-        if tier["name"] == "Devastating" and target in ("head", "jaw", "temple"):
+        # Check for knockdown (KO threshold) — minimum round 2 before KOs
+        if self.current_round >= 2 and tier["name"] == "Devastating" and target in ("head", "jaw", "temple"):
             self._check_knockdown(attacker, defender, atk_state, def_state, target, actual_damage,
                                    atk_state["fatigue_level"], strike_type)
 
@@ -1734,7 +1728,7 @@ class Fight:
 
         mental = defender.get_effective_attribute("mental_toughness", fatigue)
         durability = defender.get_effective_attribute("durability", fatigue)
-        stun_chance = max(0, (damage * 0.8 - durability * 0.12 - mental * 0.08) * 2.0)
+        stun_chance = max(0, (damage * 0.8 - durability * 0.12 - mental * 0.08) * 1.2)
 
         if stun_chance > 6 and utils.random_roll(1, 100) <= int(stun_chance):
             def_state["stunned"] = True
@@ -1749,8 +1743,7 @@ class Fight:
         temple_health = defender.get_zone_health("temple")
         overall_head = defender.get_group_health("head")
 
-        # Knockdown if jaw/temple is destroyed OR total head health is critical
-        if jaw_health <= 0 or temple_health <= 0 or overall_head <= 15:
+        if jaw_health <= 0 or temple_health <= 0 or overall_head <= 10:
             def_state["knockdown_count"] += 1
             if attacker == self.fighter1:
                 self.f1_knockdowns_this_round += 1
@@ -1771,7 +1764,7 @@ class Fight:
 
             recovery_score = heart * 0.3 + composure * 0.2 + mental * 0.2 + chin * 0.002
 
-            if overall_head <= 8:
+            if overall_head <= 4:
                 # Very low health — likely won't get up
                 self.winner = attacker
                 self.loser = defender

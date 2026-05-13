@@ -41,7 +41,7 @@ def ensure_initialized():
         weight_classes = [wc["name"] for wc in utils.WEIGHT_CLASSES]
         promotions = create_promotions(weight_classes)
         world, national, regional = promotions
-        all_fighters = generate_fighter_pool(promotions, 500)
+        all_fighters = generate_fighter_pool(promotions, 8000)
         gs["sessions"] = {}
         gs["sessions_lock"] = Lock()
         gs["promotions"] = promotions
@@ -341,7 +341,8 @@ def get_opponents_data(session):
     promo = session.get("current_promotion")
     if not f or not promo:
         return []
-    opps = promo.get_available_opponents(f)
+    all_promos = [gs.get("world"), gs.get("national"), gs.get("regional")]
+    opps = promo.get_available_opponents(f, all_promotions=[p for p in all_promos if p and p != promo])
     result = []
     for opp, difficulty in opps:
         result.append({
@@ -363,6 +364,9 @@ def get_opponents_data(session):
             "difficulty": difficulty,
             "attributes": {k: round(v, 1) for k, v in opp.attributes.items()},
         })
+    # Sort: same nationality first, then by rating descending
+    f_nat = f.nationality
+    result.sort(key=lambda x: (0 if x["nationality"] == f_nat else 1, -x["rating"]))
     return result
 
 class Handler(BaseHTTPRequestHandler):

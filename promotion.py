@@ -138,26 +138,38 @@ class Promotion:
         exclude = exclude or []
         return [f for f in self.rankings[weight_class] if f not in exclude]
 
-    def get_available_opponents(self, fighter: Fighter) -> List[Tuple[Fighter, str]]:
+    def get_available_opponents(self, fighter: Fighter, all_promotions: List['Promotion'] = None) -> List[Tuple[Fighter, str]]:
         if fighter.weight_class not in self.rankings:
             return []
         ranked = self.rankings[fighter.weight_class]
         if fighter not in ranked:
-            return [(f, "unranked matchup") for f in ranked[:10]]
+            return [(f, "unranked matchup") for f in ranked[:12]]
 
         idx = ranked.index(fighter)
         opponents = []
-        nearby = ranked[max(0, idx-3):idx] + ranked[idx+1:idx+4]
+        nearby = ranked[max(0, idx-5):idx] + ranked[idx+1:idx+6]
         for opp in nearby:
             if opp.is_available():
                 if opp.rank < fighter.rank:
-                    difficulty = "step up" if opp.rank < fighter.rank - 2 else "tough test"
+                    diff_pts = fighter.rank - opp.rank
+                    difficulty = "step up" if diff_pts >= 5 else ("tough test" if diff_pts >= 2 else "even matchup")
                 elif opp.rank > fighter.rank:
-                    difficulty = "should win" if opp.rank > fighter.rank + 2 else "pick em"
+                    diff_pts = opp.rank - fighter.rank
+                    difficulty = "should win" if diff_pts >= 5 else ("pick em" if diff_pts >= 2 else "even matchup")
                 else:
                     difficulty = "even matchup"
                 opponents.append((opp, difficulty))
-        return opponents[:5]
+
+        # Add cross-tier opponents: if player is rank 1-5 in Regional, show top National fighters
+        if all_promotions and self.tier_name == "Regional" and fighter.rank <= 5:
+            for promo in all_promotions:
+                if promo.tier_name == "National" and fighter.weight_class in promo.rankings:
+                    nat_ranked = promo.rankings[fighter.weight_class][:6]
+                    for opp in nat_ranked:
+                        if opp.is_available() and opp not in [o[0] for o in opponents]:
+                            opponents.append((opp, "prestige fight"))
+
+        return opponents[:12]
 
 def create_promotions(weight_classes: List[str]) -> List[Promotion]:
     regional = Promotion("Regional Fight Circuit", utils.PRO_TIERS[0], weight_classes)
