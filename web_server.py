@@ -717,7 +717,6 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
 
                 if game_date and game_date.day == 1:
                     if f:
-                        f.months_inactive += 1
                         f.monthly_aging(game_date)
                     if finance:
                         finance.process_monthly(game_date)
@@ -1109,7 +1108,6 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
 
                     if game_date and game_date.day == 1:
                         if f:
-                            f.months_inactive += 1
                             f.monthly_aging(game_date)
                         if finance:
                             finance.process_monthly(game_date)

@@ -115,10 +115,12 @@ class PositionSystem:
             return True
         return False
 
-    def attempt_takedown(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0) -> bool:
-        takedown_power = attacker.get_effective_attribute("takedown_power", fatigue)
-        takedown_accuracy = attacker.get_effective_attribute("takedown_accuracy", fatigue)
-        wrestling_defense = defender.get_effective_attribute("wrestling_defense", fatigue)
+    def attempt_takedown(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0,
+                          td_mod: float = 1.0, tda_mod: float = 1.0, wd_mod: float = 1.0,
+                          weight_advantage: float = 0.0, att_leg_mod: float = 1.0, def_leg_mod: float = 1.0) -> bool:
+        takedown_power = attacker.get_effective_attribute("takedown_power", fatigue) * td_mod
+        takedown_accuracy = attacker.get_effective_attribute("takedown_accuracy", fatigue) * tda_mod
+        wrestling_defense = defender.get_effective_attribute("wrestling_defense", fatigue) * wd_mod
 
         # Range penalty
         range_penalty = 0.7 if self.current_position == Position.DISTANCE else 1.0
@@ -126,23 +128,25 @@ class PositionSystem:
         # Height/weight advantage
         height_diff = attacker.height - defender.height
         height_mod = 1.0 - max(0, height_diff) * 0.003 if height_diff > 0 else 1.0 + min(0.15, abs(height_diff) * 0.002)
-        weight_advantage = min(0.2, max(-0.15, (attacker.base_weight_lbs - defender.base_weight_lbs) / 1000))
 
         success_chance = ((takedown_power * 0.4 + takedown_accuracy * 0.6) - (wrestling_defense * 0.5))
         success_chance *= range_penalty * height_mod
-        success_chance *= (1.0 + weight_advantage)
+        if weight_advantage != 0.0:
+            success_chance *= (1.0 + weight_advantage)
+        success_chance *= att_leg_mod
+        success_chance *= (2.0 - def_leg_mod)
         success_chance *= max(0.3, 1.0 - fatigue * 0.4)
         success_chance = max(5, min(92, success_chance))
 
         if utils.random_roll(1, 100) <= success_chance:
             self._set_ground(attacker, defender, Position.GROUND_GUARD)
-            # If defender was against cage, mention it
             if self.cage_position == defender:
-                pass  # Commentary can reference cage takedown
+                pass
             return True
         return False
 
-    def attempt_clinch(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0) -> bool:
+    def attempt_clinch(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0,
+                       cc_mod: float = 1.0) -> bool:
         if self.current_position not in (Position.POCKET, Position.DISTANCE):
             return False
 
@@ -150,7 +154,7 @@ class PositionSystem:
             if not self.close_distance(attacker, defender, fatigue):
                 return False
 
-        clinch_control = attacker.get_effective_attribute("clinch_control", fatigue)
+        clinch_control = attacker.get_effective_attribute("clinch_control", fatigue) * cc_mod
         clinch_escapes = defender.get_effective_attribute("clinch_escapes", fatigue)
         reach_diff = attacker.reach - defender.reach
         reach_mod = 1.0 - max(0, reach_diff) * 0.004 if reach_diff > 0 else 1.0 + min(0.1, abs(reach_diff) * 0.003)
@@ -166,19 +170,22 @@ class PositionSystem:
             return True
         return False
 
-    def takedown_from_clinch(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0) -> bool:
+    def takedown_from_clinch(self, attacker: Fighter, defender: Fighter, fatigue: float = 0.0,
+                              td_mod: float = 1.0, tda_mod: float = 1.0, wd_mod: float = 1.0,
+                              weight_advantage: float = 0.0, att_leg_mod: float = 1.0, def_leg_mod: float = 1.0) -> bool:
         if self.current_position != Position.CLINCH:
             return False
 
-        td_power = attacker.get_effective_attribute("takedown_power", fatigue) * 1.15
-        wd = defender.get_effective_attribute("wrestling_defense", fatigue)
+        td_power = attacker.get_effective_attribute("takedown_power", fatigue) * td_mod * 1.15
+        wd = defender.get_effective_attribute("wrestling_defense", fatigue) * wd_mod
         height_diff = attacker.height - defender.height
         height_mod = 1.0 - max(0, height_diff) * 0.003 if height_diff > 0 else 1.0 + abs(height_diff) * 0.002
 
         # Weight advantage helps in clinch takedowns
-        weight_mod = 1.0 + min(0.2, max(-0.15, (attacker.base_weight_lbs - defender.base_weight_lbs) / 800))
+        weight_mod = 1.0 + weight_advantage
 
         success_chance = (td_power * 0.5 - wd * 0.4) * height_mod * weight_mod
+        success_chance *= att_leg_mod
         success_chance *= max(0.3, 1.0 - fatigue * 0.4)
         success_chance = max(8, min(88, success_chance))
 
