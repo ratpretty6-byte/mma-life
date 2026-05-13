@@ -627,6 +627,11 @@ class Fight:
                     self.referee.last_standup_round = round_num
                     continue
 
+                if action_idx % 4 == 0 and not self.winner and random.random() < 0.6:
+                    pace_text = self.commentary.generate_pacing_commentary(self.fighter1, self.fighter2, phase)
+                    if pace_text:
+                        self.fight_log.append(pace_text)
+
                 self._simulate_action(phase=phase)
 
                 if not self.winner and round_num >= 2 and action_idx > 0 and action_idx % 15 == 0 and random.random() < 0.3:

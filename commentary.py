@@ -463,6 +463,8 @@ class CommentaryEngine:
                 "{fighter} slides in with a feint and closes the range!",
                 "{fighter} stalks {opponent} down and enters striking range!",
                 "{fighter} uses head movement to close the distance safely!",
+                "{fighter} is marching forward, cutting off the cage!",
+                "{fighter} pressures {opponent} against the fence!",
             ],
             "retreat": [
                 "{fighter} circles out, creating distance to reset!",
@@ -470,8 +472,33 @@ class CommentaryEngine:
                 "{fighter} uses footwork to escape the pocket!",
                 "{fighter} pivots off and backs to the center of the cage!",
                 "{fighter} retreats to range, forcing {opponent} to pursue!",
+                "{fighter} uses lateral movement to circle away from danger!",
+                "{fighter} backpedals and resets in the center!",
             ],
         }
+
+        self.pacing_templates = [
+            "{fighter} is pressing forward, looking to land the bigger shot!",
+            "{fighter} is content to fight from range, making {opponent} lead!",
+            "{fighter} paws with the jab, measuring the distance!",
+            "{fighter} is circling, looking for an opening!",
+            "Both fighters are exchanging feints, neither wanting to commit!",
+            "{fighter} is controlling the center of the cage!",
+            "The pace slows as both fighters reset and re-measure!",
+            "{fighter} faints high, dips low, trying to draw a reaction!",
+            "{opponent} is being walked down by {fighter}!",
+            "{fighter} takes a half-step back, drawing {opponent} into the pocket!",
+            "{fighter} pumps the jab, keeping {opponent} at bay!",
+            "{opponent} can't find the range — {fighter}'s footwork is on point!",
+            "There's a pause as both fighters regroup in the center!",
+            "Neither fighter wants to overcommit here — patience is key!",
+            "{fighter} is using head movement to draw a miss and counter!",
+            "The crowd murmurs as the fighters circle, each waiting for the right moment!",
+            "{fighter} switches stances, trying to create a different look!",
+            "A feeling-out process here, both fighters establishing their rhythm!",
+            "{fighter} is finding a rhythm with that jab!",
+            "Stalemate in the center — who will make the first move?",
+        ]
 
         self.ground_transition_templates = {
             "pass_guard": [
@@ -797,6 +824,12 @@ class CommentaryEngine:
     def generate_body_shot_commentary(self, attacker: Fighter, defender: Fighter) -> str:
         template = random.choice(self.body_shot_commentary)
         return template.format(attacker=attacker.name, defender=defender.name)
+
+    def generate_pacing_commentary(self, fighter: Fighter, opponent: Fighter, phase: str = "exchanges") -> Optional[str]:
+        if random.random() < 0.5:
+            return None
+        template = random.choice(self.pacing_templates)
+        return template.format(fighter=fighter.name, opponent=opponent.name)
 
     def generate_range_commentary(self, fighter: Fighter, opponent: Fighter, action: str) -> str:
         key = "close" if action == "close" else "retreat"

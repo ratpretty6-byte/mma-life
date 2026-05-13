@@ -87,6 +87,30 @@ def run_world_sim(game_date, es):
 def run_world_sim_async(game_date, es):
     Thread(target=run_world_sim, args=(game_date, es), daemon=True).start()
 
+def ensure_regional_opponents(session):
+    f = session.get("fighter")
+    promo = session.get("current_promotion")
+    if not f or not promo or promo.tier_name != "Regional":
+        return
+    wc = f.weight_class
+    available = [opp for opp in promo.rankings.get(wc, [])
+                 if opp != f and opp.nationality == f.nationality and opp.is_available()]
+    if len(available) >= 5:
+        return
+    to_create = 8 - len(available)
+    from generator import generate_single_fighter
+    wc_data = utils.get_weight_class(wc)
+    for i in range(to_create):
+        fighter = generate_single_fighter(
+            random.randint(wc_data["min"], wc_data["max"]),
+            skill_mean=utils.gaussian_random(40, 8, 25, 55),
+            skill_std=utils.gaussian_random(12, 3, 6, 18)
+        )
+        fighter.nationality = f.nationality
+        fighter.home_region = f.home_region
+        promo.sign_fighter(fighter)
+    promo.update_rankings()
+
 def get_state_dict(session):
     f = session.get("fighter")
     if not f:
@@ -929,6 +953,7 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 session["current_fight"] = None
                 session["fight_started"] = False
                 session["fight_completed"] = True
+                ensure_regional_opponents(session)
                 self.json_resp({
                     "success": True, "won": won,
                     "state": get_state_dict(session),
