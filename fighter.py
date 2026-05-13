@@ -277,19 +277,19 @@ class Fighter:
         now = game_date or datetime.now()
         if not hasattr(self, 'last_training_dates') or not self.last_training_dates:
             return
+        all_untrained_months = 999
         for attr in self.PHYSICAL_ATTRS + self.MENTAL_ATTRS:
             last_used = self.last_training_dates.get(attr)
             if last_used is None:
                 continue
             months_unused = (now - last_used).days / 30
-            if months_unused >= 3:
-                excess_months = months_unused - 2
-                decay = 0.008 * excess_months
-                self.attributes[attr] = utils.clamp(
-                    self.attributes[attr] * (1 - decay),
-                    utils.ATTR_MIN,
-                    utils.ATTR_MAX
-                )
+            all_untrained_months = min(all_untrained_months, months_unused)
+        if all_untrained_months < 4:
+            return
+        for attr in self.PHYSICAL_ATTRS + self.MENTAL_ATTRS:
+            if self.attributes.get(attr, 50) <= 30:
+                continue
+            self.attributes[attr] = max(30, self.attributes[attr] - 0.5)
 
     def monthly_aging(self, game_date: datetime = None):
         self.months_inactive += 1

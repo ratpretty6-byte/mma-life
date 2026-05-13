@@ -1306,19 +1306,15 @@ class Fight:
     def _apply_stamina_cost(self, state, action_key: str, fatigue: float, cardio: int, stamina_mult: float = 1.0):
         base_cost = STAMINA_COST.get(action_key, 2)
         cardio_eff = cardio / 100.0
-        cost = base_cost * (1.3 - cardio_eff * 0.3)
-        cost *= (1.0 + fatigue * 0.5)
+        cost = base_cost * (1.15 - cardio_eff * 0.2)
+        cost *= (1.0 + fatigue * 0.3)
 
-        # Combo stamina escalation
         combo_count = state.get("combo_count", 0)
-        if combo_count > 2:
-            cost *= (1.0 + (combo_count - 2) * 0.15)
+        if combo_count > 3:
+            cost *= (1.0 + (combo_count - 3) * 0.1)
 
         cost *= stamina_mult
-
-        # Discipline bonus: disciplined fighters conserve stamina
-        discipline = state.get("discipline_val", 0)
-        cost *= max(0.7, 1.0 - discipline * 0.005)
+        cost *= max(0.75, 1.0 - (cardio / 150.0))
 
         state["stamina"] = max(0, state["stamina"] - max(1, int(cost)))
         state["fatigue_level"] = 1.0 - (state["stamina"] / 100)

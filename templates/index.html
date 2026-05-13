@@ -76,6 +76,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .fight-log .ev-defensive { color: #888; }
 .fight-log .ev-hurt { color: #ffd700; font-weight: 600; }
 .fight-log .ev-stunned { color: #ff4a4a; font-weight: 700; }
+.fight-log .ev-f1 { border-left: 3px solid #e62400; padding-left: 3px; }
+.fight-log .ev-f2 { border-left: 3px solid #4a9eff; padding-left: 3px; }
 
 /* Strategy selector */
 .strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
@@ -1262,8 +1264,10 @@ async function loadOpponents() {
     const st = o.win_streak > 0 ? `W${o.win_streak}` : (o.loss_streak > 0 ? `L${Math.abs(o.loss_streak)}` : "");
     const div = document.createElement("div");
     div.className = "opponent-card";
-    div.innerHTML = `<div><span class="name">${escHtml(o.name)}</span> <span class="record">${escHtml(o.record)} (#${o.rank})</span><br>
-      <small>${escHtml(o.nationality || '--')} | ${escHtml(o.archetype)} | Rating: ${o.rating}</small></div>
+    const rankDir = o.rank < state.fighter.rank ? "↑" : (o.rank > state.fighter.rank ? "↓" : "=");
+    const rankColor = o.rank < state.fighter.rank ? "#4aff6a" : (o.rank > state.fighter.rank ? "#ff4a4a" : "#888");
+    div.innerHTML = `<div><span class="name">${escHtml(o.name)}</span> <span class="record">${escHtml(o.record)}</span><br>
+      <small><span style="color:${rankColor}">#${o.rank} ${rankDir}</span> | ${escHtml(o.nationality || '--')} | ${escHtml(o.archetype)} | Rating: ${o.rating}</small></div>
       <div style="text-align:right"><span class="diff ${diffClass}">${escHtml(o.difficulty)}</span><br><small>${st}</small></div>`;
     div.onclick = () => showComparison(o);
     list.appendChild(div);
@@ -1545,17 +1549,22 @@ async function replayFightEvents(fightResult) {
 
     if (ev.type === "action") {
       const t = ev.text || "";
-      if (/CRITICAL|DEVASTATES|DEVASTATING/i.test(t)) el.className += " ev-critical";
-      else if (/knockdown|goes down|dropped|staggered/i.test(t)) el.className += " ev-heavy";
-      else if (/takedown|slam|takes .+ down|puts .+ on the canvas|sprawl/i.test(t)) el.className += " ev-takedown";
-      else if (/clinch|knee|elbow|tie up|dirty box/i.test(t)) el.className += " ev-clinch";
-      else if (/hammerfist|ground|mount|side control|guard|pass/i.test(t)) el.className += " ev-ground";
-      else if (/submission|kimura|choke|armbar|triangle|tap/i.test(t)) el.className += " ev-sub-attempt";
-      else if (/blocks|slips|parries|defends/i.test(t)) el.className += " ev-defensive";
-      else if (/HURT|ROCKED|is hurt|is rocked/i.test(t)) el.className += " ev-hurt";
-      else if (/STUNNED|stunned/i.test(t)) el.className += " ev-stunned";
-      else if (/crushing|heavy|big |hard |flush|wobble/i.test(t)) el.className += " ev-heavy";
-      else el.className += " ev-strike";
+      let actCls = "ev-strike";
+      if (/CRITICAL|DEVASTATES|DEVASTATING/i.test(t)) actCls = "ev-critical";
+      else if (/knockdown|goes down|dropped|staggered/i.test(t)) actCls = "ev-heavy";
+      else if (/takedown|slam|takes .+ down|puts .+ on the canvas|sprawl/i.test(t)) actCls = "ev-takedown";
+      else if (/clinch|knee|elbow|tie up|dirty box/i.test(t)) actCls = "ev-clinch";
+      else if (/hammerfist|ground|mount|side control|guard|pass/i.test(t)) actCls = "ev-ground";
+      else if (/submission|kimura|choke|armbar|triangle|tap/i.test(t)) actCls = "ev-sub-attempt";
+      else if (/blocks|slips|parries|defends/i.test(t)) actCls = "ev-defensive";
+      else if (/HURT|ROCKED|is hurt|is rocked/i.test(t)) actCls = "ev-hurt";
+      else if (/STUNNED|stunned/i.test(t)) actCls = "ev-stunned";
+      else if (/crushing|heavy|big |hard |flush|wobble/i.test(t)) actCls = "ev-heavy";
+      el.className += " " + actCls;
+      const f1N = state && state.fighter ? state.fighter.name : "";
+      const f2N = qs("#f2NameBar") ? qs("#f2NameBar").textContent : "";
+      if (f1N && t.startsWith(f1N)) el.className += " ev-f1";
+      else if (f2N && t.startsWith(f2N)) el.className += " ev-f2";
     }
 
     if (el.textContent || el.innerHTML) {

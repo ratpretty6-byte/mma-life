@@ -364,9 +364,8 @@ def get_opponents_data(session):
             "difficulty": difficulty,
             "attributes": {k: round(v, 1) for k, v in opp.attributes.items()},
         })
-    # Sort: same nationality first, then by rating descending
-    f_nat = f.nationality
-    result.sort(key=lambda x: (0 if x["nationality"] == f_nat else 1, -x["rating"]))
+    f_rank = f.rank
+    result.sort(key=lambda x: (0 if x["nationality"] == f.nationality else 1, abs(x["rank"] - f_rank)))
     return result
 
 class Handler(BaseHTTPRequestHandler):
@@ -735,6 +734,11 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     if o.name == opp_name:
                         target = o
                         break
+                if not target:
+                    for o in promo.fighters:
+                        if o.name == opp_name and o.weight_class == f.weight_class:
+                            target = o
+                            break
                 if not target:
                     self.json_resp({"error": "Opponent not found"})
                     return
