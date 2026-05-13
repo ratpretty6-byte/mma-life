@@ -177,22 +177,21 @@ class Promotion:
 
         if self.tier_name in ("Regional", "National"):
             opponents = [o for o in opponents if o[0].nationality == fighter.nationality]
-        # Fill gaps with closest-ranked same-nat fighters from deeper rankings
-        if self.tier_name in ("Regional", "National") and len(opponents) < 4:
-            for opp in ranked:
-                if opp.nationality == fighter.nationality and opp.is_available() and opp != fighter and (opp, "") not in opponents and opp not in [o[0] for o in opponents]:
-                    if opp.rank < fighter.rank:
-                        diff_pts = fighter.rank - opp.rank
-                        d = "step up" if diff_pts >= 5 else ("tough test" if diff_pts >= 2 else "even matchup")
-                    elif opp.rank > fighter.rank:
-                        diff_pts = opp.rank - fighter.rank
-                        d = "should win" if diff_pts >= 5 else ("pick em" if diff_pts >= 2 else "even matchup")
-                    else:
-                        d = "even matchup"
-                    opponents.append((opp, d))
-                    if len(opponents) >= 12:
-                        break
-        return opponents[:12]
+            if len(opponents) < 3:
+                for opp in ranked:
+                    if opp.nationality == fighter.nationality and opp.is_available() and opp != fighter:
+                        opp_rank_diff = abs(opp.rank - fighter.rank)
+                        if opp_rank_diff <= 10 and opp not in [o[0] for o in opponents]:
+                            if opp.rank < fighter.rank:
+                                d = "step up" if fighter.rank - opp.rank >= 5 else ("tough test" if fighter.rank - opp.rank >= 2 else "even matchup")
+                            elif opp.rank > fighter.rank:
+                                d = "should win" if opp.rank - fighter.rank >= 5 else ("pick em" if opp.rank - fighter.rank >= 2 else "even matchup")
+                            else:
+                                d = "even matchup"
+                            opponents.append((opp, d))
+                            if len(opponents) >= 10:
+                                break
+        return opponents[:10]
 
 def create_promotions(weight_classes: List[str]) -> List[Promotion]:
     regional = Promotion("Regional Fight Circuit", utils.PRO_TIERS[0], weight_classes)

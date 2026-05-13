@@ -308,6 +308,16 @@ class CommentaryEngine:
             "{fighter} is unconscious before they hit the ground! Goodnight!",
         ]
 
+        self.tko_templates = [
+            "{winner} swarms with ground strikes and the referee has seen enough! TKO!",
+            "The referee dives in to save {loser}! {winner} wins by TKO!",
+            "{winner} follows {loser} to the ground and unloads — the ref steps in! TKO!",
+            "Ground and pound finishes it! The referee waves it off!",
+            "{winner} pours on the punishment and the fight is stopped! TKO!",
+            "{loser} can't defend themselves on the ground — referee stoppage!",
+            "A furious barrage from {winner} forces the referee to intervene!",
+        ]
+
         self.recovery_templates = [
             "{fighter} is on wobbly legs but the referee lets it continue!",
             "{fighter} survives the round! What a recovery!",
@@ -679,6 +689,10 @@ class CommentaryEngine:
     def generate_knockout_commentary(self, fighter: Fighter) -> str:
         template = random.choice(self.knockout_templates)
         return template.format(fighter=fighter.name)
+
+    def generate_tko_commentary(self, winner: Fighter, loser: Fighter, method: str) -> str:
+        template = random.choice(self.tko_templates)
+        return template.format(winner=winner.name, loser=loser.name, method=method)
 
     def generate_recovery_commentary(self, fighter: Fighter) -> str:
         template = random.choice(self.recovery_templates)

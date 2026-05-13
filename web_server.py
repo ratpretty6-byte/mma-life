@@ -469,7 +469,12 @@ class Handler(BaseHTTPRequestHandler):
                 ensure_initialized()
                 promos = []
                 for p in gs["promotions"]:
-                    promos.append({"name": p.name, "tier": p.tier_name, "base_pay": p.base_pay, "win_bonus": p.win_bonus, "perf_bonus": p.perf_bonus})
+                    if p.tier_name != "Regional":
+                        continue
+                    promos.append({"name": p.name, "tier": p.tier_name,
+                                   "base_pay": p.base_pay, "win_bonus": p.win_bonus,
+                                   "perf_bonus": p.perf_bonus,
+                                   "num_fighters": len(p.fighters)})
                 self.json_resp({"promotions": promos})
 
             elif path == "/api/fight_state":

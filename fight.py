@@ -412,6 +412,7 @@ class Fight:
         self.f2_round_attempts = 0
         self.f1_start_attempts = 0
         self.f2_start_attempts = 0
+        self._last_severity = "Clean"
 
     def _init_fighter_state(self) -> Dict:
         return {
@@ -656,7 +657,8 @@ class Fight:
                              "f2_state": self.f2_machine.get_state(),
                              "f1_total_score": self._get_total_score_for(1),
                              "f2_total_score": self._get_total_score_for(2),
-                             "time": self._get_time_str()}
+                             "time": self._get_time_str(),
+                             "severity": self._last_severity}
                     yield event
 
                 # Mid-round AI adaptation (every 6 actions)
@@ -665,8 +667,19 @@ class Fight:
 
             if self.winner:
                 # Knockout/Submission finish
-                if "KO" in self.win_method or "TKO" in self.win_method:
+                if self.win_method == "KO":
                     yield {"type": "knockout", "text": self.commentary.generate_knockout_commentary(self.loser),
+                           "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
+                           "time": self._get_time_str(),
+                           "f1_health": self._get_display_health(self.fighter1),
+                           "f2_health": self._get_display_health(self.fighter2),
+                           "f1_state": self.f1_machine.get_state(),
+                           "f2_state": self.f2_machine.get_state(),
+                           "f1_total_score": self._get_total_score_for(1),
+                           "f2_total_score": self._get_total_score_for(2),
+                           "total_scores": self._get_total_scores()}
+                elif "TKO" in self.win_method:
+                    yield {"type": "knockout", "text": self.commentary.generate_tko_commentary(self.winner, self.loser, self.win_method),
                            "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
                            "time": self._get_time_str(),
                            "f1_health": self._get_display_health(self.fighter1),
@@ -1131,9 +1144,9 @@ class Fight:
         tier = utils.determine_severity(accuracy, defense_score, power, composure,
                                          self.get_adrenaline(1 if attacker == self.fighter1 else 2))
 
-        # Check for critical hit
+        self._last_severity = tier["name"]
         is_critical = utils.check_critical_hit(accuracy, composure,
-                                                self.get_adrenaline(1 if attacker == self.fighter1 else 2))
+                                                 self.get_adrenaline(1 if attacker == self.fighter1 else 2))
 
         # Calculate damage
         weight_mod = self._strike_weight_modifier(attacker.weight_class)
@@ -1625,16 +1638,17 @@ class Fight:
         self._apply_stamina_cost(atk_state, "ground_strike", fatigue,
                                   attacker.get_effective_attribute("cardio", fatigue))
 
-        # TKO from ground strikes (referee stoppage)
         unanswered = def_state.get("unanswered_ground_strikes", 0)
-        if unanswered >= 10 and pos not in (Position.GROUND_GUARD,):
+        just_kd = def_state.get("knockdown", False)
+        boosted = 5 if just_kd else 1  # Faster stoppage after knockdown
+        if unanswered >= 10 / boosted and pos not in (Position.GROUND_GUARD,):
             self.winner = attacker
             self.loser = defender
             self.win_method = "TKO (Ground Strikes)"
             self.win_round = self.current_round
             self.fight_log.append(f"The referee steps in! {defender.name} can't defend themselves!")
             return
-        elif unanswered >= 7 and pos == Position.GROUND_MOUNT:
+        elif unanswered >= 7 / boosted and pos == Position.GROUND_MOUNT:
             self.winner = attacker
             self.loser = defender
             self.win_method = "TKO (Ground Strikes)"
@@ -1798,7 +1812,6 @@ class Fight:
         return False
 
     def _check_knockdown(self, attacker, defender, atk_state, def_state, target, damage, fatigue, strike_type):
-        """MMA knockdown — when head health drops to critical levels."""
         jaw_health = defender.get_zone_health("jaw")
         temple_health = defender.get_zone_health("temple")
         overall_head = defender.get_group_health("head")
@@ -1812,36 +1825,21 @@ class Fight:
             def_state["knockdown"] = True
             def_state["stunned"] = False
             def_state["stunned_timer"] = 0
+            def_state["unanswered_ground_strikes"] = 0
 
             self.fight_log.append(self.commentary.generate_knockdown_commentary(defender))
-            self.fight_log.append(f"{defender.name} goes down!")
-
-            # MMA — fighter has time to recover (referee will stop if can't)
-            heart = defender.get_effective_attribute("heart", fatigue)
-            composure = defender.get_effective_attribute("composure", fatigue)
-            mental = defender.get_effective_attribute("mental_toughness", fatigue)
-            chin = defender.get_chin_resistance()
-
-            recovery_score = heart * 0.3 + composure * 0.2 + mental * 0.2 + chin * 0.002
+            self.fight_log.append(f"{defender.name} goes down! {attacker.name} follows them to the ground!")
 
             if overall_head <= 4:
-                # Very low health — likely won't get up
                 self.winner = attacker
                 self.loser = defender
                 self.win_method = "KO"
                 self.win_round = self.current_round
-                self.fight_log.append(f"{defender.name} can't beat the count! It's over!")
+                self.fight_log.append(f"{defender.name} is out cold!")
                 return True
-            elif recovery_score < 35:
-                self.winner = attacker
-                self.loser = defender
-                self.win_method = "TKO"
-                self.win_round = self.current_round
-                self.fight_log.append(f"{defender.name} is struggling to get up... ref waves it off!")
-                return True
-            else:
-                self.fight_log.append(f"{defender.name} is trying to recover...")
-                return True
+
+            self.position_system._set_ground(attacker, defender, Position.GROUND_GUARD)
+            return True
         return False
 
     # ============================================================

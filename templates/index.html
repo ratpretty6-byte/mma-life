@@ -1584,17 +1584,22 @@ async function replayFightEvents(fightResult) {
 
     if (ev.type === "action") {
       const t = ev.text || "";
+      const sev = ev.severity || "";
       let actCls = "ev-strike";
-      if (/CRITICAL|DEVASTATES|DEVASTATING/i.test(t)) actCls = "ev-critical";
-      else if (/knockdown|goes down|dropped|staggered/i.test(t)) actCls = "ev-heavy";
+      if (/CRITICAL/.test(sev)) actCls = "ev-critical";
+      else if (sev === "Devastating") actCls = "ev-critical";
+      else if (sev === "Flush") actCls = "ev-heavy";
+      else if (sev === "Solid") actCls = "ev-strike";
+      else if (sev === "Clean") actCls = "ev-strike";
+      else if (sev === "Glancing") actCls = "ev-defensive";
+      else if (sev === "Blocked") actCls = "ev-defensive";
       else if (/takedown|slam|takes .+ down|puts .+ on the canvas|sprawl/i.test(t)) actCls = "ev-takedown";
       else if (/clinch|knee|elbow|tie up|dirty box/i.test(t)) actCls = "ev-clinch";
       else if (/hammerfist|ground|mount|side control|guard|pass/i.test(t)) actCls = "ev-ground";
       else if (/submission|kimura|choke|armbar|triangle|tap/i.test(t)) actCls = "ev-sub-attempt";
-      else if (/blocks|slips|parries|defends/i.test(t)) actCls = "ev-defensive";
+      else if (/blocks|slips|parries|defends|misses|too gassed|can't/i.test(t)) actCls = "ev-defensive";
       else if (/HURT|ROCKED|is hurt|is rocked/i.test(t)) actCls = "ev-hurt";
       else if (/STUNNED|stunned/i.test(t)) actCls = "ev-stunned";
-      else if (/crushing|heavy|big |hard |flush|wobble/i.test(t)) actCls = "ev-heavy";
       el.className += " " + actCls;
       const f1N = state && state.fighter ? state.fighter.name : "";
       const f2N = qs("#f2NameBar") ? qs("#f2NameBar").textContent : "";
