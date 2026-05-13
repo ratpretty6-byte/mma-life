@@ -6,6 +6,9 @@ from positions import PositionSystem, Position
 from strategy import StrategySystem, STRATEGIES
 from commentary import CommentaryEngine
 import utils
+from utils import get_combos_for_position, calculate_feint_chance, calculate_feint_recognition
+from utils import get_breathing_level, get_breathing_recovery_modifier, BREATHING_THRESHOLDS, BREATHING_RECOVERY_BETWEEN_ROUNDS
+from utils import get_stance_modifiers
 
 # ============================================================
 # CONSTANTS
@@ -29,6 +32,9 @@ STRIKE_PROFILES = {
     "superman_punch": {"base_damage": 10, "speed": 0.6, "stamina_cost": 4, "range": "pocket", "targets": ["head", "body"]},
 }
 
+# Import from utils for enhanced combo system
+from utils import COMBOS as NEW_COMBOS
+
 STAMINA_COST = {
     "jab": 1, "cross": 2, "hook": 3, "uppercut": 3,
     "kick": 5, "knee": 4, "elbow": 3,
@@ -39,15 +45,8 @@ STAMINA_COST = {
     "advance_mount": 3, "take_back": 4,
 }
 
-COMBINATIONS = {
-    "1-2":              {"strikes": ["jab", "cross"],           "power_bonus": 0.15, "stamina_mult": 1.1,  "iq_req": 20},
-    "1-2-3":            {"strikes": ["jab", "cross", "hook"],   "power_bonus": 0.25, "stamina_mult": 1.3,  "iq_req": 35},
-    "jab-hook":         {"strikes": ["jab", "hook"],            "power_bonus": 0.20, "stamina_mult": 1.15, "iq_req": 25},
-    "double-jab-cross": {"strikes": ["jab", "jab", "cross"],    "power_bonus": 0.20, "stamina_mult": 1.25, "iq_req": 30},
-    "uppercut-hook":    {"strikes": ["uppercut", "hook"],       "power_bonus": 0.35, "stamina_mult": 1.4,  "iq_req": 40},
-    "3-2-body":         {"strikes": ["jab", "cross", "body_shot"], "power_bonus": 0.20, "stamina_mult": 1.2, "iq_req": 30},
-    "leg-kick-set":     {"strikes": ["leg_kick", "jab-cross"],  "power_bonus": 0.15, "stamina_mult": 1.2,  "iq_req": 25},
-}
+COMBINATIONS = {c["id"]: c for c in utils.COMBOS}
+COMBOS_BY_POSITION = {}  # populated lazily
 
 
 # ============================================================
@@ -57,7 +56,7 @@ COMBINATIONS = {
 class Referee:
     """MMA referee — no 8-count. Manages cage-side stoppages and standups."""
 
-    def __init__(self, fighter1=None, fighter2=None):
+    def __init__(self, fighter1=None, fighter2=None, style="protective"):
         self.standup_pending = False
         self.target_fighter = None
         self.warning_issued = False
@@ -67,6 +66,17 @@ class Referee:
         self.f1_unanswered_strikes = 0
         self.f2_unanswered_strikes = 0
         self.last_standup_round = 0
+        self.style = style
+        # Style modifiers
+        if style == "protective":
+            self.tko_threshold = 0.85
+            self.standup_speed = 1.0
+        elif style == "let_them_fight":
+            self.tko_threshold = 1.15
+            self.standup_speed = 0.7
+        elif style == "strict":
+            self.tko_threshold = 1.0
+            self.standup_speed = 1.0
 
     def should_stand_up(self, fight, round_num) -> bool:
         """
@@ -98,7 +108,8 @@ class Referee:
 
     def stop_for_standing_tko(self, fighter, state_name: str) -> bool:
         unanswered = self.get_unanswered(fighter)
-        if unanswered >= 5:
+        threshold = int(5 * self.tko_threshold)
+        if unanswered >= threshold:
             defense = utils.calculate_defense_score(
                 fighter.attributes.get("durability", 50),
                 fighter.attributes.get("composure", 50),
@@ -127,6 +138,14 @@ class Referee:
 
         if state.get("swelling", 0) > 95:
             return f"Doctor stoppage: Severe swelling on {fighter.name}"
+
+        # Leg damage doctor check — can barely stand
+        lead_dmg = state.get("lead_leg_damage", 0)
+        rear_dmg = state.get("rear_leg_damage", 0)
+        if lead_dmg > 80 and rear_dmg > 80:
+            return f"Doctor stoppage: {fighter.name} can barely stand on damaged legs"
+        if (lead_dmg + rear_dmg) / 2 > 75 and random.random() < 0.3:
+            return f"Doctor stoppage: {fighter.name}'s legs are too damaged to continue"
 
         return None
 
@@ -254,51 +273,65 @@ class FighterState:
 # FIGHT CLASS
 # ============================================================
 
-class Judge:
-    def __init__(self, name: str, bias: float = 0.0):
+class JudgeProfile:
+    def __init__(self, name: str, aggression_weight: float = 0.15, grappling_weight: float = 0.35,
+                 damage_weight: float = 0.40, generalship_weight: float = 0.10,
+                 bias_noise: float = 0.0, bias: float = 0.0):
         self.name = name
+        self.weights = {
+            "striking": 1.0,
+            "grappling": 1.0,
+            "aggression": 1.0,
+            "octagon_control": 1.0,
+        }
+        self.aggression_weight = aggression_weight
+        self.grappling_weight = grappling_weight
+        self.damage_weight = damage_weight
+        self.generalship_weight = generalship_weight
+        self.bias_noise = bias_noise
         self.bias = bias
+
+
+class Judge:
+    def __init__(self, name: str, profile: JudgeProfile = None, bias: float = 0.0):
+        self.name = name
+        self.profile = profile or JudgeProfile(name, bias=bias)
         self.scores: List[List[int]] = []
         self.round_details: List[dict] = []
 
     def score_round(self, rd: dict) -> tuple:
-        """
-        10-point must system with UFC-style criteria.
-        rd contains: effective_striking, effective_grappling, aggression, octagon_control,
-                      knockdowns_f1, knockdowns_f2, significant_advantage
-        """
-        # Effective striking (40%)
-        strike_diff = rd["effective_striking_f1"] - rd["effective_striking_f2"]
-        strike_score = self.normalize(strike_diff) * 0.40
-
-        # Effective grappling (35%)
-        grapple_diff = rd["effective_grappling_f1"] - rd["effective_grappling_f2"]
-        grapple_score = self.normalize(grapple_diff) * 0.35
-
-        # Effective aggression (15%)
-        agg_diff = rd["aggression_f1"] - rd["aggression_f2"]
-        agg_score = self.normalize(agg_diff) * 0.15
-
-        # Octagon control (10%)
-        cage_diff = rd["octagon_control_f1"] - rd["octagon_control_f2"]
-        cage_score = self.normalize(cage_diff) * 0.10
-
-        # Knockdown bonus (applied as additive, overrides other scoring)
+        pw = self.profile.weights
         kd_diff = rd["knockdowns_f1"] - rd["knockdowns_f2"]
 
-        f1_raw = strike_score + grapple_score + agg_score + cage_score + self.bias * 0.3
-        f2_raw = -(strike_score + grapple_score + agg_score + cage_score) - self.bias * 0.3
+        # Each criterion weighted by judge preference
+        strike_diff = rd["effective_striking_f1"] - rd["effective_striking_f2"]
+        strike_score = self.normalize(strike_diff) * self.profile.damage_weight * pw["striking"]
 
-        # Knockdowns shift the score
+        grapple_diff = rd["effective_grappling_f1"] - rd["effective_grappling_f2"]
+        grapple_score = self.normalize(grapple_diff) * self.profile.grappling_weight * pw["grappling"]
+
+        agg_diff = rd["aggression_f1"] - rd["aggression_f2"]
+        agg_score = self.normalize(agg_diff) * self.profile.aggression_weight * pw["aggression"]
+
+        cage_diff = rd["octagon_control_f1"] - rd["octagon_control_f2"]
+        cage_score = self.normalize(cage_diff) * self.profile.generalship_weight * pw["octagon_control"]
+
+        # Per-judge noise
+        noise = random.gauss(0, self.profile.bias_noise)
+
+        f1_raw = strike_score + grapple_score + agg_score + cage_score + noise
+        f2_raw = -(strike_score + grapple_score + agg_score + cage_score) - noise
+
         if kd_diff != 0:
-            f1_raw += kd_diff * 1.5
-            f2_raw -= kd_diff * 1.5
+            kd_bonus = kd_diff * 1.5
+            f1_raw += kd_bonus
+            f2_raw -= kd_bonus
 
         f1_round, f2_round = 10, 10
         diff = f1_raw - f2_raw
 
         if abs(diff) < 0.15:
-            f1_round, f2_round = 10, 10  # Draw round
+            f1_round, f2_round = 10, 10
         elif diff > 0:
             f1_round = 10
             f2_round = max(7, 10 - self._score_diff_to_points(diff))
@@ -317,7 +350,6 @@ class Judge:
 
     @staticmethod
     def normalize(value: float) -> float:
-        """Normalize a difference to roughly -1.0 to 1.0 range."""
         return utils.clamp(value * 0.01, -1.0, 1.0)
 
     @staticmethod
@@ -361,15 +393,37 @@ class Fight:
         self.f1_machine = FighterState(fighter1)
         self.f2_machine = FighterState(fighter2)
 
-        # Referee
-        self.referee = Referee(fighter1, fighter2)
+        # Referee with personality
+        ref_styles = ["protective", "let_them_fight", "strict"]
+        ref_style = random.choice(ref_styles)
+        self.referee = Referee(fighter1, fighter2, style=ref_style)
+        self.referee_style = ref_style
 
-        # Judges
-        self.judges = [
-            Judge("Judge A", bias=0.3),
-            Judge("Judge B", bias=0.0),
-            Judge("Judge C", bias=-0.3),
+        # Stance system
+        self.fighter1_stance = getattr(fighter1, 'stance', 'orthodox')
+        self.fighter2_stance = getattr(fighter2, 'stance', 'orthodox')
+
+        # Judges with profiles
+        judge_profiles = [
+            JudgeProfile("Judge A", aggression_weight=0.15, grappling_weight=0.35,
+                         damage_weight=0.40, generalship_weight=0.10, bias_noise=0.5, bias=0.3),
+            JudgeProfile("Judge B", aggression_weight=0.12, grappling_weight=0.40,
+                         damage_weight=0.38, generalship_weight=0.10, bias_noise=0.8, bias=0.0),
+            JudgeProfile("Judge C", aggression_weight=0.20, grappling_weight=0.30,
+                         damage_weight=0.42, generalship_weight=0.08, bias_noise=0.6, bias=-0.3),
         ]
+        self.judges = [Judge(p.name, p) for p in judge_profiles]
+
+        # Momentum tracker (-50 to +50 per fighter)
+        self.f1_momentum = 0
+        self.f2_momentum = 0
+
+        # Crowd excitement (0-100)
+        self.crowd_excitement = 40
+        if context and context.get("rivalry_info"):
+            self.crowd_excitement = 70
+        if is_title_fight:
+            self.crowd_excitement = 85
 
         # KO tracking
         self.f1_head_damage = 0.0  # Accumulated head damage for KO threshold
@@ -421,6 +475,11 @@ class Fight:
             "cuts": [],
             "swelling": 0,
             "leg_damage": 0,
+            "lead_leg_damage": 0,
+            "rear_leg_damage": 0,
+            "liver_damage": 0,
+            "rib_damage": 0,
+            "rib_injury_active": False,
             "knockdown": False,
             "knockdown_count": 0,
             "recovering": False,
@@ -444,6 +503,17 @@ class Fight:
             "forward_pressure_points": 0,
             "effective_grappling_points": 0.0,
             "damage_taken_log": [],
+            "breathing_capacity": 100,
+            "feint_count": 0,
+            "feinted_last_action": False,
+            "opponent_action_history": [],
+            "ko_stage": 0,
+            "cardio_zone": "aerobic",
+            "consecutive_retreats": 0,
+            "pattern_read": False,
+            "pattern_read_bonus": 1.0,
+            "second_wind_used": False,
+            "involuntary_rest_timer": 0,
         }
 
     # ============================================================
@@ -489,6 +559,38 @@ class Fight:
         return max(0, total1 - total2)
 
     # ============================================================
+    # MOMENTUM SYSTEM
+    # ============================================================
+
+    def _update_momentum(self, for_fighter: int, delta: int):
+        if for_fighter == 1:
+            self.f1_momentum = utils.clamp(self.f1_momentum + delta, -50, 50)
+        else:
+            self.f2_momentum = utils.clamp(self.f2_momentum + delta, -50, 50)
+
+    def get_momentum_modifier(self, fighter_num: int) -> float:
+        m = self.f1_momentum if fighter_num == 1 else self.f2_momentum
+        if m > 20:
+            return 1.05
+        elif m < -20:
+            return 0.95
+        return 1.0
+
+    # ============================================================
+    # CROWD EXCITEMENT SYSTEM
+    # ============================================================
+
+    def _update_crowd_excitement(self, delta: int):
+        self.crowd_excitement = utils.clamp(self.crowd_excitement + delta, 0, 100)
+
+    def get_crowd_modifier(self, fighter_num: int) -> float:
+        if self.crowd_excitement < 40:
+            return 0.98
+        elif self.crowd_excitement > 70:
+            return 1.02
+        return 1.0
+
+    # ============================================================
     # BLOOD SYSTEM
     # ============================================================
 
@@ -514,46 +616,100 @@ class Fight:
         if fighter == self.fighter1:
             self.f1_head_damage += damage / 1.5
             self.f1_state["damage_taken_log"].append({"type": "head", "damage": damage, "round": self.current_round})
+            self._update_ko_stage(self.fighter1, self.f1_state, self.f1_head_damage)
         else:
             self.f2_head_damage += damage / 1.5
             self.f2_state["damage_taken_log"].append({"type": "head", "damage": damage, "round": self.current_round})
+            self._update_ko_stage(self.fighter2, self.f2_state, self.f2_head_damage)
+
+    def _update_ko_stage(self, fighter: Fighter, state: dict, head_damage: float):
+        """Progressive KO staging system. Updates visible stage without ending fight."""
+        if self.current_round < 2:
+            return
+        chin_resistance = fighter.get_chin_resistance()
+        pct = head_damage / max(1, chin_resistance)
+
+        new_stage = 0
+        if pct >= 1.0:
+            new_stage = 4  # Finish
+        elif pct >= 0.80:
+            new_stage = 3  # On the verge
+        elif pct >= 0.60:
+            new_stage = 2  # Wobbled
+        elif pct >= 0.40:
+            new_stage = 1  # Dazed
+
+        old_stage = state.get("ko_stage", 0)
+        state["ko_stage"] = new_stage
+
+        # Stage-specific effects
+        if new_stage == 1 and old_stage < 1:
+            self.fight_log.append(f"{fighter.name} looks glassy-eyed!")
+        elif new_stage == 2 and old_stage < 2:
+            self.fight_log.append(f"{fighter.name} is wobbled, legs looking unsteady!")
+        elif new_stage == 3 and old_stage < 3:
+            self.fight_log.append(f"{fighter.name} is on the verge of being finished!")
+        elif new_stage == 4:
+            pass  # Handled by _check_ko_or_tko
+
+    def _check_ko_or_tko(self, fighter: Fighter, damage: float, zone_mult: float) -> bool:
+        """Check if current damage warrants a KO/TKO. Returns True if fight is over."""
+        if self.current_round < 2:
+            return False
+        is_f1 = fighter == self.fighter1
+        head_damage = self.f1_head_damage if is_f1 else self.f2_head_damage
+        state = self.f1_state if is_f1 else self.f2_state
+        chin_resistance = fighter.get_chin_resistance()
+        opponent = self.fighter2 if is_f1 else self.fighter1
+
+        pct = head_damage / max(1, chin_resistance)
+
+        # Immediate KO: Devastating + zone_mult > 2.0 (single devastating blow)
+        if pct >= 1.0 and damage * zone_mult > 0.4 * chin_resistance:
+            self.winner = opponent
+            self.loser = fighter
+            self.win_method = "KO"
+            self.win_round = self.current_round
+            return True
+
+        # KO from accumulation: pct >= 1.0 but gradual
+        if pct >= 1.0:
+            # Check if recent damage is burst vs accumulated
+            recent = sum(
+                d["damage"] for d in state["damage_taken_log"]
+                if self.current_round - d["round"] <= 1 and d.get("round", self.current_round) == self.current_round
+            )
+            if recent > chin_resistance * 0.5:
+                self.win_method = "KO"
+            else:
+                self.win_method = "TKO (Strikes)"
+            self.winner = opponent
+            self.loser = fighter
+            self.win_round = self.current_round
+            return True
+
+        # Stage 3 with big flush shot: potential TKO
+        if pct >= 0.80 and self._last_severity in ("Flush", "Devastating"):
+            if random.random() < 0.3:  # 30% chance to call it off
+                self.winner = opponent
+                self.loser = fighter
+                self.win_method = "TKO (Strikes)"
+                self.win_round = self.current_round
+                return True
+
+        return False
 
     def _track_ko_accumulation(self, fighter: Fighter, damage: float, zone_mult: float):
         # No KOs in round 1 to prevent instant finishes
         if self.current_round < 2:
             return
-        chin_resistance = fighter.get_chin_resistance()
-        ko_threshold = chin_resistance
-
-        if fighter == self.fighter1:
-            if self.f1_head_damage > ko_threshold:
-                self.winner = self.fighter2
-                self.loser = self.fighter1
-                # Determine if it's a KO or TKO based on how quickly damage accumulated
-                recent_head_dmg = sum(
-                    d["damage"] for d in self.f1_state["damage_taken_log"]
-                    if self.current_round - d["round"] <= 1
-                )
-                if recent_head_dmg > ko_threshold * 0.5:
-                    self.win_method = "KO"
-                else:
-                    self.win_method = "TKO"
-                self.win_round = self.current_round
-                self.fight_log.append(f"\n*** {self.fighter2.name} stops {self.fighter1.name}! {self.win_method} in round {self.current_round}! ***")
-        else:
-            if self.f2_head_damage > ko_threshold:
-                self.winner = self.fighter1
-                self.loser = self.fighter2
-                recent_head_dmg = sum(
-                    d["damage"] for d in self.f2_state["damage_taken_log"]
-                    if self.current_round - d["round"] <= 1
-                )
-                if recent_head_dmg > ko_threshold * 0.5:
-                    self.win_method = "KO"
-                else:
-                    self.win_method = "TKO (Strikes)"
-                self.win_round = self.current_round
-                self.fight_log.append(f"\n*** {self.fighter1.name} stops {self.fighter2.name}! {self.win_method} in round {self.current_round}! ***")
+        if self._check_ko_or_tko(fighter, damage, zone_mult):
+            loser = self.loser
+            if loser == self.fighter1:
+                log_text = f"\n*** {self.fighter2.name} stops {self.fighter1.name}! {self.win_method} in round {self.current_round}! ***"
+            else:
+                log_text = f"\n*** {self.fighter1.name} stops {self.fighter2.name}! {self.win_method} in round {self.current_round}! ***"
+            self.fight_log.append(log_text)
 
     # ============================================================
     # MAIN SIMULATION GENERATOR
@@ -632,6 +788,27 @@ class Fight:
                     if pace_text:
                         self.fight_log.append(pace_text)
 
+                # Periodic leg damage commentary (every 10 actions)
+                if action_idx % 10 == 0 and not self.winner:
+                    self._apply_leg_damage_effects(self.f1_state, 1)
+                    self._apply_leg_damage_effects(self.f2_state, 2)
+
+                # Ring generalship check (every 6 actions)
+                if action_idx % 6 == 0 and not self.winner:
+                    self._check_ring_generalship()
+
+                # Pattern recognition check (every 8 actions)
+                if action_idx % 8 == 0 and not self.winner:
+                    self._check_pattern_recognition()
+
+                # Rib injury effect: reduced striking power
+                if self.f1_state.get("rib_injury_active") and action_idx % 3 == 0:
+                    if random.random() < 0.3:
+                        self.fight_log.append(f"{self.fighter1.name} is hampered by rib damage!")
+                if self.f2_state.get("rib_injury_active") and action_idx % 3 == 0:
+                    if random.random() < 0.3:
+                        self.fight_log.append(f"{self.fighter2.name} is hampered by rib damage!")
+
                 self._simulate_action(phase=phase)
 
                 if not self.winner and round_num >= 2 and action_idx > 0 and action_idx % 15 == 0 and random.random() < 0.3:
@@ -655,6 +832,23 @@ class Fight:
                 # Yield action result with time stamp
                 if self.fight_log:
                     last = self.fight_log[-1]
+                    # Determine crowd reaction and sound cue based on event
+                    reaction = None
+                    sound = None
+                    sev_lower = (self._last_severity or "").lower()
+                    if "devastating" in sev_lower or "critical" in sev_lower:
+                        reaction = "eruption"
+                    elif "flush" in sev_lower:
+                        reaction = "cheer"
+                    elif "solid" in sev_lower:
+                        reaction = "gasp"
+                    if "CRITICAL" in (self._last_severity or "") or "Devastating" in (self._last_severity or ""):
+                        sound = "impact"
+                    if self.crowd_excitement > 80:
+                        reaction = reaction or "cheer"
+                    elif self.crowd_excitement < 25:
+                        reaction = reaction or "silence"
+
                     event = {"type": "action", "text": last, "round": round_num,
                              "f1_health": self._get_display_health(self.fighter1),
                              "f2_health": self._get_display_health(self.fighter2),
@@ -663,7 +857,12 @@ class Fight:
                              "f1_total_score": self._get_total_score_for(1),
                              "f2_total_score": self._get_total_score_for(2),
                              "time": self._get_time_str(),
-                             "severity": self._last_severity}
+                             "severity": self._last_severity,
+                             "f1_momentum": self.f1_momentum,
+                             "f2_momentum": self.f2_momentum,
+                             "crowd_excitement": self.crowd_excitement,
+                             "crowd_reaction": reaction,
+                             "sound_cue": sound}
                     yield event
 
                 # Mid-round AI adaptation (every 6 actions)
@@ -682,7 +881,9 @@ class Fight:
                            "f2_state": self.f2_machine.get_state(),
                            "f1_total_score": self._get_total_score_for(1),
                            "f2_total_score": self._get_total_score_for(2),
-                           "total_scores": self._get_total_scores()}
+                           "total_scores": self._get_total_scores(),
+                           "crowd_reaction": "eruption",
+                           "sound_cue": "ko_bell"}
                 elif "TKO" in self.win_method:
                     yield {"type": "knockout", "text": self.commentary.generate_tko_commentary(self.winner, self.loser, self.win_method),
                            "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
@@ -706,7 +907,9 @@ class Fight:
                            "f2_state": self.f2_machine.get_state(),
                            "f1_total_score": self._get_total_score_for(1),
                            "f2_total_score": self._get_total_score_for(2),
-                           "total_scores": self._get_total_scores()}
+                           "total_scores": self._get_total_scores(),
+                           "crowd_reaction": "cheer",
+                           "sound_cue": "bell"}
                 yield {"type": "post_fight",
                        "text": self.commentary.generate_post_fight(self.winner, self.win_method, self.current_round, False, self.loser)}
                 if self.winner and self.loser:
@@ -845,15 +1048,15 @@ class Fight:
     def _determine_actions_this_round(self, round_num: int) -> int:
         """
         Determine how many actions in this round based on fight pace.
-        Later rounds with high fatigue = fewer effective actions.
-        Early rounds = more actions, championship pacing.
+        Round-by-round fatigue acceleration:
+        R1: 1.0x, R2: 1.0x, R3: 1.5x, R4: 1.8x, R5: 2.2x
         """
         base_actions = random.randint(28, 40)
         avg_fatigue = (self.f1_state["fatigue_level"] + self.f2_state["fatigue_level"]) / 2
-        # Past round 3, fatigue reduces action count
-        if round_num > 3:
-            reduction = avg_fatigue * (round_num - 3) * 3
-            base_actions = max(15, int(base_actions - reduction))
+
+        fatigue_mult = {1: 1.0, 2: 1.0, 3: 1.5, 4: 1.8, 5: 2.2}.get(round_num, 1.5)
+        reduction = avg_fatigue * fatigue_mult * 2
+        base_actions = max(15, int(base_actions - reduction))
         return base_actions
 
     def _get_phase(self, progress: float) -> str:
@@ -893,8 +1096,21 @@ class Fight:
 
         state_mods = self.f1_machine.get_stat_modifier() if attacker == self.fighter1 else self.f2_machine.get_stat_modifier()
         if state_mods["accuracy"] <= 0.4:
-            # Fighter is essentially out — skip
             return
+
+        # === INVOLUNTARY REST (Oxygen Debt) ===
+        if atk_state["cardio_zone"] == "oxygen_debt" and random.random() < 0.08:
+            atk_state["stamina"] = max(0, atk_state["stamina"] - 2)
+            atk_state["fatigue_level"] = 1.0 - (atk_state["stamina"] / 100)
+            self.fight_log.append(f"{attacker.name} is gassed, taking a moment to breathe!")
+            self.referee.record_damage_taken(defender,
+                self.position_system.current_position in (Position.POCKET, Position.DISTANCE, Position.CLINCH),
+                attacker=attacker)
+            return
+
+        # === SECOND WIND CHECK ===
+        if self._check_second_wind(atk_state, attacker):
+            self.fight_log.append(f"{attacker.name} digs deep and finds a second wind!")
 
         # Ground game: use dedicated ground action system
         if Position.is_ground(self.position_system.current_position):
@@ -903,15 +1119,95 @@ class Fight:
             self.referee.record_damage_taken(defender, False, attacker=attacker)
             return
 
-        # Determine if combo or single strike
+        # === FEINT SYSTEM ===
         fight_iq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
         fatigue = atk_state["fatigue_level"]
 
+        # Check for feint
+        feint_mods = atk_strategy.get_modifiers()
+        feint_chance = calculate_feint_chance(fight_iq, feint_mods)
+        is_feint = random.random() < feint_chance
+
+        # Recognized feint? Defender with high IQ can see through it
+        def_iq = defender.get_effective_attribute("fight_iq", def_state["fatigue_level"])
+        def_adapt = defender.get_effective_attribute("adaptability", def_state["fatigue_level"])
+        feint_recognized = random.random() < calculate_feint_recognition(def_iq, def_adapt)
+
+        if is_feint and not feint_recognized and not Position.is_ground(self.position_system.current_position):
+            # Feint successful — build up feint stack
+            atk_state["feint_count"] = min(3, atk_state.get("feint_count", 0) + 1)
+            atk_state["feinted_last_action"] = True
+            # Stamina cost for feinting (minimal)
+            atk_state["stamina"] = max(0, atk_state["stamina"] - 1)
+            # Commentary
+            feint_lines = [
+                f"{attacker.name} feints high!",
+                f"{attacker.name} sells the jab!",
+                f"{attacker.name} feints a level change!",
+                f"{attacker.name} shows a kick, pulls it back!",
+                f"{attacker.name} fakes the takedown!",
+            ]
+            self.fight_log.append(random.choice(feint_lines))
+            self.referee.record_damage_taken(defender, True, attacker=attacker)
+            return
+        elif is_feint and feint_recognized:
+            # Defender read the feint — no penalty, and defender gains small momentum
+            self.fight_log.append(f"{defender.name} reads the feint by {attacker.name}!")
+            atk_state["feint_count"] = max(0, atk_state.get("feint_count", 0) - 1)
+            atk_state["feinted_last_action"] = True
+            def_num = 1 if defender == self.fighter1 else 2
+            self._update_momentum(def_num, 1)
+            self.referee.record_damage_taken(defender, True, attacker=attacker)
+            return
+
+        # Reset feint flag for real actions
+        atk_state["feinted_last_action"] = False
+
+        # Track action in opponent history (for pattern recognition)
+        def_state.get("opponent_action_history", []).append(f"{fight_iq:.0f}_{atk_strategy.current_strategy.get('id', 'unknown') if atk_strategy.current_strategy else 'unknown'}")
+        hist = def_state.get("opponent_action_history", [])
+        if len(hist) > 12:
+            def_state["opponent_action_history"] = hist[-12:]
+
+        # Low IQ freeze check (Phase 3C)
+        recog_iq = fight_iq * 0.6  # Recognition component
+        if recog_iq < 30 and atk_state.get("hurt", False) and random.random() < 0.15:
+            self.fight_log.append(f"{attacker.name} freezes up after getting hurt!")
+            self.referee.record_damage_taken(defender,
+                self.position_system.current_position in (Position.POCKET, Position.DISTANCE, Position.CLINCH),
+                attacker=attacker)
+            return
+
+        # High IQ trap setting (Phase 3C)
+        adapt_iq = fight_iq * 0.4  # Adaptation component
+        if adapt_iq > 70 and random.random() < 0.05 and def_state.get("feint_count", 0) > 0:
+            self.fight_log.append(f"{attacker.name} sets a trap, baiting a reaction!")
+            atk_state["feint_count"] = min(3, atk_state.get("feint_count", 0) + 1)
+
+        # Zone-based combo chance adjustment
+        cardio_zone = atk_state.get("cardio_zone", "aerobic")
+        zone_combo_mod = {"aerobic": 1.0, "anaerobic": 0.5, "oxygen_debt": 0.0}.get(cardio_zone, 1.0)
+
+        # Determine if combo or single strike
+        pos_for_combo = "standing"
+        if Position.is_ground(self.position_system.current_position):
+            pos_for_combo = "ground"
+        elif self.position_system.current_position == Position.CLINCH:
+            pos_for_combo = "clinch"
+
         combo_type = None
-        if random.random() < utils.calculate_combo_chance(fight_iq, fatigue):
-            available_combos = [c for c in COMBINATIONS if COMBINATIONS[c]["iq_req"] <= fight_iq]
-            if available_combos and random.random() < 0.4:  # 40% chance to combo
-                combo_type = random.choice(available_combos)
+        combo_chance = utils.calculate_combo_chance(fight_iq, fatigue) * zone_combo_mod
+        if random.random() < combo_chance:
+            available_combos = get_combos_for_position(pos_for_combo)
+            available_combos = [c for c in available_combos if c["iq_req"] <= fight_iq]
+            if available_combos:
+                # Heavier combos need more IQ to attempt
+                iq_weighted = []
+                for c in available_combos:
+                    weight = max(0.2, 1.0 - (c["iq_req"] - fight_iq) / 100.0)
+                    iq_weighted.extend([c] * int(weight * 10))
+                if iq_weighted:
+                    combo_type = random.choice(iq_weighted)["id"]
 
         if combo_type:
             self._execute_combo(attacker, defender, atk_state, def_state, atk_strategy, combo_type, phase, state_mods)
@@ -945,29 +1241,52 @@ class Fight:
             return
 
         strike_type = action_type
-        target = self._select_target(strike_type, pos, def_state)
+        target = self._select_target(strike_type, pos, def_state, strategy)
 
         self._perform_strike(attacker, defender, atk_state, def_state, strike_type, target, strategy, phase, state_mods)
 
     def _execute_combo(self, attacker, defender, atk_state, def_state, strategy, combo_key, phase, state_mods):
-        combo = COMBINATIONS[combo_key]
-        strikes = combo["strikes"]
+        combo_data = COMBINATIONS.get(combo_key)
+        if not combo_data:
+            self._execute_single_strike(attacker, defender, atk_state, def_state, strategy, phase, state_mods)
+            return
+        strikes = combo_data["strikes"]
         self.fight_log.append(f"{attacker.name} throws a {combo_key.replace('-', ' ')}!")
 
-        stamina_mult = combo.get("stamina_mult", 1.0)
-        base_bonus = combo.get("power_bonus", 0.0)
+        stamina_mult = combo_data.get("stamina_mult", 1.0)
+        base_bonus = combo_data.get("power_bonus", 0.0)
+
+        # Feint bonus applies to all strikes in the combo
+        feint_stack = atk_state.get("feint_count", 0)
+        combo_feint_bonus = 1.0 + feint_stack * 0.03  # smaller bonus per strike in combo
+        combo_power_bonus = base_bonus * combo_feint_bonus
 
         for i, strike_type in enumerate(strikes):
+            if self.winner:
+                break
+
             pos = self.position_system.current_position
-            target = self._select_target(strike_type, pos, def_state)
+
+            # For combos, some strike types need position mapping
+            actual_strike = strike_type
+            if strike_type == "kick" and pos != Position.DISTANCE:
+                actual_strike = "cross"  # adapt to position
+            elif strike_type in ("knee", "elbow") and not Position.is_ground(pos) and pos != Position.CLINCH:
+                actual_strike = random.choice(["hook", "uppercut"])  # adapt to position
+
+            target = self._select_target(actual_strike, pos, def_state, strategy)
 
             # Combos have slightly reduced accuracy on later strikes
-            accuracy_penalty = 1.0 - (i * 0.08)
+            accuracy_penalty = 1.0 - (i * 0.07)
             mod_copy = state_mods.copy()
             mod_copy["accuracy"] *= accuracy_penalty
 
-            self._perform_strike(attacker, defender, atk_state, def_state, strike_type, target,
-                                strategy, phase, mod_copy, combo_bonus=base_bonus, stamina_mult=stamina_mult)
+            self._perform_strike(attacker, defender, atk_state, def_state, actual_strike, target,
+                                strategy, phase, mod_copy, combo_bonus=combo_power_bonus, stamina_mult=stamina_mult)
+
+            # Reset feint stack after combo finishes
+            if i == len(strikes) - 1:
+                atk_state["feint_count"] = 0
 
             # Defender can be staggered mid-combo
             head_pct = defender.get_zone_health_pct("jaw") * 0.5 + defender.get_zone_health_pct("temple") * 0.5
@@ -1041,18 +1360,45 @@ class Fight:
 
         if choice == "strike":
             fight_iq = 50
-            return self._select_specific_strike(pos, fight_iq)
+            return self._select_specific_strike(pos, fight_iq, strategy)
         elif choice == "takedown":
             return "takedown_attempt"
         elif choice == "clinch":
             return "clinch_attempt"
         return "jab"
 
-    def _select_specific_strike(self, pos, fight_iq=50) -> str:
+    def _select_specific_strike(self, pos, fight_iq=50, strategy=None) -> str:
+        # Strategy influences strike type selection
+        kick_bias = 0.0
+        body_bias = 0.0
+        if strategy and strategy.current_strategy:
+            sid = strategy.current_strategy.get("id")
+            if sid == "leg_kick_focus":
+                kick_bias = 0.30
+            elif sid == "kickboxing_focus":
+                kick_bias = 0.15
+            elif sid == "muay_thai_focus":
+                kick_bias = 0.10
+            elif sid == "body_shot_focus":
+                body_bias = 0.20
+
+            # Boxing focus prefers punches
+            if sid in ("boxing_focus", "power_hunting"):
+                kick_bias = -0.10
+
         if pos == Position.DISTANCE:
+            # Mix of kicks and punches based on strategy
+            types = ["jab", "cross", "kick"]
             if random.random() < 0.15 + fight_iq / 500:
-                return random.choice(["jab", "cross", "kick", "superman_punch"])
-            return random.choice(["jab", "cross", "kick"])
+                types.append("superman_punch")
+            # Apply kick bias by adjusting probabilities
+            if kick_bias > 0:
+                types.extend(["kick"] * int(kick_bias * 10))
+            elif kick_bias < 0:
+                # Reduce kicks
+                if "kick" in types:
+                    types.remove("kick")
+            return random.choice(types)
         elif pos == Position.POCKET:
             return random.choice(["jab", "cross", "hook", "uppercut", "knee", "elbow"])
         elif pos in (Position.CLINCH,):
@@ -1061,29 +1407,114 @@ class Fight:
             return random.choice(["hammerfist", "elbow", "punch"])
         return "jab"
 
-    def _select_target(self, strike_type, pos, def_state) -> str:
-        """Select body target based on strike type and strategy context."""
+    def _select_target(self, strike_type, pos, def_state, strategy=None) -> str:
+        """Aimed targeting based on strike type — different strikes favor different zones."""
         is_kick = "kick" in strike_type
         is_ground = Position.is_ground(pos)
 
+        # Strategy-dependent target bias
+        body_bias = 0.0
+        leg_bias = 0.0
+        head_bias = 0.0
+        if strategy:
+            mods = strategy.get_modifiers()
+            body_bias = mods.get("body_damage_bonus", 0.0) - 1.0 if mods.get("body_damage_bonus") else 0.0
+            kick_bonus = mods.get("kick_power", 1.0)
+
         if is_kick:
-            # Leg kicks become more likely as fight progresses
-            return random.choice(["head", "body", "legs"])
+            r = random.random()
+            # Leg kick focus increases leg target chance
+            if strategy and strategy.current_strategy and strategy.current_strategy.get("id") == "leg_kick_focus":
+                if r < 0.65:
+                    return "legs"
+                elif r < 0.85:
+                    return "body"
+                else:
+                    return "head"
+            if r < 0.40:
+                return "legs"
+            elif r < 0.75:
+                return "body"
+            else:
+                return "head"
 
         if is_ground:
-            return random.choice(["head", "body"])
+            return random.choice(["head", "head", "body", "body", "jaw"])
 
-        if strike_type in ("jab", "cross"):
-            # Head-focused but some body work
-            return random.choice(["head", "head", "head", "body", "jaw"])
-        elif strike_type in ("hook", "uppercut"):
-            return random.choice(["head", "jaw", "body"])
+        if strike_type == "jab":
+            r = random.random()
+            if r < 0.40:
+                return "nose"
+            elif r < 0.65:
+                return "jaw"
+            elif r < 0.85:
+                return "head"
+            else:
+                return "body"
+        elif strike_type == "cross":
+            r = random.random()
+            if r < 0.35:
+                return "jaw"
+            elif r < 0.55:
+                return "temple"
+            elif r < 0.75:
+                return "nose"
+            elif r < 0.90:
+                return "head"
+            else:
+                return "body"
+        elif strike_type == "hook":
+            r = random.random()
+            if r < 0.40:
+                return "temple"
+            elif r < 0.70:
+                return "jaw"
+            elif r < 0.85:
+                return "head"
+            else:
+                return "body"
+        elif strike_type == "uppercut":
+            r = random.random()
+            if r < 0.50:
+                return "jaw"
+            elif r < 0.75:
+                return "body"
+            else:
+                return "head"
         elif strike_type in ("knee", "elbow"):
-            return random.choice(["head", "body"])
+            r = random.random()
+            if r < 0.50:
+                return "head"
+            elif r < 0.80:
+                return "body"
+            else:
+                return "jaw"
         elif strike_type == "body_shot":
-            return "body"
+            r = random.random()
+            if r < 0.40:
+                return "solar_plexus"
+            elif r < 0.75:
+                return "liver"
+            else:
+                return "ribs"
+        elif strike_type == "superman_punch":
+            r = random.random()
+            if r < 0.55:
+                return "head"
+            elif r < 0.35:
+                return "jaw"
+            else:
+                return "body"
 
-        return random.choice(["head", "body", "jaw"])
+        # Default with body/head bias from strategy
+        r = random.random() * 1.0
+        r -= body_bias * 0.3  # body_bias shifts probability toward body
+        if r < 0.50:
+            return random.choice(["head", "head", "jaw", "temple"])
+        elif r < 0.75:
+            return "body"
+        else:
+            return random.choice(["jaw", "temple", "nose"])
 
     def _perform_strike(self, attacker, defender, atk_state, def_state,
                         strike_type, target, strategy, phase, state_mods,
@@ -1112,15 +1543,65 @@ class Fight:
         # Reach advantage
         reach_mod = self.position_system.get_reach_advantage(attacker, defender)
 
+        # Momentum modifier
+        attacker_num = 1 if attacker == self.fighter1 else 2
+        momentum_mod = self.get_momentum_modifier(attacker_num)
+
+        # Crowd modifier
+        crowd_mod = self.get_crowd_modifier(attacker_num)
+
+        # === STANCE MODIFIERS ===
+        a_stance = self.fighter1_stance if attacker == self.fighter1 else self.fighter2_stance
+        d_stance = self.fighter2_stance if attacker == self.fighter1 else self.fighter1_stance
+        stance_mods = get_stance_modifiers(a_stance, d_stance)
+        power_stance_mod = stance_mods["power_mod"]
+        speed_stance_mod = stance_mods["speed_mod"]
+        acc_stance_mod = stance_mods["accuracy_mod"]
+
+        # Power hand bonus: rear hand strikes (cross, rear hook, uppercut from rear) get +10%
+        rear_hand_strikes = ["cross", "hook", "uppercut"]
+        power_hand_bonus = 1.10 if strike_type in rear_hand_strikes else 1.0
+        lead_hand_speed_bonus = 1.08 if strike_type == "jab" else 1.0
+
+        # === PRECISION ROLL ===
+        # Gaussian variance in how cleanly a strike lands
+        precision = max(0.4, min(1.6, random.gauss(1.0, 0.15)))
+
+        # === FEINT BONUS ===
+        feint_stack = atk_state.get("feint_count", 0)
+        feint_acc_bonus = 1.0 + feint_stack * 0.08
+        feint_power_bonus = 1.0 + feint_stack * 0.05
+        feint_crit_bonus = 1.0 + feint_stack * 0.10
+
         # State modifiers from fighter state machine
-        power = attacker.get_effective_attribute(power_attr, atk_state["fatigue_level"]) * sp_mod * phase_power
-        speed = attacker.get_effective_attribute(speed_attr, atk_state["fatigue_level"]) * hs_mod
+        # Leg damage effects: kick power reduced by rear leg damage, movement by both
+        attacker_fstate = self.f1_state if attacker == self.fighter1 else self.f2_state
+        if is_kick:
+            kick_penalty = self._get_leg_kick_penalty(attacker_fstate)
+        else:
+            kick_penalty = 1.0
+        move_mod = self._get_leg_damage_modifier(attacker_fstate)
+        # Leg-damaged fighters move slower, affecting speed of action
+        leg_speed_mod = max(0.7, move_mod)
+
+        # Rib injury penalty: reduced striking power
+        if attacker_fstate.get("rib_injury_active"):
+            rib_power_penalty = 0.85
+        else:
+            rib_power_penalty = 1.0
+
+        power = (attacker.get_effective_attribute(power_attr, atk_state["fatigue_level"])
+                 * sp_mod * phase_power * momentum_mod * crowd_mod
+                 * power_stance_mod * power_hand_bonus * feint_power_bonus * kick_penalty * rib_power_penalty)
+        speed = (attacker.get_effective_attribute(speed_attr, atk_state["fatigue_level"])
+                 * hs_mod * speed_stance_mod * lead_hand_speed_bonus * leg_speed_mod)
         raw_accuracy = attacker.get_effective_attribute(accuracy_attr, atk_state["fatigue_level"])
 
         # Composite accuracy calculation
         accuracy = raw_accuracy * (speed / 100) * reach_mod * (1.0 + fight_iq / 600)
         accuracy *= (0.8 if phase == "feeling_out" else (1.15 if phase == "desperation" else 1.0))
         accuracy *= state_mods.get("accuracy", 1.0)
+        accuracy *= acc_stance_mod * feint_acc_bonus * precision
 
         # Vision penalty from blood/swelling
         blood_penalty = self._get_blood_penalty(attacker)
@@ -1140,6 +1621,10 @@ class Fight:
         # Fatigue impact on accuracy
         fatigue = atk_state["fatigue_level"]
         accuracy *= max(0.5, 1.0 - fatigue * 0.4)
+
+        # Cardio zone accuracy penalty
+        _, _, zone_acc_penalty = self._get_cardio_zone(atk_state)
+        accuracy *= (1.0 - zone_acc_penalty)
 
         # Clamp accuracy
         accuracy = utils.clamp(accuracy, 3, 98)
@@ -1185,15 +1670,39 @@ class Fight:
         damage = max(1, int(raw_damage))
 
         # Target-specific modifiers
-        if target == "body":
+        if target in ("body", "ribs"):
             damage = int(damage * 0.8)
+        elif target in ("solar_plexus",):
+            damage = int(damage * 0.9)  # Less raw damage, more stun effect
+        elif target == "liver":
+            damage = int(damage * 1.1)  # More damage to liver
         elif target == "legs":
             damage = int(damage * 0.55)
         elif target in ("jaw", "temple"):
             damage = int(damage * 1.2)
+        elif target == "nose":
+            damage = int(damage * 0.85)
 
         # Apply damage to zone
         actual_damage = defender.apply_damage_to_zone(target, damage, self)
+
+        # Momentum updates
+        attacker_num = 1 if attacker == self.fighter1 else 2
+        tier_name = tier["name"]
+        kd_chance = tier.get("knockdown_chance", 0)
+        if is_critical:
+            self._update_momentum(attacker_num, 8)
+            self._update_momentum(3 - attacker_num, -5)
+            self._update_crowd_excitement(8)
+        elif tier_name in ("Devastating", "Flush"):
+            self._update_momentum(attacker_num, 5)
+            self._update_momentum(3 - attacker_num, -3)
+            self._update_crowd_excitement(5)
+        elif tier_name in ("Solid",):
+            self._update_momentum(attacker_num, 2)
+            self._update_crowd_excitement(3)
+        elif tier_name in ("Glancing", "Blocked"):
+            self._update_momentum(3 - attacker_num, 1)
 
         # Update state tracking
         if attacker == self.fighter1:
@@ -1205,17 +1714,80 @@ class Fight:
             self.f2_state["significant_strikes_landed"] += 1
             self.f2_state["rounds_damage_dealt"].append(actual_damage)
 
-        # Update body fatigue
+        # Update body fatigue (now targeted by body sub-targets too)
         defender_state = def_state
-        if target == "body":
+        if target in ("body", "solar_plexus", "liver", "ribs", "chest"):
             defender_state["body_fatigue"] = min(100, defender_state["body_fatigue"] + actual_damage * 0.5)
             # Body damage drains attacker stamina too (body shots are tiring)
             stamina_drain = int(actual_damage * 0.3)
             atk_state["stamina"] = max(0, atk_state["stamina"] - stamina_drain)
 
-        # Leg damage tracking
+        # === BREATHING SYSTEM ===
+        if target in ("body", "solar_plexus", "liver", "ribs", "chest"):
+            breathing_reduction = actual_damage * 0.6
+            defender_state["breathing_capacity"] = max(0, defender_state["breathing_capacity"] - breathing_reduction)
+            # Commentary at thresholds
+            br = defender_state["breathing_capacity"]
+            if br < 30 and random.random() < 0.4:
+                self.fight_log.append(f"{defender.name} can barely breathe!")
+            elif br < 50 and random.random() < 0.3:
+                self.fight_log.append(f"{defender.name} is gasping for air!")
+
+        # === LIVER SHOT SYSTEM ===
+        if target == "liver":
+            defender_state["liver_damage"] = min(100, defender_state["liver_damage"] + actual_damage)
+            ld = defender_state["liver_damage"]
+            fold_chance = 0
+            if ld >= 30:
+                fold_chance = (ld - 20) / 80.0
+            if ld >= 50:
+                fold_chance = (ld - 10) / 60.0
+            if ld >= 70:
+                fold_chance = 1.0
+            if random.random() < fold_chance:
+                defender_state["stunned"] = True
+                defender_state["stunned_timer"] = random.randint(2, 4)
+                self.fight_log.append(f"LIVER SHOT! {defender.name} is folding!")
+
+        # === SOLAR PLEXUS STAMINA BURST ===
+        if target == "solar_plexus" and tier["name"] in ("Solid", "Flush", "Devastating"):
+            # Immediate stamina drain
+            stamina_burst = 8 + int(actual_damage * 0.5)
+            defender_state["stamina"] = max(0, defender_state["stamina"] - stamina_burst)
+            defender_state["fatigue_level"] = 1.0 - (defender_state["stamina"] / 100)
+            if random.random() < 0.35:
+                defender_state["stunned"] = True
+                defender_state["stunned_timer"] = random.randint(1, 2)
+                self.fight_log.append(f"{defender.name} is winded from the solar plexus shot! {stamina_burst} stamina drained!")
+            else:
+                self.fight_log.append(f"{defender.name} feels that body shot — gasps!")
+
+        # === RIBS INJURY ACCUMULATION ===
+        if target == "ribs" and tier["name"] in ("Solid", "Flush", "Devastating"):
+            defender_state["rib_damage"] = defender_state.get("rib_damage", 0) + actual_damage
+            rib_dmg = defender_state["rib_damage"]
+            if rib_dmg > 60 and random.random() < 0.15:
+                self.fight_log.append(f"{defender.name} may have broken ribs from that shot! Power and cardio affected!")
+                defender_state["body_fatigue"] = min(100, defender_state["body_fatigue"] + 15)
+                # Also reduce striking power for the rest of the fight
+                defender_state["rib_injury_active"] = True
+            elif rib_dmg > 40 and random.random() < 0.10:
+                self.fight_log.append(f"{defender.name} winces from the rib shot!")
+                defender_state["body_fatigue"] = min(100, defender_state["body_fatigue"] + 8)
+            elif rib_dmg > 20 and random.random() < 0.05:
+                self.fight_log.append(f"Body shot to the ribs! {defender.name} is feeling that!")
+
+        # Per-leg damage tracking (increased accumulation for visible impact)
         if target == "legs":
+            leg_target = random.choice(["lead_leg", "rear_leg"])
+            leg_accum = actual_damage * 1.2  # Increased from 0.6
+            if leg_target == "lead_leg":
+                defender_state["lead_leg_damage"] = min(100, defender_state["lead_leg_damage"] + leg_accum)
+            else:
+                defender_state["rear_leg_damage"] = min(100, defender_state["rear_leg_damage"] + leg_accum)
             defender_state["leg_damage"] = min(100, defender_state["leg_damage"] + actual_damage * 0.6)
+        elif target in ("lead_leg", "rear_leg"):
+            defender_state[f"{target}_damage"] = min(100, defender_state.get(f"{target}_damage", 0) + actual_damage * 1.2)
 
         # Head damage tracking
         if target in ("head", "jaw", "temple", "left_eye", "right_eye", "nose"):
@@ -1240,7 +1812,7 @@ class Fight:
                 break
 
         # Stamina drain for defender from body damage
-        if target == "body":
+        if target in ("body", "solar_plexus", "liver", "ribs", "chest"):
             body_damage = defender_state["body_fatigue"]
             bd_effects = utils.get_body_damage_level(body_damage)
             if bd_effects:
@@ -1250,7 +1822,6 @@ class Fight:
         # Check for stun and state transitions
         head_pct = defender.get_group_health("head")
         body_pct = defender.get_group_health("body")
-        leg_pct = defender.get_group_health("legs")
 
         # Mark hurt state
         if head_pct < 55 or body_pct < 45:
@@ -1310,6 +1881,62 @@ class Fight:
         vision_damage = tier.get("vision_damage", 0) * 100
         def_state["vision_impairment"] = min(80, def_state["vision_impairment"] + vision_damage)
 
+    def _get_leg_damage_modifier(self, fighter_state: dict) -> float:
+        """Return movement modifier based on cumulative leg damage (0.0-1.0)."""
+        lead = fighter_state.get("lead_leg_damage", 0)
+        rear = fighter_state.get("rear_leg_damage", 0)
+        avg = (lead + rear) / 2
+        if avg < 20:
+            return 1.0
+        elif avg < 40:
+            return 0.92
+        elif avg < 60:
+            return 0.78
+        elif avg < 80:
+            return 0.55
+        else:
+            return 0.30
+
+    def _get_leg_takedown_penalty(self, fighter_state: dict) -> float:
+        """Return takedown defense modifier based on lead leg damage."""
+        lead = fighter_state.get("lead_leg_damage", 0)
+        if lead < 20:
+            return 1.0
+        elif lead < 40:
+            return 0.92
+        elif lead < 60:
+            return 0.80
+        elif lead < 80:
+            return 0.60
+        else:
+            return 0.40
+
+    def _get_leg_kick_penalty(self, fighter_state: dict) -> float:
+        """Return kick power modifier based on rear leg damage."""
+        rear = fighter_state.get("rear_leg_damage", 0)
+        if rear < 20:
+            return 1.0
+        elif rear < 40:
+            return 0.85
+        elif rear < 60:
+            return 0.60
+        elif rear < 80:
+            return 0.35
+        else:
+            return 0.15
+
+    def _apply_leg_damage_effects(self, fighter_state: dict, fighter_num: int):
+        """Apply leg damage effects to state machine and log commentary at thresholds."""
+        lead = fighter_state.get("lead_leg_damage", 0)
+        rear = fighter_state.get("rear_leg_damage", 0)
+        # Log commentary at thresholds
+        if lead > 50 and random.random() < 0.15:
+            fighter = self.fighter1 if fighter_num == 1 else self.fighter2
+            self.fight_log.append(f"{fighter.name}'s lead leg is chewed up!")
+        if rear > 50 and random.random() < 0.15:
+            fighter = self.fighter1 if fighter_num == 1 else self.fighter2
+            self.fight_log.append(f"{fighter.name}'s rear leg is giving out!")
+
     def _get_composite_defense(self, defender, def_state, atk_state) -> float:
         """
         Calculate complete defensive rating for this moment.
@@ -1340,6 +1967,14 @@ class Fight:
         if vision > 20:
             defense *= max(0.6, 1.0 - (vision - 20) / 200.0)
 
+        # Leg damage reduces defensive movement
+        leg_mod = self._get_leg_damage_modifier(def_state)
+        defense *= (0.6 + 0.4 * leg_mod)
+
+        # Pattern read bonus — defender reads attacker's patterns
+        if def_state.get("pattern_read"):
+            defense *= def_state.get("pattern_read_bonus", 1.0)
+
         # Guard up when hurt — bonus defense but costs stamina
         if def_state["hurt"]:
             # Higher fight IQ = better defensive reads when hurt
@@ -1347,15 +1982,63 @@ class Fight:
 
         return utils.clamp(defense, 10, 95)
 
+    def _get_cardio_zone(self, state: dict) -> tuple:
+        """Determine cardio zone and return (zone_name, zone_penalty_modifier)."""
+        fatigue = state["fatigue_level"]
+        stamina = state["stamina"]
+        if stamina > 45:
+            return ("aerobic", 1.0, 0.0)
+        elif stamina > 20:
+            anaerobic_pct = (45 - stamina) / 25.0
+            accuracy_penalty = anaerobic_pct * 0.15  # Up to -15% at 20 stamina
+            return ("anaerobic", 1.25, accuracy_penalty)
+        else:
+            oxygen_debt_pct = (20 - stamina) / 20.0
+            accuracy_penalty = 0.15 + oxygen_debt_pct * 0.45  # 15-60% at 0 stamina
+            return ("oxygen_debt", 1.50, accuracy_penalty)
+
+    def _check_second_wind(self, state: dict, fighter_obj) -> bool:
+        """Check if fighter gets a second wind surge."""
+        if state.get("second_wind_used"):
+            return False
+        if state["fatigue_level"] < 0.85:
+            return False
+        heart = fighter_obj.get_effective_attribute("heart", state["fatigue_level"])
+        chance = (heart / 200.0) * (1.0 - state["fatigue_level"])
+        if random.random() < chance:
+            recovery = 15 + int(heart * 0.05)
+            state["stamina"] = min(100, state["stamina"] + recovery)
+            state["fatigue_level"] = 1.0 - (state["stamina"] / 100)
+            state["second_wind_used"] = True
+            return True
+        return False
+
     def _apply_stamina_cost(self, state, action_key: str, fatigue: float, cardio: int, stamina_mult: float = 1.0):
         base_cost = STAMINA_COST.get(action_key, 2)
         cardio_eff = cardio / 100.0
-        cost = base_cost * (1.15 - cardio_eff * 0.2)
-        cost *= (1.0 + fatigue * 0.3)
 
+        # Zone-based stamina cost scaling
+        zone, zone_mult, _ = self._get_cardio_zone(state)
+        state["cardio_zone"] = zone
+
+        # Base cost with cardio efficiency
+        cost = base_cost * (1.20 - cardio_eff * 0.3)
+        cost *= (1.0 + fatigue * 0.2)  # Fatigue scaling (reduced from 0.3)
+
+        # Anaerobic zone: +25% cost
+        if zone == "anaerobic":
+            cost *= 1.25
+        elif zone == "oxygen_debt":
+            cost *= 1.50
+
+        # Combo escalation
         combo_count = state.get("combo_count", 0)
         if combo_count > 3:
-            cost *= (1.0 + (combo_count - 3) * 0.1)
+            cost *= (1.0 + (combo_count - 3) * 0.15)
+
+        # Takedown/clinch burst actions cost more in oxygen debt
+        if zone == "oxygen_debt" and action_key in ("takedown_attempt", "clinch_attempt", "stand_up", "sweep"):
+            cost *= 1.3
 
         cost *= stamina_mult
         cost *= max(0.75, 1.0 - (cardio / 150.0))
@@ -1411,14 +2094,16 @@ class Fight:
         weight_advantage = utils.clamp(weight_advantage, -0.3, 0.3)
         temp_power *= (1.0 + weight_advantage)
 
-        # Leg damage reduces takedown power
-        if attacker == self.fighter1:
-            leg_penalty = 1.0 - (self.f1_state["leg_damage"] / 300.0)
-        else:
-            leg_penalty = 1.0 - (self.f2_state["leg_damage"] / 300.0)
-        temp_power *= max(0.7, leg_penalty)
+        # Per-leg damage reduces takedown power (attacker) and helps defense (defender)
+        att_state = self._get_attacker_state(attacker)
+        def_state = self._get_opponent_state(attacker)
+        att_leg_mod = self._get_leg_takedown_penalty(att_state)
+        def_leg_mod = self._get_leg_takedown_penalty(def_state)
 
-        attacker.takedown_power_temp *= leg_penalty
+        temp_power *= att_leg_mod
+        # Defender's damaged legs also make them easier to take down
+        # (leg_mod near 1 = healthy, lower = damaged = easier to take down)
+        temp_power *= (2.0 - def_leg_mod)
 
         defender_state = self._get_opponent_state(attacker)
         self._apply_stamina_cost(
@@ -1775,23 +2460,51 @@ class Fight:
             self.f2_state["effective_grappling_points"] += grapple_pts
 
     def _round_end_effects(self, round_num: int):
-        """Apply end-of-round effects: stamina recovery, injury checks."""
-        for state in [self.f1_state, self.f2_state]:
-            # Stamina recovery between rounds
-            stamina_recovery = 20 + state.get("stamina", 100) * 0.15
+        """Apply end-of-round effects: stamina recovery, injury checks, cut progression, breathing."""
+        is_title_round = round_num >= 4 and self.is_title_fight
+
+        for idx, (state, fighter) in enumerate([(self.f1_state, self.fighter1), (self.f2_state, self.fighter2)]):
+            # Stamina recovery between rounds — affected by breathing + cardio
+            breathing_cap = state.get("breathing_capacity", 100)
+            breathing_mod = get_breathing_recovery_modifier(breathing_cap)
+            title_penalty = 0.33 if is_title_round else 1.0
+
+            # Scale recovery by cardio attribute
+            cardio_attr = fighter.get_effective_attribute("cardio", 0)
+            cardio_recovery_mod = 0.5 + (cardio_attr / 100.0)  # 0.5 at 0 cardio, 1.5 at 100
+            stamina_recovery = (15 + state.get("stamina", 100) * 0.12) * breathing_mod * title_penalty * cardio_recovery_mod
             state["stamina"] = min(100, state["stamina"] + stamina_recovery)
             state["fatigue_level"] = 1.0 - (state["stamina"] / 100)
+
+            # Breathing recovery between rounds
+            breathing_recovery = BREATHING_RECOVERY_BETWEEN_ROUNDS
+            if is_title_round and breathing_cap < 30:
+                breathing_recovery = 5  # very little recovery in deep title rounds
+            elif is_title_round:
+                breathing_recovery = 10
+            state["breathing_capacity"] = min(100, breathing_cap + breathing_recovery)
+
+            # Leg damage recovery (10% per round, corner work adds 15%)
+            state["lead_leg_damage"] = max(0, state.get("lead_leg_damage", 0) - 10)
+            state["rear_leg_damage"] = max(0, state.get("rear_leg_damage", 0) - 10)
+            state["leg_damage"] = (state.get("lead_leg_damage", 0) + state.get("rear_leg_damage", 0)) / 2
 
             # Reduce stun/hurt timers
             state["stunned_timer"] = max(0, state["stunned_timer"] - 2)
             if state["stunned_timer"] == 0:
                 state["stunned"] = False
 
-            # Reduce swelling slightly
+            # Reduce swelling slightly (cut man between rounds)
             state["swelling"] = max(0, state["swelling"] - 5)
+
+            # Cut progression: cuts worsen if not managed between rounds
+            for cut in state.get("cuts", []):
+                if random.random() < 0.2:
+                    cut["severity"] = min(1.0, cut["severity"] * 1.3)
 
             # Reset combo tracking
             state["combo_count"] = 0
+            state["feint_count"] = 0
 
     # ============================================================
     # STRIKE CHECKS
@@ -1820,32 +2533,51 @@ class Fight:
         jaw_health = defender.get_zone_health("jaw")
         temple_health = defender.get_zone_health("temple")
         overall_head = defender.get_group_health("head")
+        ko_stage = def_state.get("ko_stage", 0)
 
-        if jaw_health <= 0 or temple_health <= 0 or overall_head <= 10:
-            def_state["knockdown_count"] += 1
-            if attacker == self.fighter1:
-                self.f1_knockdowns_this_round += 1
-            else:
-                self.f2_knockdowns_this_round += 1
-            def_state["knockdown"] = True
-            def_state["stunned"] = False
-            def_state["stunned_timer"] = 0
-            def_state["unanswered_ground_strikes"] = 0
+        # Determine if knockdown happens
+        knockdown = False
+        if jaw_health <= 5 or temple_health <= 5:
+            knockdown = True
+        elif overall_head <= 15:
+            knockdown = True
+        elif ko_stage >= 3 and self._last_severity in ("Flush", "Devastating"):
+            knockdown = True
+        elif ko_stage >= 2 and self._last_severity == "Devastating":
+            knockdown = random.random() < 0.5
 
-            self.fight_log.append(self.commentary.generate_knockdown_commentary(defender))
-            self.fight_log.append(f"{defender.name} goes down! {attacker.name} follows them to the ground!")
+        if not knockdown:
+            return False
 
-            if overall_head <= 4:
-                self.winner = attacker
-                self.loser = defender
-                self.win_method = "KO"
-                self.win_round = self.current_round
-                self.fight_log.append(f"{defender.name} is out cold!")
-                return True
+        attacker_num = 1 if attacker == self.fighter1 else 2
+        self._update_momentum(attacker_num, 15)
+        self._update_momentum(3 - attacker_num, -15)
+        self._update_crowd_excitement(15)
 
-            self.position_system._set_ground(attacker, defender, Position.GROUND_GUARD)
+        def_state["knockdown_count"] += 1
+        if attacker == self.fighter1:
+            self.f1_knockdowns_this_round += 1
+        else:
+            self.f2_knockdowns_this_round += 1
+        def_state["knockdown"] = True
+        def_state["stunned"] = False
+        def_state["stunned_timer"] = 0
+        def_state["unanswered_ground_strikes"] = 0
+
+        self.fight_log.append(self.commentary.generate_knockdown_commentary(defender))
+        self.fight_log.append(f"{defender.name} goes down! {attacker.name} follows them to the ground!")
+
+        # Check if this is an instant KO (head critical damage or stage 4)
+        if ko_stage >= 4 or overall_head <= 4 or (ko_stage >= 3 and overall_head <= 15):
+            self.winner = attacker
+            self.loser = defender
+            self.win_method = "KO"
+            self.win_round = self.current_round
+            self.fight_log.append(f"{defender.name} is out cold!")
             return True
-        return False
+
+        self.position_system._set_ground(attacker, defender, Position.GROUND_GUARD)
+        return True
 
     # ============================================================
     # ROUND SCORING
@@ -1866,11 +2598,36 @@ class Fight:
         f2_avg = sum(j.scores[-1][1] for j in self.judges) / 3.0
         score_text = f"{int(f1_avg)}-{int(f2_avg)}"
 
-        # Scorecard update commentary
-        self.fight_log.append(f"End of Round {round_num}:")
-        for judge in self.judges:
-            self.fight_log.append(f"  {judge.name}: {judge.scores[r_idx][0]}-{judge.scores[r_idx][1]}")
-        self.fight_log.append(f"  Score: {score_text}")
+        # Enhanced scoring commentary (Phase 4A)
+        rd = self._gather_round_data()
+        f1_damage = self._calc_effective_striking(self.fighter1, self.f1_state)
+        f2_damage = self._calc_effective_striking(self.fighter2, self.f2_state)
+        f1_grapple = self._calc_effective_grappling(self.fighter1, self.f1_state)
+        f2_grapple = self._calc_effective_grappling(self.fighter2, self.f2_state)
+        f1_kd = self.f1_knockdowns_this_round
+        f2_kd = self.f2_knockdowns_this_round
+
+        deciding_factor = None
+        if f1_kd != f2_kd:
+            decider = self.fighter1 if f1_kd > f2_kd else self.fighter2
+            deciding_factor = f"{decider.name}'s knockdown was the difference"
+        elif abs(f1_damage - f2_damage) > 15:
+            decider = self.fighter1 if f1_damage > f2_damage else self.fighter2
+            deciding_factor = f"Effective striking by {decider.name}"
+        elif abs(f1_grapple - f2_grapple) > 3:
+            decider = self.fighter1 if f1_grapple > f2_grapple else self.fighter2
+            deciding_factor = f"{decider.name}'s ground control"
+
+        if not deciding_factor:
+            f1_strikes = self.f1_state.get("significant_strikes_landed", 0)
+            f2_strikes = self.f2_state.get("significant_strikes_landed", 0)
+            if f1_strikes != f2_strikes:
+                decider = self.fighter1 if f1_strikes > f2_strikes else self.fighter2
+                deciding_factor = f"{decider.name} out-landed their opponent"
+
+        if deciding_factor:
+            self.fight_log.append(f"Round {round_num}: {deciding_factor}")
+        self.fight_log.append(f"Score: {score_text}")
 
     def _gather_round_data(self) -> dict:
         """Gather data for round scoring based on 10-point must system criteria."""
@@ -1920,31 +2677,114 @@ class Fight:
     # ============================================================
 
     def _check_ai_mid_round(self):
-        """More frequent AI adaptation during rounds."""
-        f1_total = sum(sum(j.scores[r][0] for j in self.judges) for r in range(len(self.judges[0].scores))) if self.judges[0].scores else 0
-        f2_total = sum(sum(j.scores[r][1] for j in self.judges) for r in range(len(self.judges[0].scores))) if self.judges[0].scores else 0
-
+        """More frequent AI adaptation during rounds — uses strategy drift."""
+        if not self.judges[0].scores:
+            return
         round_diffs = [int(sum(j.scores[r][1] - j.scores[r][0] for j in self.judges) / 3.0)
                        for r in range(len(self.judges[0].scores))]
 
         new_strat = StrategySystem.pick_ai_strategy(
             self.fighter2, self.fighter1,
             round_diffs, self.current_round, self.rounds, self.strategy2.current_strategy)
-        self.strategy2.adjust_strategy(new_strat)
+
+        # Use drift instead of instant switch (Phase 3A)
+        fight_iq = self.fighter2.get_effective_attribute("fight_iq", self.f2_state["fatigue_level"])
+        adaptability = self.fighter2.get_effective_attribute("adaptability", self.f2_state["fatigue_level"])
+        switched = self.strategy2.drift_toward_strategy(new_strat, fight_iq, adaptability)
+
+        if switched:
+            self.fight_log.append(f"{self.fighter2.name} is adjusting their approach!")
         self.strategy1.set_opponent_strategy(self.strategy2.current_strategy)
+
+    def _calculate_ring_generalship(self, fighter: Fighter) -> float:
+        """Compute ring generalship from athleticism, hand_speed, and fight_iq."""
+        ath = fighter.get_effective_attribute("athleticism", 0)
+        speed = fighter.get_effective_attribute("hand_speed", 0)
+        iq = fighter.get_effective_attribute("fight_iq", 0)
+        return (ath * 0.35 + speed * 0.25 + iq * 0.40) / 100.0
+
+    def _check_ring_generalship(self):
+        """Evaluate ring control and apply pressure/cage effects."""
+        # Calculate ring generalship for both fighters
+        f1_rg = self._calculate_ring_generalship(self.fighter1)
+        f2_rg = self._calculate_ring_generalship(self.fighter2)
+        rg_diff = f1_rg - f2_rg
+
+        # Higher ring generalship fighter controls distance
+        if abs(rg_diff) > 0.05 and random.random() < abs(rg_diff) * 0.5:
+            controller = self.fighter1 if rg_diff > 0 else self.fighter2
+            controlled = self.fighter2 if rg_diff > 0 else self.fighter1
+            c_state = self.f1_state if rg_diff > 0 else self.f2_state
+
+            # If at distance, push toward cage
+            if self.position_system.current_position in (Position.DISTANCE, Position.POCKET):
+                c_state["forward_pressure_points"] = c_state.get("forward_pressure_points", 0) + 1
+                if random.random() < 0.3:
+                    self.position_system.set_cage_position(controlled)
+                    self.fight_log.append(f"{controller.name} pressures {controlled.name} against the cage!")
+
+        # Backing up penalty: if a fighter has been retreating without countering
+        for state, fighter, opponent in [
+            (self.f1_state, self.fighter1, self.fighter2),
+            (self.f2_state, self.fighter2, self.fighter1),
+        ]:
+            retreats = state.get("consecutive_retreats", 0)
+            if retreats >= 3:
+                state["forward_pressure_points"] = max(0, state.get("forward_pressure_points", 0) - 2)
+                state["consecutive_retreats"] = 0
+                if random.random() < 0.3:
+                    self.fight_log.append(f"{fighter.name} needs to stop backing up!")
 
     def _check_ai_adaptation(self, round_num: int):
-        """Between-round AI adaptation."""
+        """Between-round AI adaptation — uses strategy drift."""
+        # Build score differential from judge scores
+        round_diffs = []
+        if self.judges[0].scores:
+            round_diffs = [int(sum(j.scores[r][1] - j.scores[r][0] for j in self.judges) / 3.0)
+                           for r in range(len(self.judges[0].scores))]
+
         new_strat = StrategySystem.pick_ai_strategy(
             self.fighter2, self.fighter1,
-            [], self.current_round, self.rounds, self.strategy2.current_strategy)
-        self.strategy2.adjust_strategy(new_strat)
+            round_diffs, self.current_round, self.rounds, self.strategy2.current_strategy)
+
+        fight_iq = self.fighter2.get_effective_attribute("fight_iq", self.f2_state["fatigue_level"])
+        adaptability = self.fighter2.get_effective_attribute("adaptability", self.f2_state["fatigue_level"])
+        switched = self.strategy2.drift_toward_strategy(new_strat, fight_iq, adaptability)
+
+        if switched:
+            self.fight_log.append(f"{self.fighter2.name} is making adjustments between rounds!")
         self.strategy1.set_opponent_strategy(self.strategy2.current_strategy)
 
-        # Pattern recognition: detect if one fighter keeps using same strategy
+        # Pattern detection
         if self.f1_state.get("combo_count", 0) > 5:
-            # Fighter1 keeps throwing combos, AI adapts
             self.fight_log.append(f"{self.fighter2.name} starts reading the patterns!")
+
+    def _check_pattern_recognition(self):
+        """Analyze opponent action history for repeated patterns."""
+        for fighter, opponent, state, opp_state in [
+            (self.fighter1, self.fighter2, self.f1_state, self.f2_state),
+            (self.fighter2, self.fighter1, self.f2_state, self.f1_state),
+        ]:
+            history = opp_state.get("opponent_action_history", [])
+            if len(history) < 6:
+                continue
+            fight_iq = fighter.get_effective_attribute("fight_iq", state["fatigue_level"])
+            if fight_iq < 50:
+                continue
+            recog_score = fight_iq * 0.6
+
+            # Check for repeated strategy patterns
+            strat_entries = [h.split("_")[1] if "_" in h else h for h in history[-10:]]
+            from collections import Counter
+            pattern_counts = Counter(strat_entries)
+            most_common, count = pattern_counts.most_common(1)[0]
+
+            if count >= 4 and random.random() < recog_score / 100.0:
+                state["pattern_read"] = True
+                if random.random() < 0.5:
+                    self.fight_log.append(f"{fighter.name} reads {opponent.name}'s pattern!")
+                # Bonus: next defensive action gets +10% effectiveness
+                state["pattern_read_bonus"] = 1.10
 
     # ============================================================
     # HELPER METHODS
@@ -2031,6 +2871,9 @@ class Fight:
     def _get_display_health(self, fighter: Fighter) -> dict:
         """Format health display for the frontend."""
         f_state = self.f1_state if fighter == self.fighter1 else self.f2_state
+        breathing_cap = f_state.get("breathing_capacity", 100)
+        breathing_lvl = get_breathing_level(breathing_cap)
+        leg_damage = (f_state.get("lead_leg_damage", 0) + f_state.get("rear_leg_damage", 0)) / 2
         return {
             "head": round(fighter.get_group_health("head"), 1),
             "body": round(fighter.get_group_health("body"), 1),
@@ -2038,6 +2881,12 @@ class Fight:
             "overall": round(fighter.get_overall_health_pct(), 1),
             "stamina": round(f_state.get("stamina", 100), 1),
             "blood": round(fighter._blood_level, 1),
+            "breathing": round(breathing_cap, 1),
+            "breathing_level": breathing_lvl,
+            "lead_leg_damage": round(f_state.get("lead_leg_damage", 0), 1),
+            "rear_leg_damage": round(f_state.get("rear_leg_damage", 0), 1),
+            "leg_damage": round(leg_damage, 1),
+            "cardio_zone": f_state.get("cardio_zone", "aerobic"),
         }
 
     def _get_attacker_state(self, fighter):

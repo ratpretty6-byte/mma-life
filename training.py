@@ -88,6 +88,51 @@ class TrainingSystem:
         # Track fight preparation status
         self.fight_camp_active = False
         self.total_camp_days = 0  # For fight prep tracking
+        self.recovery_active = False
+        self.recovery_type = None
+        self.film_study_sessions = 0
+
+    def start_film_study(self) -> bool:
+        if self.film_study_sessions >= 2:
+            return False
+        self.film_study_sessions += 1
+        for attr in ["fight_iq", "adaptability"]:
+            old_val = self.fighter.attributes.get(attr, 50)
+            new_val = utils.clamp(old_val + 0.08, utils.ATTR_MIN, utils.ATTR_MAX)
+            self.fighter.attributes[attr] = new_val
+        return True
+
+    def start_recovery(self, recovery_type: str) -> bool:
+        if self.recovery_active:
+            return False
+        self.recovery_active = True
+        self.recovery_type = recovery_type
+        return True
+
+    def process_recovery(self) -> Optional[str]:
+        if not self.recovery_active:
+            return None
+        result = None
+        if self.recovery_type == "ice_bath":
+            old_fatigue = self.fatigue
+            self.fatigue = max(0.0, self.fatigue - 0.25)
+            result = f"Ice bath reduced fatigue from {old_fatigue:.0%} to {self.fatigue:.0%}"
+        elif self.recovery_type == "sports_massage":
+            for attr in self.fighter.PHYSICAL_ATTRS:
+                if random.random() < 0.3:
+                    val = self.fighter.attributes.get(attr, 50)
+                    self.fighter.attributes[attr] = utils.clamp(val + 0.02, utils.ATTR_MIN, utils.ATTR_MAX)
+            result = "Sports massage helped muscle recovery"
+        elif self.recovery_type == "nutrition_plan":
+            self.fatigue = max(0.0, self.fatigue - 0.1)
+            result = "Nutrition plan boosts recovery rate"
+        elif self.recovery_type == "meditation":
+            comp = self.fighter.attributes.get("composure", 50)
+            self.fighter.attributes["composure"] = utils.clamp(comp + 0.1, utils.ATTR_MIN, utils.ATTR_MAX)
+            result = "Meditation improved mental composure"
+        self.recovery_active = False
+        self.recovery_type = None
+        return result
 
     def auto_fill_schedule(self, drill: TrainingDrill):
         for d in range(5):
@@ -164,8 +209,12 @@ class TrainingSystem:
         drill = self.get_today_drill()
         is_rest = drill is None
 
+        recovery_result = self.process_recovery() if self.recovery_active else None
+
         result = {"day": DAYS_OF_WEEK[self.current_week_day], "is_rest": is_rest,
-                  "gains": {}, "fatigue": self.fatigue, "injury": None, "camp_over": camp_over, "drill_over": False}
+                  "gains": {}, "fatigue": self.fatigue, "injury": None,
+                  "camp_over": camp_over, "drill_over": False,
+                  "recovery": recovery_result}
 
         if not self.in_training:
             result["status"] = "idle"
@@ -214,6 +263,9 @@ class TrainingSystem:
             gains[attr] = new_val - old_val
             if game_date:
                 self.fighter.last_training_dates[attr] = game_date
+
+        # Track training type for style evolution
+        self.fighter.record_training_type(drill.drill_type, intensity_mult)
 
         self.fatigue = utils.clamp(self.fatigue + (drill.fatigue_rate * intensity_mult), 0.0, 1.0)
 

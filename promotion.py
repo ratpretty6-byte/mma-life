@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Tuple
 from fighter import Fighter
 from datetime import datetime, timedelta
 import utils
+import random
 
 class Contract:
     def __init__(self, fighter: Fighter, promotion: 'Promotion', fights_remaining: int,
@@ -60,6 +61,8 @@ class Promotion:
         self.rankings: Dict[str, List[Fighter]] = {wc: [] for wc in weight_classes}
         self.champions: Dict[str, Optional[Fighter]] = {wc: None for wc in weight_classes}
         self.contracts: Dict[Fighter, Contract] = {}
+        self._last_ranking_update: Dict[str, datetime] = {}
+        self._mandatory_challenges: Dict[str, Fighter] = {}
 
     def sign_fighter(self, fighter: Fighter, fights: int = 4, game_date: datetime = None) -> Contract:
         if fighter in self.fighters:
@@ -91,16 +94,35 @@ class Promotion:
         fighter.current_contract = None
         self.update_rankings()
 
-    def update_rankings(self):
+    def update_rankings(self, game_date: datetime = None):
         for wc in self.weight_classes:
             fighters = self.rankings[wc]
             scored = []
             for f in fighters:
                 opp_ratings = [50.0]
                 sos = utils.calculate_strength_of_schedule(f.wins, f.losses, opp_ratings)
+
+                # Momentum bonus for win streaks
+                momentum_bonus = 0
+                if f.win_streak >= 3:
+                    momentum_bonus = 2
+                if f.win_streak >= 5:
+                    momentum_bonus = 5
+                if f.win_streak >= 7:
+                    momentum_bonus = 10
+                if f.loss_streak >= 3:
+                    momentum_bonus = -3
+                if f.loss_streak >= 5:
+                    momentum_bonus = -6
+
+                # Inactivity penalty
+                inactivity_penalty = 0
+                if f.months_inactive > 4:
+                    inactivity_penalty = min(5, int((f.months_inactive - 4) * 0.5))
+
                 score = (f.wins * 3 + f.knockouts * 2 + f.submissions * 2
                          + f.win_streak * 5 - f.losses * 2 - f.loss_streak * 3
-                         + sos * 10)
+                         + sos * 10 + momentum_bonus - inactivity_penalty)
                 scored.append((f, score))
             scored.sort(key=lambda x: (-x[1], x[0].name))
             champion = self.champions.get(wc)
@@ -108,8 +130,49 @@ class Promotion:
                 scored.sort(key=lambda x: (0 if x[0] == champion else 1, -x[1], x[0].name))
             self.rankings[wc] = [s[0] for s in scored]
             for idx, fighter in enumerate(self.rankings[wc], 1):
+                prev_rank = fighter.rank
                 fighter.rank = idx
                 fighter.update_rank(idx)
+            self._last_ranking_update[wc] = game_date or datetime.now()
+        self._check_title_stripping(game_date)
+        self._check_mandatory_challenges(game_date)
+
+    def _check_title_stripping(self, game_date: datetime = None):
+        for wc in self.weight_classes:
+            champ = self.champions.get(wc)
+            if champ and hasattr(champ, 'last_fight_date') and champ.last_fight_date:
+                now = game_date or datetime.now()
+                days_since_defense = (now - champ.last_fight_date).days
+                if days_since_defense > 180:
+                    contender = self.get_title_challenger(wc)
+                    if contender:
+                        self.set_champion(contender)
+                        return {"type": "title_stripped", "fighter": champ.name, "new_champion": contender.name}
+
+    def _check_mandatory_challenges(self, game_date: datetime = None):
+        for wc in self.weight_classes:
+            champ = self.champions.get(wc)
+            if not champ:
+                continue
+            rankings = self.rankings.get(wc, [])
+            if len(rankings) < 2:
+                continue
+            top_contender = rankings[1] if rankings[0] == champ else rankings[0]
+            defenses_since_challenge = 0
+            if hasattr(champ, 'last_title_defense_date') and champ.last_title_defense_date:
+                now = game_date or datetime.now()
+                days_since = (now - champ.last_title_defense_date).days
+                defenses_since_challenge = max(0, days_since // 180)
+            if defenses_since_challenge >= 3:
+                self._mandatory_challenges[wc] = top_contender
+
+    def is_undisputed_champion(self, fighter: Fighter, other_promotions: List['Promotion'] = None) -> bool:
+        if not other_promotions:
+            return False
+        for promo in other_promotions:
+            if promo.champions.get(fighter.weight_class) != fighter:
+                return False
+        return True
 
     def get_title_challenger(self, weight_class: str) -> Optional[Fighter]:
         if weight_class not in self.rankings or len(self.rankings[weight_class]) < 2:

@@ -26,8 +26,10 @@ class HealthSystem:
         if injury_type not in INJURY_TYPES:
             return {}
         info = INJURY_TYPES[injury_type]
-        # Injury severity scales with how much damage was taken
-        severity = min(1.0, info["base_severity"] * severity_mult)
+        # Cumulative trauma makes injuries worse
+        career_fights = self.fighter.career_total_fights
+        career_mod = 1.0 + (career_fights * 0.01)
+        severity = min(1.0, info["base_severity"] * severity_mult * career_mod)
         recovery_days = int(info["recovery_days"] * (0.5 + severity))
         now = game_date or datetime.now()
         injury = {

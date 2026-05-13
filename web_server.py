@@ -159,6 +159,15 @@ def get_state_dict(session):
             "injuries": [{"type": i["type"], "severity": round(i["severity"], 2)} for i in f.injuries],
             "suspension": max(0, (f.medical_suspension_end - game_date).days) if f.medical_suspension_end else 0,
             "retired": f.retired,
+            "stance": f.stance,
+        "signature_strike": f.get_signature_strike(),
+            "career_damage": round(f.career_damage_taken, 1),
+            "career_fights": f.career_total_fights,
+            "ko_losses": f.career_ko_losses,
+            "prime_status": "prime" if f.PRIME_START <= f.age <= f.PRIME_END else ("developing" if f.age < f.PRIME_START else "declining"),
+            "peak_rank": f.peak_rank,
+            "scouting_level": getattr(f, 'times_scouted', 0),
+            "signature_strikes": f.signature_strikes,
         },
         "promotion": {
             "name": promo.name if promo else "Free Agent",
@@ -166,6 +175,8 @@ def get_state_dict(session):
             "rankings": [{"name": o.name, "rank": r+1, "record": o.get_record_string(), "rating": round(o.get_overall_rating(), 1)}
                          for r, o in enumerate((promo.rankings.get(f.weight_class) or [])[:15])] if promo else [],
             "champion": (promo.champions.get(f.weight_class).name if promo.champions.get(f.weight_class) else "N/A") if promo else "N/A",
+            "undisputed": promo.is_undisputed_champion(f, [gs.get("world"), gs.get("national"), gs.get("regional")]) if promo else False,
+            "mandatory": promo._mandatory_challenges.get(f.weight_class).name if promo and promo._mandatory_challenges.get(f.weight_class) else None,
         } if promo else None,
         "contract": _get_contract_state(session),
         "training": _get_training_state(session),
@@ -205,6 +216,10 @@ def _get_fight_booking_state(session):
     opponent = fb.fighter2 if fb.fighter1 == f else fb.fighter1
     game_date = session.get("game_date", datetime.now())
     days_until = max(0, (fb.date - game_date).days) if fb.date else 0
+    fight_week_day = None
+    if 0 <= days_until <= 5:
+        fight_week_events = ["Press Conference", "Open Workout", "Weigh-In", "Faceoff", "Rest Day", "Fight Night"]
+        fight_week_day = fight_week_events[days_until] if days_until < 6 else None
     return {
         "opponent": {
             "name": opponent.name,
@@ -224,6 +239,7 @@ def _get_fight_booking_state(session):
         },
         "is_title": fb.is_title_fight,
         "days_until": days_until,
+        "fight_week_day": fight_week_day,
     }
 
 def _get_fight_state(session):
@@ -248,6 +264,10 @@ def _get_fight_state(session):
         "f2_state": fight.f2_machine.get_state(),
         "scores": [[j.scores[r][0] for j in fight.judges] for r in range(len(fight.judges[0].scores))] if fight.judges[0].scores else [],
         "fight_log_length": len(fight.fight_log),
+        "f1_momentum": fight.f1_momentum,
+        "f2_momentum": fight.f2_momentum,
+        "crowd_excitement": fight.crowd_excitement,
+        "referee_style": getattr(fight, 'referee_style', 'protective'),
     }
 
 def _get_training_state(session):
@@ -279,6 +299,9 @@ def _get_training_state(session):
         "fatigue": round(t.fatigue * 100),
         "schedule": t.get_schedule_state(),
         "available_drills": available_drills,
+        "film_study_available": t.film_study_sessions < 2,
+        "recovery_active": t.recovery_active,
+        "recovery_type": t.recovery_type,
     }
 
 def _get_gym_atmosphere(session):
@@ -320,6 +343,10 @@ def _get_health_state(session):
         return None
     return {
         "ring_rust": round(f.get_ring_rust_penalty() * 100),
+        "career_damage": round(f.career_damage_taken, 1),
+        "career_fights": f.career_total_fights,
+        "ko_losses": f.career_ko_losses,
+        "age_mod": round(f.get_prime_age_modifier(), 3),
     }
 
 def _get_media_state(session):
@@ -349,6 +376,11 @@ def _get_career_state(session, game_date=None):
         "rivalries": len(c.rivalries),
         "retired": c.fighter.retired if c.fighter else False,
         "promotion_offer": offer,
+        "awards": getattr(c, '_awards', {}),
+        "season_months": getattr(c, 'season_months', 0),
+        "yearly_wins": getattr(c, '_yearly_wins', 0),
+        "yearly_kos": getattr(c, '_yearly_kos', 0),
+        "yearly_subs": getattr(c, '_yearly_subs', 0),
     }
 
 def get_available_camps_data():
@@ -449,7 +481,8 @@ class Handler(BaseHTTPRequestHandler):
                 weight = random.randint(wc_data["min"], wc_data["max"])
                 
                 game_date = datetime(2025, 1, 6)
-                f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, game_date=game_date)
+                stance = utils.get_stance_for_background(bg)
+                f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, stance=stance, game_date=game_date)
                 regional = gs["regional"]
                 career = CareerSystem(f)
                 career.sign_with_promotion(regional, 4, game_date)
@@ -581,9 +614,10 @@ class Handler(BaseHTTPRequestHandler):
                 region = body.get("region", "California")
                 trait_id = body.get("trait_id")
                 personality_id = body.get("personality_id", "humble")
+                stance = body.get("stance", None)
                 game_date = datetime(2025, 1, 6)
 
-                f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, game_date=game_date)
+                f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, stance=stance, game_date=game_date)
 
                 # Age-scaled starting stats: 18yo starts ~25% below base, 35yo starts at base+5%
                 age_min = 18
@@ -879,6 +913,35 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 result = fight.submit_strategy_web(strategy)
                 self.json_resp({"success": True, "fight_result": result})
 
+            elif path == "/api/scout_opponent":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                if not f:
+                    self.json_resp({"error": "Not initialized"})
+                    return
+                f.times_scouted = getattr(f, 'times_scouted', 0) + 1
+                fb = session.get("current_fight_booking")
+                opponent = fb.fighter2 if fb and fb.fighter1 == f else None
+                if not opponent and fb:
+                    opponent = fb.fighter1
+                if not opponent:
+                    self.json_resp({"error": "No opponent to scout"})
+                    return
+                scouted = f.times_scouted
+                opponent_attrs = opponent.attributes if scouted >= 3 else (
+                    {k: round(v, -1) for k, v in opponent.attributes.items()} if scouted >= 1 else {})
+                preferred_strats = opponent.preferred_strategies if hasattr(opponent, 'preferred_strategies') else []
+                scouting_report = {
+                    "level": "full" if scouted >= 3 else ("partial" if scouted >= 1 else "none"),
+                    "sessions": scouted,
+                    "opponent_archetype": opponent.archetype,
+                    "opponent_background": opponent.background,
+                    "opponent_attrs_visible": scouted >= 1,
+                    "opponent_preferred_strategies": preferred_strats if scouted >= 3 else [],
+                }
+                self.json_resp({"success": True, "scouting": scouting_report})
+
             elif path == "/api/fight_bonuses":
                 sid = body.get("sid", "")
                 session = get_or_create_session(sid)
@@ -948,6 +1011,23 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     if bonuses_data:
                         bonuses = bonuses_data
 
+                # Record career damage after fight
+                if fight.fight_log:
+                    f.record_fight_damage(fight.f1_head_damage if f == fight.fighter1 else fight.f2_head_damage,
+                                           was_ko="KO" in method)
+
+                # Record season fight data
+                if career:
+                    career.record_season_fight(won, method, fight.win_round or 0, opponent, fb.is_title_fight)
+
+                # Advance season and check for year-end awards
+                season_award = None
+                if career:
+                    season_award = career.advance_season(game_date)
+                    if season_award:
+                        news_list = gs.setdefault("world_news", [])
+                        news_list.append(season_award)
+
                 session["current_event"] = None
                 session["current_fight_booking"] = None
                 session["current_fight"] = None
@@ -959,6 +1039,7 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     "state": get_state_dict(session),
                     "milestones": milestones,
                     "bonuses": bonuses,
+                    "season_award": season_award,
                 })
 
             elif path == "/api/sign_free_agent":
@@ -1174,6 +1255,48 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                         return
                 self.json_resp({"error": "Gym not found"})
 
+            elif path == "/api/film_study":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                training = session.get("training")
+                if not training:
+                    self.json_resp({"error": "Not initialized"})
+                    return
+                success = training.start_film_study()
+                self.json_resp({"success": success, "state": get_state_dict(session)})
+
+            elif path == "/api/migrate_weight":
+                sid = body.get("sid", "")
+                direction = body.get("direction", "up")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                if not f:
+                    self.json_resp({"error": "Not initialized"})
+                    return
+                current_idx = utils.get_weight_class_index(f.weight_class)
+                target_idx = current_idx + (1 if direction == "up" else -1)
+                if target_idx < 0 or target_idx >= len(utils.WEIGHT_CLASSES):
+                    self.json_resp({"error": "No weight class available in that direction"})
+                    return
+                target_wc = utils.WEIGHT_CLASSES[target_idx]
+                target_weight = random.randint(target_wc["min"], target_wc["max"])
+                if direction == "up":
+                    success = f.migrate_weight_class_up(target_weight)
+                else:
+                    success = f.migrate_weight_class_down(target_weight)
+                self.json_resp({"success": success, "state": get_state_dict(session)})
+
+            elif path == "/api/start_recovery":
+                sid = body.get("sid", "")
+                recovery_type = body.get("type", "ice_bath")
+                session = get_or_create_session(sid)
+                training = session.get("training")
+                if not training:
+                    self.json_resp({"error": "Not initialized"})
+                    return
+                success = training.start_recovery(recovery_type)
+                self.json_resp({"success": success, "state": get_state_dict(session)})
+
             elif path == "/api/leave_gym":
                 sid = body.get("sid", "")
                 session = get_or_create_session(sid)
@@ -1181,6 +1304,132 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 if f:
                     f.gym = None
                 self.json_resp({"success": True, "state": get_state_dict(session)})
+
+            elif path == "/api/balance_test":
+                """Run multiple simulated fights and return aggregate stats."""
+                from fight import Fight
+                from generator import generate_single_fighter
+                sid = body.get("sid", "")
+                iterations = body.get("iterations", 100)
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                if not f:
+                    self.json_resp({"error": "No fighter in session"})
+                    return
+                wc_data = utils.get_weight_class(f.weight_class)
+                # Generate a generic opponent of same weight class
+                opponent = generate_single_fighter(
+                    random.randint(wc_data["min"], wc_data["max"]),
+                    skill_mean=utils.gaussian_random(50, 10, 25, 65),
+                    skill_std=utils.gaussian_random(15, 3, 8, 20)
+                )
+                opponent.weight_class = f.weight_class
+                results = {"f1_wins": 0, "f2_wins": 0, "draws": 0, "kos": 0, "tkos": 0,
+                           "submissions": 0, "decisions": 0, "total_rounds": [], "avg_duration": 0}
+                strats = [s["id"] for s in STRATEGIES]
+                for _ in range(iterations):
+                    a_strat = random.choice(strats)
+                    d_strat = random.choice(strats)
+                    fight = Fight(f, opponent, rounds=3, is_title_fight=False)
+                    fight.strategy1.set_pre_fight_strategy(a_strat)
+                    fight.strategy2.set_pre_fight_strategy(d_strat)
+                    for event in fight.simulate_fight_gen():
+                        if event["type"] == "complete":
+                            break
+                    if fight.winner == f:
+                        results["f1_wins"] += 1
+                    elif fight.winner == opponent:
+                        results["f2_wins"] += 1
+                    else:
+                        results["draws"] += 1
+                    if fight.win_method:
+                        if "KO" in fight.win_method and "TKO" not in fight.win_method:
+                            results["kos"] += 1
+                        elif "TKO" in fight.win_method:
+                            results["tkos"] += 1
+                        elif "Submission" in fight.win_method:
+                            results["submissions"] += 1
+                        else:
+                            results["decisions"] += 1
+                    results["total_rounds"].append(fight.win_round or 3)
+                results["avg_rounds"] = sum(results["total_rounds"]) / max(1, len(results["total_rounds"]))
+                results["total"] = iterations
+                del results["total_rounds"]
+                self.json_resp({"success": True, "results": results})
+
+            elif path == "/api/bulk_simulate":
+                """Advanced bulk simulation with configurable fighters."""
+                from fight import Fight
+                from generator import generate_single_fighter
+                iterations = body.get("iterations", 100)
+                f1_mean = body.get("f1_mean", 50)
+                f1_std = body.get("f1_std", 10)
+                f2_mean = body.get("f2_mean", 50)
+                f2_std = body.get("f2_std", 10)
+                wc_idx = body.get("weight_class", 3)
+                wc_data = utils.WEIGHT_CLASSES[wc_idx]
+
+                detailed = body.get("detailed", False)
+                results = {"f1_wins": 0, "f2_wins": 0, "draws": 0,
+                           "ko_tko_pct": 0, "sub_pct": 0, "dec_pct": 0,
+                           "avg_rounds": 0, "by_method": {}}
+                round_data = []
+
+                for i in range(iterations):
+                    f1 = generate_single_fighter(
+                        random.randint(wc_data["min"], wc_data["max"]),
+                        skill_mean=utils.gaussian_random(f1_mean, f1_std, 20, 80),
+                        skill_std=utils.gaussian_random(12, 3, 5, 20)
+                    )
+                    f2 = generate_single_fighter(
+                        random.randint(wc_data["min"], wc_data["max"]),
+                        skill_mean=utils.gaussian_random(f2_mean, f2_std, 20, 80),
+                        skill_std=utils.gaussian_random(12, 3, 5, 20)
+                    )
+                    f1.weight_class = wc_data["name"]
+                    f2.weight_class = wc_data["name"]
+
+                    a_strat = random.choice([s["id"] for s in STRATEGIES])
+                    d_strat = random.choice([s["id"] for s in STRATEGIES])
+                    fight = Fight(f1, f2, rounds=3, is_title_fight=False)
+                    fight.strategy1.set_pre_fight_strategy(a_strat)
+                    fight.strategy2.set_pre_fight_strategy(d_strat)
+                    for event in fight.simulate_fight_gen():
+                        if event["type"] == "complete":
+                            break
+                    if fight.winner == f1:
+                        results["f1_wins"] += 1
+                    elif fight.winner == f2:
+                        results["f2_wins"] += 1
+                    else:
+                        results["draws"] += 1
+
+                    method_cat = "Decision"
+                    if fight.win_method:
+                        if "Submission" in fight.win_method:
+                            method_cat = "Submission"
+                        elif "KO" in fight.win_method and "TKO" not in fight.win_method:
+                            method_cat = "KO"
+                        elif "TKO" in fight.win_method:
+                            method_cat = "TKO"
+                    results["by_method"][method_cat] = results["by_method"].get(method_cat, 0) + 1
+                    round_data.append(fight.win_round or 3)
+
+                total = max(1, iterations)
+                results["ko_tko_pct"] = (results["by_method"].get("KO", 0) + results["by_method"].get("TKO", 0)) / total * 100
+                results["sub_pct"] = results["by_method"].get("Submission", 0) / total * 100
+                results["dec_pct"] = results["by_method"].get("Decision", 0) / total * 100
+                results["avg_rounds"] = sum(round_data) / total
+                results["total"] = iterations
+
+                if detailed:
+                    # Also capture archetype matchup breakdowns
+                    results["f1_win_pct"] = round(results["f1_wins"] / total * 100, 1)
+                    results["f2_win_pct"] = round(results["f2_wins"] / total * 100, 1)
+                    results["draw_pct"] = round(results["draws"] / total * 100, 1)
+                    results["avg_rounds"] = round(results["avg_rounds"], 1)
+
+                self.json_resp({"success": True, "results": results})
 
             else:
                 self.json_resp({"error": "Unknown endpoint"})

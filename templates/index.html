@@ -163,6 +163,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
 
 .next-action { background: linear-gradient(135deg, #1a2a1a, #14141f); border: 1px solid #4aff6a; border-radius: 8px; padding: 12px; margin-bottom: 8px; text-align: center; }
+.recovery-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .next-action .action-label { color: #4aff6a; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
 .next-action .action-text { color: #fff; font-size: 14px; font-weight: 600; margin-top: 4px; }
 .next-action .action-btn { margin-top: 8px; }
@@ -278,6 +279,13 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
             <option value="Florida">Florida</option>
           </select>
         </div>
+        <div>
+          <label>Stance</label>
+          <select id="fStance" name="stance">
+            <option value="orthodox">Orthodox</option>
+            <option value="southpaw">Southpaw</option>
+          </select>
+        </div>
       </div>
 
       <label style="margin-top:10px">Trait (tap to select)</label>
@@ -317,6 +325,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
           <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rating</span><br><span class="stat-value" id="hRating" style="font-size:16px">--</span></div>
           <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Net Worth</span><br><span class="stat-value" id="hNet" style="font-size:14px">$0</span></div>
         </div>
+        <div class="stat-row"><span class="stat-label">Stance</span><span class="stat-value" id="hStance">--</span></div>
         <div class="stat-row"><span class="stat-label">Streak</span><span class="stat-value" id="hStreak">--</span></div>
         <div class="stat-row"><span class="stat-label">Next Fight</span><span class="stat-value" id="hNextFight">Not booked</span></div>
         <div class="stat-row"><span class="stat-label">Injuries</span><span class="stat-value" id="hInjuries">None</span></div>
@@ -375,6 +384,17 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-title">Recovery &amp; Preparation <span id="filmStudyStatus" style="font-size:11px;color:#888;font-weight:400"></span></div>
+        <div class="flex-row" style="gap:4px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-small" onclick="doRecovery('ice_bath')">&#x2744; Ice Bath</button>
+          <button class="btn btn-ghost btn-small" onclick="doRecovery('sports_massage')">&#x1F4AA; Massage</button>
+          <button class="btn btn-ghost btn-small" onclick="doRecovery('nutrition_plan')">&#x1F966; Nutrition</button>
+          <button class="btn btn-ghost btn-small" onclick="doRecovery('meditation')">&#x1F9D8; Meditation</button>
+          <button class="btn btn-ghost btn-small" onclick="doFilmStudy()">&#x1F3AC; Film Study</button>
+        </div>
+      </div>
+
       <div class="card" id="gymFightersCard" style="display:none">
         <div class="card-title">Training Partners <span id="gymFighterCount" style="font-size:11px;color:#888;font-weight:400"></span></div>
         <div id="gymFighterList" style="max-height:180px;overflow-y:auto;font-size:12px"></div>
@@ -394,6 +414,11 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
         <div class="card-title">Available Opponents</div>
         <div id="opponentList"></div>
         <div id="noOpponents" class="hidden" style="color:#888;font-size:13px;text-align:center;padding:12px">No available opponents right now. Advance time to find fights.</div>
+      </div>
+      <div id="scoutSection" class="card hidden">
+        <div class="flex-between"><div class="card-title">Scouting Report</div><span id="scoutLevel" style="font-size:11px;color:#888"></span></div>
+        <div id="scoutBody" style="font-size:12px;color:#ccc"></div>
+        <button class="btn btn-secondary btn-small" style="margin-top:6px" onclick="scoutOpponent()">Spy on Next Opponent</button>
       </div>
 
       <div id="fightReady" class="hidden card">
@@ -418,6 +443,8 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
                 <span style="font-size:9px;color:#888">H:<span id="f1HeadBar" style="color:#e62400">100</span></span>
                 <span style="font-size:9px;color:#888">B:<span id="f1BodyBar" style="color:#e62400">100</span></span>
                 <span style="font-size:9px;color:#888">L:<span id="f1LegBar" style="color:#e62400">100</span></span>
+                <span style="font-size:9px;color:#888">Br:<span id="f1BreathBar" style="color:#e6e600">100</span></span>
+                <span id="f1CardioZone" style="font-size:9px">Aerobic</span>
               </div>
             </div>
             <div>
@@ -429,6 +456,8 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
                 <span style="font-size:9px;color:#888">H:<span id="f2HeadBar" style="color:#e62400">100</span></span>
                 <span style="font-size:9px;color:#888">B:<span id="f2BodyBar" style="color:#e62400">100</span></span>
                 <span style="font-size:9px;color:#888">L:<span id="f2LegBar" style="color:#e62400">100</span></span>
+                <span style="font-size:9px;color:#888">Br:<span id="f2BreathBar" style="color:#e6e600">100</span></span>
+                <span id="f2CardioZone" style="font-size:9px">Aerobic</span>
               </div>
             </div>
           </div>
@@ -442,6 +471,20 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
                 <div id="f2ScoreFill" style="height:100%;width:50%;background:#ffd700;border-radius:3px;transition:width .3s;float:right"></div>
               </div>
             </div>
+          </div>
+          <div id="momentumDisplay" style="margin-top:6px;display:none">
+            <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#888">
+              <span id="f1MomentumLabel" style="flex:1;text-align:right"></span>
+              <div style="flex:2;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+                <div id="f1MomentumFill" style="height:100%;width:50%;background:linear-gradient(90deg,#e62400,#ffd700);border-radius:3px;transition:width .3s"></div>
+              </div>
+              <span style="width:20px;text-align:center">&#x26A1;</span>
+              <div style="flex:2;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+                <div id="f2MomentumFill" style="height:100%;width:50%;background:linear-gradient(90deg,#ffd700,#4a9eff);border-radius:3px;transition:width .3s;float:right"></div>
+              </div>
+              <span id="f2MomentumLabel" style="flex:1;text-align:left"></span>
+            </div>
+            <div id="crowdDisplay" style="font-size:9px;color:#888;text-align:center;margin-top:2px"></div>
           </div>
         </div>
         <div class="card">
@@ -506,12 +549,17 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
         <div class="stat-row"><span class="stat-label">Age</span><span class="stat-value" id="cAge">--</span></div>
         <div class="stat-row"><span class="stat-label">Trait</span><span class="stat-value" id="cTrait">--</span></div>
         <div class="stat-row"><span class="stat-label">Personality</span><span class="stat-value" id="cPersonality">--</span></div>
+        <div class="stat-row"><span class="stat-label">Prime Status</span><span class="stat-value" id="cPrime">--</span></div>
+        <div class="stat-row"><span class="stat-label">Signature Strike</span><span class="stat-value" id="cSignature">--</span></div>
       </div>
       <div class="card">
         <div class="card-title">Career</div>
         <div class="stat-row"><span class="stat-label">Title Defenses</span><span class="stat-value" id="cTitles">0</span></div>
         <div class="stat-row"><span class="stat-label">Career Earnings</span><span class="stat-value" id="cEarnings">$0</span></div>
         <div class="stat-row"><span class="stat-label">Rivalries</span><span class="stat-value" id="cRivalries">0</span></div>
+        <div class="stat-row"><span class="stat-label">Career Damage</span><span class="stat-value" id="cDamage">0</span></div>
+        <div class="stat-row"><span class="stat-label">Total Fights</span><span class="stat-value" id="cFights">0</span></div>
+        <div class="stat-row"><span class="stat-label">Awards</span><span class="stat-value" id="cAwards">None</span></div>
       </div>
     </div>
 
@@ -805,11 +853,12 @@ async function createFighter() {
   const trait_id = traitBtn ? traitBtn.dataset.trait : null;
   const persBtn = qs("#personalityGrid .selected");
   const personality_id = persBtn ? persBtn.dataset.pers || "humble" : "humble";
+  const stance = qs("#fStance").value;
 
   const btn = qs("#startCareerBtn");
   btn.textContent = "Creating...";
   btn.disabled = true;
-  const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id });
+  const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id, stance });
   btn.textContent = "START CAREER";
   btn.disabled = false;
   if (resp.success) {
@@ -846,6 +895,7 @@ function updateAllUI() {
   qs("#hRating").textContent = f.rating;
   const streak = f.win_streak > 0 ? `W${f.win_streak}` : (f.loss_streak > 0 ? `L${f.loss_streak}` : "0");
   qs("#hStreak").textContent = streak;
+  qs("#hStance").textContent = f.stance ? (f.stance.charAt(0).toUpperCase() + f.stance.slice(1)) : "--";
   qs("#hInjuries").textContent = (f.injuries&&f.injuries.length) ? f.injuries.map(i=>i.type).join(", ") : "None";
   qs("#hGym").textContent = fin ? fin.gym : "None";
   qs("#hDate").textContent = gd || "--";
@@ -866,6 +916,9 @@ function updateAllUI() {
 
   if (fb) {
     qs("#hNextFight").textContent = `vs ${fb.opponent.name} (${fb.days_until}d)`;
+    const fwd = fb.fight_week_day;
+    const fwHtml = fwd ? `<br><span style="color:#ffd700;font-size:10px">&#x1F4C5; Fight Week: ${escHtml(fwd)}</span>` : "";
+    if (fwHtml) qs("#hNextFight").innerHTML = qs("#hNextFight").textContent + fwHtml;
   } else {
     qs("#hNextFight").textContent = "Not booked";
   }
@@ -1072,30 +1125,22 @@ function updateGymTab() {
   }
 
   qs("#btnStartTraining").classList.add("hidden");
-  qs("#btnStartCamp").classList.add("hidden");
-  qs("#btnStopTraining").classList.add("hidden");
-  qs("#btnEndCamp").classList.add("hidden");
-  qs("#fatigueBar").classList.add("hidden");
-
-  if (t) {
-    const fatigue = t.fatigue || 0;
-    if (t.in_training) {
-      qs("#fatigueBar").classList.remove("hidden");
-      const fill = qs("#fatigueFill");
-      fill.style.width = fatigue + "%";
-      if (fatigue > 70) fill.style.background = "#ff4a4a";
-      else if (fatigue > 40) fill.style.background = "#ffd700";
-      else fill.style.background = "#4aff6a";
-
-      if (t.in_camp) {
-        qs("#trainingStatus").innerHTML = `<span style="color:#4aff6a">Camp: ${escHtml(t.camp_name)}</span> &mdash; ${escHtml(t.drill_name)} | Day ${t.days_trained}/${t.camp_weeks*7} | Fatigue: ${fatigue}%`;
-        qs("#btnEndCamp").classList.remove("hidden");
-        qs("#btnStopTraining").classList.remove("hidden");
-      } else {
-        qs("#trainingStatus").innerHTML = `<span style="color:#4a9eff">Base Training</span> &mdash; ${escHtml(t.drill_name)} | Fatigue: ${fatigue}%`;
-        qs("#btnStopTraining").classList.remove("hidden");
-        qs("#btnStartCamp").classList.remove("hidden");
-      }
+    qs("#btnStartCamp").classList.add("hidden");
+  }
+  const fss = qs("#filmStudyStatus");
+  if (t && t.film_study_available) {
+    fss.textContent = "Film study: available (2x/week)";
+    fss.style.color = "#4aff6a";
+  } else if (t) {
+    fss.textContent = "Film study: used for this week";
+    fss.style.color = "#ffd700";
+  }
+  if (t && t.recovery_active) {
+    fss.textContent = "Recovery active: " + (t.recovery_type || "processing");
+    fss.style.color = "#4a9eff";
+  }
+  updateScheduleGrid();
+}
     } else {
       qs("#trainingStatus").innerHTML = `<span style="color:#888">Not training</span>`;
       qs("#btnStartTraining").classList.remove("hidden");
@@ -1141,8 +1186,9 @@ function updateNewsFeed() {
   let html = "";
   newsCache.forEach(n => {
     const sevColor = n.severity === "major" ? "#ffd700" : (n.severity === "upset" ? "#ff6a4a" : "#888");
+    const typeIcon = {"fight_result":"&#x1F94A;","retirement":"&#x1F550;","fighter_signing":"&#x270D;","rivalry":"&#x26A1;","title_change":"&#x1F3C6;","injury_report":"&#x1F915;","scandal":"&#x26A0;","award":"&#x2B50;","comeback":"&#x1F504;","title_stripped":"&#x26A0;","prospect":"&#x1F4A5;"}[n.type] || "&#x1F4F0;";
     html += `<div style="padding:6px 0;border-bottom:1px solid #1a1a2a">
-      <div style="color:${sevColor};font-weight:600;font-size:12px">${escHtml(n.headline)}</div>
+      <div style="color:${sevColor};font-weight:600;font-size:12px">${typeIcon} ${escHtml(n.headline)}</div>
       <div style="color:#999;font-size:11px">${escHtml(n.body)}</div>
     </div>`;
   });
@@ -1186,6 +1232,18 @@ async function doSetDrill(dayIdx, drillName) {
 async function refreshGymTab() {
   if (state && state.strategies) STRATS = state.strategies;
   updateGymTab();
+}
+
+async function doRecovery(type) {
+  const resp = await api("/api/start_recovery", { sid, type });
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Recovery started!", "success"); }
+  else toast(resp.error || "Already recovering", "error");
+}
+
+async function doFilmStudy() {
+  const resp = await api("/api/film_study", { sid });
+  if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Film study complete! Fight IQ + Adaptability improved", "success"); }
+  else toast("Film study used 2/2 this week", "error");
 }
 
 async function showStartCamp() {
@@ -1417,6 +1475,28 @@ async function loadFightOfferDetails(o, baseHtml) {
   showModal(html);
 }
 
+async function scoutOpponent() {
+  const resp = await api("/api/scout_opponent", { sid });
+  if (resp.success && resp.scouting) {
+    const s = resp.scouting;
+    qs("#scoutSection").classList.remove("hidden");
+    qs("#scoutLevel").textContent = s.level.toUpperCase();
+    const levelColor = s.level === "full" ? "#4aff6a" : (s.level === "partial" ? "#ffd700" : "#888");
+    qs("#scoutLevel").style.color = levelColor;
+    let bodyHtml = `<span style="color:${levelColor}">Scouting: ${s.sessions} session(s)</span><br>`;
+    bodyHtml += `Archetype: ${escHtml(s.opponent_archetype)} | Background: ${escHtml(s.opponent_background)}<br>`;
+    if (s.opponent_attrs_visible && s.opponent_preferred_strategies && s.opponent_preferred_strategies.length) {
+      bodyHtml += `Preferred strategies: ${s.opponent_preferred_strategies.join(", ")}`;
+    } else if (s.opponent_attrs_visible) {
+      bodyHtml += `Attributes partially scouted (rounded values)`;
+    }
+    qs("#scoutBody").innerHTML = bodyHtml;
+    toast("Scouting report updated", "success");
+  } else {
+    toast("No opponent to scout yet", "error");
+  }
+}
+
 async function bookFight(opponentName) {
   const weeksSel = qs("#bookWeeks");
   const weeks = weeksSel ? parseInt(weeksSel.value) : 8;
@@ -1479,7 +1559,9 @@ async function startFight() {
   }
 
   qs("#fightScoreBars").style.display = "block";
+  qs("#momentumDisplay").style.display = "block";
   updateScoreBars(0, 0);
+  updateMomentumBars(0, 0, 50);
 
   fightReplaying = true;
   await replayFightEvents(resp.fight_result);
@@ -1495,6 +1577,13 @@ function updateHealthBars(f1Health, f2Health) {
     qs("#f1HeadBar").textContent = Math.max(0, f1Health.head || 100).toFixed(0);
     qs("#f1BodyBar").textContent = Math.max(0, f1Health.body || 100).toFixed(0);
     qs("#f1LegBar").textContent = Math.max(0, f1Health.legs || 100).toFixed(0);
+    const br = Math.max(0, f1Health.breathing || 100);
+    qs("#f1BreathBar").textContent = br.toFixed(0);
+    qs("#f1BreathBar").style.color = br > 70 ? "#4aff6a" : (br > 50 ? "#e6e600" : (br > 30 ? "#ffd700" : "#ff4a4a"));
+    const zone1 = f1Health.cardio_zone || "aerobic";
+    const zone1El = qs("#f1CardioZone");
+    zone1El.textContent = zone1 === "aerobic" ? "Aerobic" : (zone1 === "anaerobic" ? "Anaerobic" : "O₂ Debt");
+    zone1El.style.color = zone1 === "aerobic" ? "#4aff6a" : (zone1 === "anaerobic" ? "#ffd700" : "#ff4a4a");
   }
   if (f2Health) {
     const h = Math.max(0, f2Health.overall || 100);
@@ -1505,6 +1594,29 @@ function updateHealthBars(f1Health, f2Health) {
     qs("#f2HeadBar").textContent = Math.max(0, f2Health.head || 100).toFixed(0);
     qs("#f2BodyBar").textContent = Math.max(0, f2Health.body || 100).toFixed(0);
     qs("#f2LegBar").textContent = Math.max(0, f2Health.legs || 100).toFixed(0);
+    const br = Math.max(0, f2Health.breathing || 100);
+    qs("#f2BreathBar").textContent = br.toFixed(0);
+    qs("#f2BreathBar").style.color = br > 70 ? "#4aff6a" : (br > 50 ? "#e6e600" : (br > 30 ? "#ffd700" : "#ff4a4a"));
+    const zone2 = f2Health.cardio_zone || "aerobic";
+    const zone2El = qs("#f2CardioZone");
+    zone2El.textContent = zone2 === "aerobic" ? "Aerobic" : (zone2 === "anaerobic" ? "Anaerobic" : "O₂ Debt");
+    zone2El.style.color = zone2 === "aerobic" ? "#4aff6a" : (zone2 === "anaerobic" ? "#ffd700" : "#ff4a4a");
+  }
+}
+
+function updateMomentumBars(f1Momentum, f2Momentum, crowdExcitement) {
+  const f1M = Math.max(0, Math.min(100, (f1Momentum + 50)));
+  const f2M = Math.max(0, Math.min(100, (f2Momentum + 50)));
+  qs("#f1MomentumFill").style.width = f1M + "%";
+  qs("#f2MomentumFill").style.width = f2M + "%";
+  qs("#f1MomentumLabel").textContent = f1Momentum > 5 ? "HOT" : (f1Momentum < -5 ? "COLD" : "");
+  qs("#f2MomentumLabel").textContent = f2Momentum > 5 ? "HOT" : (f2Momentum < -5 ? "COLD" : "");
+  if (crowdExcitement >= 0) {
+    const cd = qs("#crowdDisplay");
+    const ce = Math.max(0, Math.min(100, crowdExcitement));
+    if (ce > 70) cd.innerHTML = "&#x1F525; Crowd is ELECTRIC! (" + ce + "%)";
+    else if (ce < 30) cd.innerHTML = "Crowd is quiet (" + ce + "%)";
+    else cd.innerHTML = "Crowd: " + ce + "%";
   }
 }
 
@@ -1617,6 +1729,7 @@ async function replayFightEvents(fightResult) {
       if (ev.f1_state) updateFighterState(qs("#f1NameBar"), qs("#f1StateBar"), ev.f1_state);
       if (ev.f2_state) updateFighterState(qs("#f2NameBar"), qs("#f2StateBar"), ev.f2_state);
       if (ev.f1_total_score != null) updateScoreBars(ev.f1_total_score, ev.f2_total_score);
+      if (ev.f1_momentum != null) updateMomentumBars(ev.f1_momentum, ev.f2_momentum, ev.crowd_excitement);
     }
 
     if (fightSpeed > 0) {
@@ -1777,6 +1890,10 @@ async function refreshCareerTab() {
   qs("#cTrait").textContent = traitName;
   qs("#cPersonality").textContent = persName;
   qs("#cRating").textContent = f.rating;
+  const primeStatus = f.prime_status || "unknown";
+  const primeColor = primeStatus === "prime" ? "#4aff6a" : (primeStatus === "developing" ? "#4a9eff" : "#ff9a4a");
+  qs("#cPrime").innerHTML = `<span style="color:${primeColor}">${primeStatus.charAt(0).toUpperCase() + primeStatus.slice(1)}</span>`;
+  qs("#cSignature").textContent = f.signature_strike || "None yet";
 
   if (con) {
     qs("#cBasePay").textContent = `$${con.base_pay.toLocaleString()}`;
@@ -1794,6 +1911,14 @@ async function refreshCareerTab() {
     qs("#cTitles").textContent = car.title_defenses;
     qs("#cEarnings").textContent = `$${(car.earnings || 0).toLocaleString()}`;
     qs("#cRivalries").textContent = car.rivalries;
+    qs("#cDamage").textContent = f.career_damage ? f.career_damage.toFixed(0) : "0";
+    qs("#cFights").textContent = f.career_fights || 0;
+    if (car.awards && Object.keys(car.awards).length) {
+      const awardList = Object.keys(car.awards).join(", ");
+      qs("#cAwards").innerHTML = `<span style="color:#ffd700">${escHtml(awardList)}</span>`;
+    } else {
+      qs("#cAwards").textContent = "None";
+    }
   }
 
   const physLabels = ["striking_power","striking_accuracy","hand_speed","kick_power","kick_accuracy","kick_speed","takedown_power","takedown_accuracy","wrestling_defense","clinch_control","clinch_escapes","clinch_strikes","clinch_throws","top_control","bottom_control","submission_offense","submission_defense","cardio","durability","athleticism"];

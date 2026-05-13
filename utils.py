@@ -276,6 +276,83 @@ GYMS = [
 ]
 
 
+# ============= STANCE CONSTANTS =============
+
+STANCES = ["orthodox", "southpaw"]
+
+def get_stance_for_background(background: str) -> str:
+    southpaw_high = ["taekwondo", "karate", "muay_thai", "capoeira"]
+    orthodox_high = ["boxing", "wrestling", "judo"]
+    if background in southpaw_high:
+        return "southpaw" if random.random() < 0.55 else "orthodox"
+    elif background in orthodox_high:
+        return "orthodox" if random.random() < 0.65 else "southpaw"
+    else:
+        return random.choice(STANCES)
+
+def get_stance_modifiers(attacker_stance: str, defender_stance: str) -> dict:
+    if attacker_stance == defender_stance:
+        return {"power_mod": 1.0, "speed_mod": 1.0, "accuracy_mod": 1.02, "clinch_mod": 1.1}
+    else:
+        return {"power_mod": 1.06, "speed_mod": 0.98, "accuracy_mod": 0.97, "clinch_mod": 0.95}
+
+# ============= FEINT SYSTEM =============
+
+FEINT_BASE_CHANCE = 0.05
+FEINT_MAX_CHANCE = 0.15
+
+def calculate_feint_chance(fight_iq: float, strategy_modifiers: dict) -> float:
+    base = FEINT_BASE_CHANCE + (fight_iq / 1000.0)
+    strat_bonus = strategy_modifiers.get("feint_chance", 0.0)
+    return min(FEINT_MAX_CHANCE, base + strat_bonus)
+
+def calculate_feint_recognition(fight_iq: float, adaptability: float) -> float:
+    return min(0.4, (fight_iq + adaptability) / 400.0)
+
+# ============= BREATHING SYSTEM =============
+
+BREATHING_THRESHOLDS = {
+    "normal": {"min": 70, "cardio_recovery_mod": 1.0, "body_damage_mod": 1.0},
+    "impaired": {"min": 50, "cardio_recovery_mod": 0.90, "body_damage_mod": 1.1},
+    "struggling": {"min": 30, "cardio_recovery_mod": 0.75, "body_damage_mod": 1.2},
+    "critical": {"min": 0, "cardio_recovery_mod": 0.55, "body_damage_mod": 1.35},
+}
+BREATHING_RECOVERY_BETWEEN_ROUNDS = 15
+
+def get_breathing_level(breathing_capacity: float) -> str:
+    for level in ["normal", "impaired", "struggling", "critical"]:
+        if breathing_capacity >= BREATHING_THRESHOLDS[level]["min"]:
+            return level
+    return "critical"
+
+def get_breathing_recovery_modifier(breathing_capacity: float) -> float:
+    level = get_breathing_level(breathing_capacity)
+    return BREATHING_THRESHOLDS[level]["cardio_recovery_mod"]
+
+# ============= ENHANCED COMBO SYSTEM =============
+
+COMBOS = [
+    {"id": "1-2", "strikes": ["jab", "cross"], "power_bonus": 0.15, "stamina_mult": 1.1, "iq_req": 15, "type": "striking"},
+    {"id": "1-2-3", "strikes": ["jab", "cross", "hook"], "power_bonus": 0.25, "stamina_mult": 1.3, "iq_req": 30, "type": "striking"},
+    {"id": "jab-hook", "strikes": ["jab", "hook"], "power_bonus": 0.20, "stamina_mult": 1.15, "iq_req": 20, "type": "striking"},
+    {"id": "double-jab-cross", "strikes": ["jab", "jab", "cross"], "power_bonus": 0.20, "stamina_mult": 1.25, "iq_req": 25, "type": "striking"},
+    {"id": "uppercut-hook", "strikes": ["uppercut", "hook"], "power_bonus": 0.35, "stamina_mult": 1.4, "iq_req": 35, "type": "striking"},
+    {"id": "3-2-body", "strikes": ["jab", "cross", "body_shot"], "power_bonus": 0.20, "stamina_mult": 1.2, "iq_req": 25, "type": "striking"},
+    {"id": "jab-cross-hook", "strikes": ["jab", "cross", "hook"], "power_bonus": 0.28, "stamina_mult": 1.35, "iq_req": 32, "type": "striking"},
+    {"id": "hook-uppercut-hook", "strikes": ["hook", "uppercut", "hook"], "power_bonus": 0.40, "stamina_mult": 1.5, "iq_req": 42, "type": "striking"},
+    {"id": "jab-cross-kick", "strikes": ["jab", "cross", "kick"], "power_bonus": 0.30, "stamina_mult": 1.45, "iq_req": 35, "type": "striking"},
+    {"id": "cross-hook-kick", "strikes": ["cross", "hook", "kick"], "power_bonus": 0.35, "stamina_mult": 1.5, "iq_req": 40, "type": "striking"},
+    {"id": "knee-elbow-knee", "strikes": ["knee", "elbow", "knee"], "power_bonus": 0.40, "stamina_mult": 1.5, "iq_req": 38, "type": "clinch"},
+    {"id": "elbow-elbow-knee", "strikes": ["elbow", "elbow", "knee"], "power_bonus": 0.35, "stamina_mult": 1.4, "iq_req": 35, "type": "clinch"},
+    {"id": "ground-hammer-punch", "strikes": ["hammerfist", "punch", "hammerfist"], "power_bonus": 0.25, "stamina_mult": 1.3, "iq_req": 20, "type": "ground"},
+    {"id": "ground-elbow-hammer", "strikes": ["elbow", "hammerfist", "punch"], "power_bonus": 0.30, "stamina_mult": 1.35, "iq_req": 25, "type": "ground"},
+]
+
+def get_combos_for_position(position: str) -> list:
+    type_map = {"standing": "striking", "clinch": "clinch", "ground": "ground"}
+    pos_type = type_map.get(position, "striking")
+    return [c for c in COMBOS if c.get("type") == pos_type]
+
 # ============= NEW REVPAMP FUNCTIONS =============
 
 def calculate_defense_score(durability: float, composure: float, fight_iq: float, is_hurt: bool, is_stunned: bool) -> float:

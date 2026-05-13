@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 from fighter import Fighter
 from datetime import datetime, timedelta
+import random
 import utils
 
 class Transaction:
@@ -59,6 +60,22 @@ class FinancialSystem:
             "remaining_months": duration_months
         }
 
+    def add_ppv_revenue(self, ppv_buys: int, fighter_share: float = 0.02, game_date: datetime = None):
+        revenue = ppv_buys * 49.99 * fighter_share
+        self.add_income(revenue, "ppv_revenue", f"PPV revenue: {utils.format_currency(revenue)}", game_date)
+        return revenue
+
+    def apply_taxes(self, game_date: datetime = None) -> float:
+        monthly_income = sum(t.amount for t in self.transactions
+                              if t.category in ("fight_purse", "sponsorship", "bonus_fotn",
+                                                "bonus_potn", "ppv_revenue", "merchandise")
+                              and (game_date and (game_date - t.date).days <= 30))
+        if monthly_income > 50000:
+            tax = monthly_income * 0.30
+            self.add_expense(tax, "taxes", f"Tax on {utils.format_currency(monthly_income)} income", game_date)
+            return tax
+        return 0.0
+
     def process_monthly(self, game_date: datetime = None):
         self.add_expense(MONTHLY_LIVING_EXPENSE, "living_expenses", "Monthly living expenses", game_date)
 
@@ -79,6 +96,9 @@ class FinancialSystem:
             if inv["months_remaining"] <= 0:
                 self.add_income(inv["amount"] * (1 + inv["return_rate"]), "investment", "Investment return", game_date)
                 self.investments.remove(inv)
+
+        # Apply taxes on monthly income
+        self.apply_taxes(game_date)
 
         if self.net_worth < 0:
             self.consecutive_broke_months += 1

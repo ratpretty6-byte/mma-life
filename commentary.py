@@ -421,6 +421,36 @@ class CommentaryEngine:
             "Another body shot from {attacker}! You can see {defender} wilting!",
         ]
 
+        self.liver_shot_commentary = [
+            "RIGHT TO THE LIVER! That shot folds {defender}!",
+            "Liver shot! {attacker} digs deep and {defender} is in agony!",
+            "A brutal body shot to the liver — {defender} is hurting badly!",
+            "Devastating liver kick! {defender} is crumpling!",
+            "{attacker} finds the liver with a perfect shot! {defender} is gasping!",
+        ]
+
+        self.solar_plexus_commentary = [
+            "BODY SHOT! {attacker} drives a shot into the solar plexus — {defender} is winded!",
+            "That shot to the midsection takes {defender}'s breath away!",
+            "{attacker} lands flush on the solar plexus — {defender} is struggling to breathe!",
+            "A perfect shot to the solar plexus from {attacker}. {defender} is hurt!",
+        ]
+
+        self.rib_shot_commentary = [
+            "{attacker} lands a hard shot to {defender}'s ribs — those are starting to add up!",
+            "A vicious shot to the ribs from {attacker}! {defender} winces!",
+            "{attacker} targets the ribs — you can see that shot landed deep!",
+            "{defender} may have cracked ribs from that {strike_type}!",
+        ]
+
+        self.breathing_commentary = [
+            "{fighter} is breathing heavily now, that body work is paying off!",
+            "{fighter} is gasping for air — body damage is taking its toll!",
+            "{fighter} is laboring to breathe, hands dropping below the chin!",
+            "{fighter} looks exhausted, the body shots have slowed them significantly!",
+            "{fighter} can't seem to catch their breath!",
+        ]
+
         self.post_fight_templates = {
             "decision": [
                 "After three hard rounds, the judges score the bout... {score_detail}",
@@ -567,6 +597,25 @@ class CommentaryEngine:
             "The tide is turning! {fighter} is finding a second wind!",
         ]
 
+        self.momentum_commentary = [
+            "{fighter} is on fire right now! Momentum is all theirs!",
+            "{fighter} is building serious momentum — {opponent} can't get anything going!",
+            "{fighter} is in the zone! Every shot is landing!",
+            "The crowd is feeding off {fighter}'s energy! What a surge!",
+            "{fighter} is raining down shots — {opponent} needs to weather this storm!",
+            "{opponent} is wilting under {fighter}'s pressure!",
+        ]
+
+        self.crowd_commentary = [
+            "The crowd is on their feet! This is incredible!",
+            "The atmosphere is electric in here tonight!",
+            "The fans are roaring — they love what they're seeing!",
+            "What an atmosphere! This is why we love this sport!",
+            "The roof is coming off! What a fight we have here!",
+            "You can feel the energy in the building!",
+            "The crowd is going WILD! What a moment!",
+        ]
+
         self.bonus_templates = [
             "Fight of the Night: {fotn} — both warriors earn {amount}!",
             "Performance of the Night: {potn} takes home an extra {amount}!",
@@ -661,6 +710,18 @@ class CommentaryEngine:
                 lower_ranked = fighter1 if rank1 > rank2 else fighter2
                 higher_ranked = fighter2 if rank1 > rank2 else fighter1
                 diff = abs(rank1 - rank2)
+
+                # Reach comparison
+                reach_diff = fighter1.reach - fighter2.reach
+                if abs(reach_diff) >= 3:
+                    longer_fighter = fighter1 if reach_diff > 0 else fighter2
+                    parts.append(f"{longer_fighter.name} has a {abs(reach_diff)}-inch reach advantage")
+
+                # Weight comparison (if same weight class, mention natural weight)
+                weight_diff = fighter1.base_weight_lbs - fighter2.base_weight_lbs
+                if abs(weight_diff) >= 10:
+                    heavier = fighter1 if weight_diff > 0 else fighter2
+                    parts.append(f"{heavier.name} comes in {abs(weight_diff)}lbs heavier")
 
                 if diff > 5 and lower_ranked:
                     difficulty = "tough ask" if diff > 20 else ("step up" if diff > 10 else "interesting test")
@@ -875,6 +936,17 @@ class CommentaryEngine:
         if perf_of_night:
             results.append(f"Performance of the Night: {perf_of_night} takes home {amount}!")
         return "\n".join(results) if results else ""
+
+    def generate_momentum_commentary(self, fighter: Fighter, opponent: Fighter, momentum: int) -> Optional[str]:
+        if abs(momentum) < 20:
+            return None
+        template = random.choice(self.momentum_commentary)
+        return template.format(fighter=fighter.name, opponent=opponent.name)
+
+    def generate_crowd_commentary(self, excitement: int) -> Optional[str]:
+        if excitement < 70:
+            return None
+        return random.choice(self.crowd_commentary)
 
     def generate_fatigue_commentary(self, fighter: Fighter, fatigue: float) -> Optional[str]:
         """Generate fatigue-related commentary based on fatigue level."""

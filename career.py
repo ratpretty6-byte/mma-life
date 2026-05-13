@@ -5,6 +5,7 @@ from events import FightBooking
 from datetime import datetime, timedelta
 import utils
 import random
+from news import StorylineTracker
 
 class Rivalry:
     def __init__(self, fighter1: Fighter, fighter2: Fighter):
@@ -30,6 +31,9 @@ class Rivalry:
     def get_opponent(self, fighter: Fighter) -> Fighter:
         return self.fighter2 if fighter == self.fighter1 else self.fighter1
 
+AWARD_CATEGORIES = ["Fighter of the Year", "Knockout of the Year", "Submission of the Year",
+                     "Fight of the Year", "Comeback of the Year", "Rookie of the Year"]
+
 class CareerSystem:
     def __init__(self, fighter: Fighter):
         self.fighter = fighter
@@ -44,6 +48,16 @@ class CareerSystem:
         self._fastest_ko_round = 99
         self._most_consecutive_wins = 0
         self._longest_win_streak = 0
+        self.storyline_tracker = StorylineTracker()
+        self.season_months = 0
+        self._awards: Dict[str, int] = {}
+        self._yearly_wins = 0
+        self._yearly_kos = 0
+        self._yearly_subs = 0
+        self._best_ko_this_year = None
+        self._best_sub_this_year = None
+        self._best_fight_this_year = None
+        self._current_season_fights: List[Dict] = []
 
     def sign_with_promotion(self, promotion: Promotion, fights: int = 4, game_date: datetime = None) -> bool:
         if self.current_promotion:
@@ -144,6 +158,72 @@ class CareerSystem:
             "retired": self.fighter.retired,
             "milestones": getattr(self, '_milestones', []),
         }
+
+    def advance_season(self, game_date: datetime) -> Optional[Dict]:
+        self.season_months += 1
+        if game_date and game_date.month == 12 and game_date.day >= 25:
+            return self._calculate_year_end_awards()
+        return None
+
+    def record_season_fight(self, won: bool, method: str, round_num: int, opponent: Fighter, is_title: bool = False):
+        self._current_season_fights.append({
+            "won": won, "method": method, "round": round_num,
+            "opponent": opponent.name, "opponent_rating": opponent.get_overall_rating(),
+            "is_title": is_title, "date": datetime.now(),
+        })
+        self._yearly_wins += 1 if won else 0
+        if "KO" in method:
+            self._yearly_kos += 1
+            ko_rd = round_num or 99
+            if not self._best_ko_this_year or ko_rd < self._best_ko_this_year.get("round", 99):
+                self._best_ko_this_year = {"opponent": opponent.name, "round": round_num}
+        if "Submission" in method:
+            self._yearly_subs += 1
+            self._best_sub_this_year = self._best_sub_this_year or {"opponent": opponent.name, "method": method}
+        if round_num and round_num >= 3 and won:
+            fight_score = (opponent.get_overall_rating() if opponent.get_overall_rating() > 50 else 0)
+            if not self._best_fight_this_year or fight_score > self._best_fight_this_year.get("score", 0):
+                self._best_fight_this_year = {"opponent": opponent.name, "round": round_num, "score": fight_score}
+
+    def _calculate_year_end_awards(self) -> Dict:
+        awards = {}
+        if self._yearly_wins >= 5:
+            awards["Fighter of the Year"] = 1
+        if self._best_ko_this_year:
+            awards["Knockout of the Year"] = 1
+        if self._best_sub_this_year:
+            awards["Submission of the Year"] = 1
+        if self._best_fight_this_year:
+            awards["Fight of the Year"] = 1
+        if self._yearly_wins >= 3 and self.fighter.age <= 23:
+            awards["Rookie of the Year"] = 1
+        comeback = sum(1 for f in self._current_season_fights if not f["won"])
+        if self._yearly_wins >= 3 and comeback >= 2:
+            wins_after_loss = sum(1 for i, f in enumerate(self._current_season_fights)
+                                   if not f["won"] and i + 1 < len(self._current_season_fights)
+                                   and self._current_season_fights[i + 1]["won"])
+            if wins_after_loss >= 1:
+                awards["Comeback of the Year"] = 1
+
+        for cat in awards:
+            self._awards[cat] = self._awards.get(cat, 0) + 1
+            self._milestones.append(f"{cat} — {self.fighter.name} wins {cat}!")
+            if cat == "Fighter of the Year":
+                self.fighter.attributes["charisma"] = utils.clamp(
+                    self.fighter.attributes.get("charisma", 50) + 3, utils.ATTR_MIN, utils.ATTR_MAX)
+
+        # Reset yearly counters
+        self._yearly_wins = 0
+        self._yearly_kos = 0
+        self._yearly_subs = 0
+        self._best_ko_this_year = None
+        self._best_sub_this_year = None
+        self._best_fight_this_year = None
+        self._current_season_fights = []
+
+        if awards:
+            return {"type": "award", "awards": list(awards.keys()), "winner": self.fighter.name}
+        return None
 
     def check_milestones(self, won: bool, method: str, round_num: int) -> List[str]:
         new_milestones = []

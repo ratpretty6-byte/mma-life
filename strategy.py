@@ -20,7 +20,7 @@ STRATEGIES = [
         "name": "Defensive Striking",
         "description": "Counter-punching and distance management",
         "modifiers": {"striking_accuracy": 1.15, "wrestling_defense": 1.1, "hand_speed": 0.9,
-                      "striking_power": 0.9, "cardio_drain": 0.9, "parry_chance": 1.2},
+                      "striking_power": 0.9, "cardio_drain": 0.9, "parry_chance": 1.2, "feint_chance": 0.03},
         "counters": ["aggressive_striking", "volume_striking"],
         "preferred_position": "standing",
         "action_weights": {"strike": 0.75, "takedown": 0.10, "clinch": 0.15},
@@ -70,7 +70,7 @@ STRATEGIES = [
         "name": "Volume Striking",
         "description": "High output, accumulating damage with low-damage strikes",
         "modifiers": {"hand_speed": 1.2, "striking_accuracy": 1.1, "striking_power": 0.8,
-                      "cardio_drain": 1.1, "combo_frequency": 1.15},
+                      "cardio_drain": 1.1, "combo_frequency": 1.25},
         "counters": ["power_hunting", "defensive_striking"],
         "preferred_position": "standing",
         "action_weights": {"strike": 0.90, "takedown": 0.05, "clinch": 0.05},
@@ -161,7 +161,7 @@ STRATEGIES = [
         "name": "Counter Striker",
         "description": "Let opponent come forward, punish with precise counters",
         "modifiers": {"striking_accuracy": 1.2, "hand_speed": 1.05, "composure": 1.1,
-                      "striking_power": 0.95, "counter_power": 1.3, "defensive_striking": 1.15},
+                      "striking_power": 0.95, "counter_power": 1.3, "defensive_striking": 1.15, "feint_chance": 0.02},
         "counters": ["aggressive_striking", "power_hunting", "brawler"],
         "preferred_position": "standing",
         "action_weights": {"strike": 0.70, "takedown": 0.10, "clinch": 0.20},
@@ -171,7 +171,7 @@ STRATEGIES = [
         "name": "Brawler",
         "description": "Walk forward, absorb punishment, deal heavy damage",
         "modifiers": {"striking_power": 1.25, "durability": 1.1, "aggression": 1.15,
-                      "striking_accuracy": 0.88, "cardio_drain": 1.1, "heart": 1.1},
+                      "striking_accuracy": 0.88, "cardio_drain": 1.1, "heart": 1.1, "feint_chance": -0.02},
         "counters": ["counter_striker", "leg_kick_focus"],
         "preferred_position": "standing",
         "action_weights": {"strike": 0.85, "takedown": 0.10, "clinch": 0.05},
@@ -198,7 +198,11 @@ class StrategySystem:
         self.pre_fight_strategy: Optional[Dict] = None
         self.switch_penalty = 0.0
         self._opponent_strategy: Optional[Dict] = None
-        self._previous_strategies: List[str] = []  # Track recent strategy switches for pattern detection
+        self._previous_strategies: List[str] = []
+        # Strategy drift (gradual adaptation)
+        self.drift_target_id: Optional[str] = None
+        self.drift_progress: float = 0.0
+        self._last_evaluation: str = "maintain"
 
     def set_opponent_strategy(self, strategy: Optional[Dict]):
         self._opponent_strategy = strategy
@@ -210,6 +214,8 @@ class StrategySystem:
                 self.current_strategy = strategy
                 self.switch_penalty = 0.0
                 self._previous_strategies = [strategy_id]
+                self.drift_target_id = None
+                self.drift_progress = 0.0
                 return True
         return False
 
@@ -219,22 +225,43 @@ class StrategySystem:
                 old_strategy = self.current_strategy
                 self.current_strategy = strategy
 
-                # Adaptability affects switch penalty (lower is better)
                 adaptability = self.fighter.get_effective_attribute("adaptability", 0) / 100.0
                 self.switch_penalty = max(0.01, 0.08 - adaptability * 0.06)
 
-                # Track strategy pattern for AI
                 self._previous_strategies.append(new_strategy_id)
                 if len(self._previous_strategies) > 5:
                     self._previous_strategies.pop(0)
 
-                # Apply training camp bonuses if any
                 if old_strategy and old_strategy.get("id") == new_strategy_id:
-                    # No penalty for staying the same — reduced penalty
                     self.switch_penalty *= 0.5
 
+                self.drift_target_id = None
+                self.drift_progress = 0.0
                 return True
         return False
+
+    def drift_toward_strategy(self, target_id: str, fight_iq: float, adaptability: float) -> bool:
+        """Gradually drift action weights toward a target strategy."""
+        if target_id == (self.current_strategy or {}).get("id"):
+            return False
+        # Find the target strategy
+        target = None
+        for s in STRATEGIES:
+            if s["id"] == target_id:
+                target = s
+                break
+        if not target:
+            return False
+        # Set drift target
+        self.drift_target_id = target_id
+        # Drift rate based on adaptability (0.1-0.3 per evaluation)
+        drift_rate = 0.10 + (adaptability / 100.0) * 0.20
+        self.drift_progress = min(1.0, self.drift_progress + drift_rate)
+        # When drift completes, fully switch
+        if self.drift_progress >= 1.0:
+            self.adjust_strategy(target_id)
+            return True
+        return True
 
     def get_modifiers(self) -> Dict[str, float]:
         if not self.current_strategy:
@@ -278,6 +305,21 @@ class StrategySystem:
         if not self.current_strategy:
             return {"strike": 0.7, "takedown": 0.15, "clinch": 0.15}
         weights = self.current_strategy.get("action_weights", {}).copy()
+
+        # Drift blending: mix current and target weights
+        if self.drift_target_id and self.drift_progress > 0 and self.drift_progress < 1.0:
+            target = None
+            for s in STRATEGIES:
+                if s["id"] == self.drift_target_id:
+                    target = s
+                    break
+            if target:
+                target_weights = target.get("action_weights", {})
+                for key in set(list(weights.keys()) + list(target_weights.keys())):
+                    current_w = weights.get(key, 0)
+                    target_w = target_weights.get(key, 0)
+                    weights[key] = current_w * (1 - self.drift_progress) + target_w * self.drift_progress
+
         if self.switch_penalty > 0:
             for key in weights:
                 weights[key] *= (1 - self.switch_penalty * 0.5)
@@ -312,24 +354,25 @@ class StrategySystem:
         and suggest counter-strategies.
         """
         iq = self.fighter.get_effective_attribute("fight_iq", 0)
+        adaptability = self.fighter.get_effective_attribute("adaptability", 0)
         if iq < 40 or len(opponent_action_history) < 4:
             return None
 
         from collections import Counter
-        recent = opponent_action_history[-6:]
+        recent = opponent_action_history[-8:]
         pattern = Counter(recent)
         most_common, count = pattern.most_common(1)[0]
 
-        # If opponent repeats same action 4+ times in last 6
+        # If opponent repeats same action 4+ times in last 8
         if count >= 4:
-            # High IQ fighters recognize and adapt
-            if random.random() < (iq / 150.0):
-                # Return an appropriate counter
+            adaptation_chance = (iq / 150.0) * (1.0 + adaptability / 300.0)
+            if random.random() < adaptation_chance:
                 counter_map = {
                     "jab": "slip_cross",
                     "cross": "parry_hook",
                     "takedown_attempt": "sprawl",
                     "clinch_attempt": "underhook",
+                    "kick": "check_kick",
                 }
                 return counter_map.get(most_common)
         return None
@@ -372,6 +415,17 @@ class StrategySystem:
             if s["id"] == strategy_id:
                 return s
         return None
+
+    @staticmethod
+    def evaluate_round_effectiveness(fighter: Fighter, opponent: Fighter, round_num: int,
+                                       round_score_diff: int, damage_taken_pct: float) -> str:
+        if round_score_diff < -2 and damage_taken_pct > 40:
+            return "desperate_switch"
+        elif round_score_diff < -1:
+            return "need_change"
+        elif round_score_diff > 1 and damage_taken_pct < 20:
+            return "keep_winning"
+        return "maintain"
 
     @staticmethod
     def pick_ai_strategy(fighter: Fighter, opponent_fighter: Fighter, round_scores: List[int],

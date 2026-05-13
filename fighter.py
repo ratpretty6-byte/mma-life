@@ -19,6 +19,12 @@ class Fighter:
         "charisma", "aggression", "composure", "adaptability"
     ]
 
+    # Prime age range: 24-33 is peak performance
+    PRIME_START = 24
+    PRIME_END = 33
+    DECLINE_START = 34
+    STEEP_DECLINE = 39
+
     # 10 body zones — more granular than old head/body/legs model
     BODY_ZONES = [
         "left_eye", "right_eye", "jaw", "temple", "nose",
@@ -30,7 +36,7 @@ class Fighter:
     ZONE_KO_MULTIPLIER = {
         "jaw": 1.4, "temple": 1.8, "nose": 1.0,
         "left_eye": 0.7, "right_eye": 0.7,
-        "solar_plexus": 1.3, "liver": 1.5,
+        "solar_plexus": 1.3, "liver": 1.5, "ribs": 0.9,
         "chest": 0.6, "kidneys": 0.8,
         "lead_leg": 0.5, "rear_leg": 0.6
     }
@@ -39,13 +45,13 @@ class Fighter:
     ZONE_GROUPS = {
         "left_eye": "head", "right_eye": "head", "jaw": "head",
         "temple": "head", "nose": "head",
-        "chest": "body", "solar_plexus": "body", "liver": "body",
+        "chest": "body", "solar_plexus": "body", "liver": "body", "ribs": "body",
         "lead_leg": "legs", "rear_leg": "legs"
     }
 
     def __init__(self, name: str, age: int, weight_lbs: float, background: str = "mma", archetype: str = "balanced",
                  nationality: str = "American", home_region: str = "California", trait_id: str = None, personality_id: str = "humble",
-                 game_date: datetime = None):
+                 stance: str = None, game_date: datetime = None):
         self.name = name
         self.age = age
         self.base_weight_lbs = weight_lbs
@@ -59,6 +65,7 @@ class Fighter:
         self.home_region = home_region
         self.trait_id = trait_id
         self.personality_id = personality_id
+        self.stance = stance or utils.get_stance_for_background(background)
 
         self.height = random.randint(64, 80)
         self.reach = random.randint(64, 84)
@@ -100,6 +107,25 @@ class Fighter:
 
         self.retired = False
         self.retirement_date = None
+
+        # Cumulative trauma tracking (career damage)
+        self.career_damage_taken = 0.0
+        self.career_ko_losses = 0
+        self.career_total_fights = 0
+        self.concussion_count = 0
+
+        # Signature move tracking
+        self.signature_strikes = {}
+        self.nickname = None
+
+        # Scouting data
+        self.times_scouted = 0
+        self.preferred_strategies = []
+
+        # Weight migration state
+        self.migrating_weight_class = None
+        self.migration_camps_remaining = 0
+        self._style_evolution_tracker: Dict[str, int] = {}
 
     def _init_attributes(self):
         base = 50
@@ -190,7 +216,7 @@ class Fighter:
         if zone == "head":
             target_zone = random.choice(["left_eye", "right_eye", "jaw", "temple", "nose"])
         elif zone == "body":
-            target_zone = random.choice(["chest", "solar_plexus", "liver"])
+            target_zone = random.choice(["chest", "solar_plexus", "liver", "ribs"])
         elif zone == "legs":
             target_zone = random.choice(["lead_leg", "rear_leg"])
 
@@ -230,9 +256,9 @@ class Fighter:
         age_mod = 1.0 - max(0, (self.age - 30)) * 0.005
         return base * age_mod * 2.0
 
-    def get_effective_attribute(self, attr: str, fatigue: float = 0.0) -> int:
+    def get_effective_attribute(self, attr: str, fatigue: float = 0.0, in_fight: bool = False) -> int:
         base = self.attributes.get(attr, 50)
-        age_mod = utils.get_age_modifier(self.age)
+        age_mod = self.get_prime_age_modifier()
 
         injury_penalty = 0.0
         for injury in self.injuries:
@@ -247,16 +273,29 @@ class Fighter:
         elif attr in ("striking_power", "kick_power"):
             injury_penalty += cut_penalties["strength_penalty"]
 
-        ring_rust = self.get_ring_rust_penalty()
+        ring_rust = self.get_ring_rust_penalty(in_fight=in_fight)
         confidence_mod = self.get_confidence_modifier()
 
         effective = base * age_mod * (1.0 - ring_rust) * confidence_mod
         return utils.calculate_effective_attribute(effective, fatigue, injury_penalty)
 
-    def get_ring_rust_penalty(self) -> float:
-        if self.months_inactive <= 6:
+    def get_prime_age_modifier(self) -> float:
+        if self.age < self.PRIME_START:
+            return 0.85 + (self.age - 18) * 0.025
+        elif self.age <= self.PRIME_END:
+            return 1.0
+        elif self.age < self.STEEP_DECLINE:
+            return max(0.85, 1.0 - (self.age - self.PRIME_END) * 0.02)
+        else:
+            return max(0.70, 1.0 - (self.age - self.STEEP_DECLINE) * 0.04)
+
+    def get_ring_rust_penalty(self, in_fight: bool = False) -> float:
+        if self.months_inactive <= 4:
             return 0.0
-        return min(0.25, (self.months_inactive - 6) * 0.03)
+        base = min(0.25, (self.months_inactive - 4) * 0.03)
+        if in_fight:
+            return base * 1.5
+        return base
 
     def get_confidence_modifier(self) -> float:
         bonus = self.win_streak * 0.02
@@ -294,6 +333,65 @@ class Fighter:
     def monthly_aging(self, game_date: datetime = None):
         self.months_inactive += 1
         self.apply_skill_decay(game_date)
+        self.apply_career_trauma_effects()
+
+    def apply_career_trauma_effects(self):
+        cumul = self.career_damage_taken
+        if cumul >= 700 and random.random() < 0.05:
+            self.retired = True
+        trauma_reduction = 0
+        if cumul >= 500:
+            trauma_reduction = 5
+        elif cumul >= 300:
+            trauma_reduction = 3
+        elif cumul >= 100:
+            trauma_reduction = 1
+        if trauma_reduction > 0:
+            for attr in self.PHYSICAL_ATTRS:
+                self.attributes[attr] = max(utils.ATTR_MIN, self.attributes[attr] - trauma_reduction * 0.02)
+
+    def record_fight_damage(self, damage_taken: float, was_ko: bool = False):
+        self.career_damage_taken += damage_taken
+        self.career_total_fights += 1
+        if was_ko:
+            self.career_ko_losses += 1
+
+    def record_training_type(self, drill_type: str, count: int = 1):
+        self._style_evolution_tracker[drill_type] = self._style_evolution_tracker.get(drill_type, 0) + count
+
+    def check_style_evolution(self) -> Optional[str]:
+        if not self._style_evolution_tracker:
+            return None
+        total = sum(self._style_evolution_tracker.values())
+        if total < 12:
+            return None
+        dominant = max(self._style_evolution_tracker, key=self._style_evolution_tracker.get)
+        dominant_count = self._style_evolution_tracker[dominant]
+        ratio = dominant_count / total
+
+        if ratio < 0.4:
+            return None
+        if self.age > 33 and random.random() < 0.3:
+            if self.archetype in ["brawler", "boxer", "kickboxer"]:
+                return "counter_striker"
+        if self.age < 25 and dominant in ("striking", "clinch", "grappling") and random.random() < 0.15:
+            arch_map = {"striking": "boxer", "clinch": "muay_thai", "grappling": "submission_artist",
+                        "sparring": "balanced", "conditioning": "balanced", "mental": "counter_striker"}
+            new_arch = arch_map.get(dominant)
+            if new_arch and new_arch != self.archetype and random.random() < 0.1:
+                return new_arch
+        return None
+
+    def record_signature_strike(self, strike_type: str):
+        self.signature_strikes[strike_type] = self.signature_strikes.get(strike_type, 0) + 1
+
+    def get_signature_strike(self) -> Optional[str]:
+        if not self.signature_strikes:
+            return None
+        best = max(self.signature_strikes, key=self.signature_strikes.get)
+        if self.signature_strikes[best] >= 20:
+            return best
+        return None
 
     def cut_weight(self, target_weight_lbs: float) -> bool:
         self.weight_cut_lbs = max(0, self.base_weight_lbs - target_weight_lbs)
@@ -302,6 +400,61 @@ class Fighter:
             return False
         self.current_weight_lbs = target_weight_lbs
         self.weigh_in_pass = True
+        return True
+
+    def migrate_weight_class_up(self, target_weight: float) -> bool:
+        if self.migration_camps_remaining > 0:
+            return False
+        target_wc = utils.get_weight_class(target_weight)
+        current_idx = utils.get_weight_class_index(self.weight_class)
+        target_idx = utils.get_weight_class_index(target_wc)
+        if target_idx <= current_idx:
+            return False
+        self.migrating_weight_class = target_wc
+        self.migration_camps_remaining = 2
+        return True
+
+    def migrate_weight_class_down(self, target_weight: float) -> bool:
+        if self.migration_camps_remaining > 0:
+            return False
+        target_wc = utils.get_weight_class(target_weight)
+        current_idx = utils.get_weight_class_index(self.weight_class)
+        target_idx = utils.get_weight_class_index(target_wc)
+        if target_idx >= current_idx:
+            return False
+        self.migrating_weight_class = target_wc
+        self.migration_camps_remaining = 2
+        return True
+
+    def advance_migration(self):
+        if self.migration_camps_remaining <= 0:
+            return False
+        self.migration_camps_remaining -= 1
+        if self.migration_camps_remaining <= 0 and self.migrating_weight_class:
+            current_idx = utils.get_weight_class_index(self.weight_class)
+            target_idx = utils.get_weight_class_index(self.migrating_weight_class)
+            is_up = target_idx > current_idx
+            for wc in utils.WEIGHT_CLASSES:
+                if wc["name"] == self.migrating_weight_class:
+                    new_weight = random.randint(wc["min"], wc["max"])
+                    self.adjust_weight(new_weight)
+                    if is_up:
+                        for attr in ["hand_speed", "kick_speed", "athleticism", "cardio"]:
+                            self.attributes[attr] = utils.clamp(
+                                self.attributes.get(attr, 50) - 4, utils.ATTR_MIN, utils.ATTR_MAX)
+                        for attr in ["striking_power", "durability"]:
+                            self.attributes[attr] = utils.clamp(
+                                self.attributes.get(attr, 50) + 3, utils.ATTR_MIN, utils.ATTR_MAX)
+                    else:
+                        for attr in ["hand_speed", "kick_speed", "athleticism", "cardio"]:
+                            self.attributes[attr] = utils.clamp(
+                                self.attributes.get(attr, 50) + 4, utils.ATTR_MIN, utils.ATTR_MAX)
+                        for attr in ["striking_power", "durability"]:
+                            self.attributes[attr] = utils.clamp(
+                                self.attributes.get(attr, 50) - 3, utils.ATTR_MIN, utils.ATTR_MAX)
+                    break
+            self.migrating_weight_class = None
+            return True
         return True
 
     def adjust_weight(self, new_weight_lbs: float):

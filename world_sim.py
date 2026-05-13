@@ -1,24 +1,100 @@
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from fighter import Fighter
 from promotion import Promotion
 from fight import Fight
 from events import EventSystem
+from generator import generate_single_fighter
 import random
 import copy
+import utils
 
 class WorldSimulator:
     def __init__(self, promotions: List[Promotion]):
         self.promotions = promotions
+        self.month_counter = 0
 
     def simulate_month(self, game_date: datetime, event_sys: EventSystem) -> List[Dict]:
         results = []
+        self.month_counter += 1
+
         for promo in self.promotions:
             for wc in promo.weight_classes:
                 wc_results = self._simulate_weight_class(promo, wc, game_date, event_sys)
                 results.extend(wc_results)
-            promo.update_rankings()
+            promo.update_rankings(game_date)
+
+        # Prospect pipeline: generate 2-3 new fighters every 3-4 months
+        if self.month_counter % 4 == 0:
+            prospect_news = self._generate_prospects(game_date)
+            results.extend(prospect_news)
+
+        # Retirement simulation
+        retirement_news = self._simulate_retirements(game_date)
+        results.extend(retirement_news)
+
         return results
+
+    def _generate_prospects(self, game_date: datetime) -> List[Dict]:
+        news = []
+        num_prospects = random.randint(2, 3)
+        for _ in range(num_prospects):
+            wc_idx = random.choices(range(8), weights=[0.10, 0.12, 0.14, 0.18, 0.16, 0.14, 0.10, 0.06])[0]
+            wc = utils.WEIGHT_CLASSES[wc_idx]
+            weight = random.randint(wc["min"], wc["max"])
+            fighter = generate_single_fighter(weight, skill_mean=random.gauss(25, 5), skill_std=random.gauss(10, 3))
+            fighter.age = random.randint(18, 23)
+            fighter.months_inactive = 0
+            for promo in self.promotions:
+                if promo.tier_name == "Regional":
+                    promo.sign_fighter(fighter)
+                    news.append({
+                        "type": "prospect",
+                        "fighter": fighter.name,
+                        "age": fighter.age,
+                        "weight_class": wc["name"],
+                        "promotion": promo.name,
+                    })
+                    break
+        return news
+
+    def _simulate_retirements(self, game_date: datetime) -> List[Dict]:
+        news = []
+        for promo in self.promotions:
+            for fighter in promo.fighters[:]:
+                if fighter.retired:
+                    continue
+                if fighter.age >= 40:
+                    fighter.retired = True
+                    fighter.retirement_date = game_date
+                    news.append({
+                        "type": "retirement",
+                        "fighter": fighter.name,
+                        "age": fighter.age,
+                        "record": fighter.get_record_string(),
+                        "legacy_score": 0,
+                    })
+                elif fighter.age >= 37 and fighter.loss_streak >= 3 and random.random() < 0.15:
+                    fighter.retired = True
+                    fighter.retirement_date = game_date
+                    news.append({
+                        "type": "retirement",
+                        "fighter": fighter.name,
+                        "age": fighter.age,
+                        "record": fighter.get_record_string(),
+                        "legacy_score": 0,
+                    })
+                elif fighter.career_ko_losses >= 3 and random.random() < 0.05:
+                    fighter.retired = True
+                    fighter.retirement_date = game_date
+                    news.append({
+                        "type": "retirement",
+                        "fighter": fighter.name,
+                        "age": fighter.age,
+                        "record": fighter.get_record_string(),
+                        "legacy_score": 0,
+                    })
+        return news
 
     def _simulate_weight_class(self, promo: Promotion, wc: str, game_date: datetime, event_sys: EventSystem) -> List[Dict]:
         fighters = promo.rankings.get(wc, [])
