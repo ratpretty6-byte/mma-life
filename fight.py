@@ -323,7 +323,7 @@ class Judge:
         f2_raw = -(strike_score + grapple_score + agg_score + cage_score) - noise
 
         if kd_diff != 0:
-            kd_bonus = kd_diff * 1.5
+            kd_bonus = 1.0 + max(0, kd_diff - 1) * 1.0
             f1_raw += kd_bonus
             f2_raw -= kd_bonus
 
@@ -339,10 +339,17 @@ class Judge:
             f2_round = 10
             f1_round = max(7, 10 - self._score_diff_to_points(abs(diff)))
 
-        if kd_diff >= 3:
-            f2_round = min(f2_round, 7)
-        elif kd_diff <= -3:
-            f1_round = min(f1_round, 7)
+        # 10-8 gate: rarely score 10-8 unless multiple knockdowns or massive domination
+        if (10 - min(f1_round, f2_round)) >= 2:
+            sig_f1 = rd.get("f1_sig_strikes", 0)
+            sig_f2 = rd.get("f2_sig_strikes", 0)
+            total_sig = max(sig_f1, sig_f2, 1)
+            min_ratio = min(sig_f1, sig_f2) / total_sig
+            if abs(kd_diff) < 2 and min_ratio > 0.25:
+                loser_score = max(f1_round, f2_round)
+                if loser_score == 8:
+                    f1_round = 10 if f1_round > f2_round else 9
+                    f2_round = 9 if f1_round > f2_round else 10
 
         self.scores.append([f1_round, f2_round])
         self.round_details.append(rd)
@@ -354,11 +361,11 @@ class Judge:
 
     @staticmethod
     def _score_diff_to_points(diff: float) -> int:
-        if diff < 0.3:
+        if diff < 0.5:
             return 1
-        elif diff < 1.2:
+        elif diff < 2.5:
             return 2
-        elif diff < 3.0:
+        elif diff < 4.5:
             return 3
         else:
             return 4
@@ -1248,8 +1255,8 @@ class Fight:
         if self.position_system.current_position == Position.CLINCH:
             return False
 
-        if not (atk1.get_effective_attribute("aggression", def_state1["fatigue_level"]) > 55 and
-                atk2.get_effective_attribute("aggression", def_state2["fatigue_level"]) > 55):
+        if not (atk1.get_effective_attribute("aggression", def_state1["fatigue_level"]) > 40 and
+                atk2.get_effective_attribute("aggression", def_state2["fatigue_level"]) > 40):
             return False
 
         pos = self.position_system.current_position
@@ -1303,9 +1310,16 @@ class Fight:
         atk2, def2, atk_state2, def_state2, strat2 = (
             self.fighter2, self.fighter1, self.f2_state, self.f1_state, self.strategy2)
 
-        # Determine who is the attacker this exchange
+        # Determine if this beat is an exchange (both throw) or single attacker
         agg1 = atk1.get_effective_attribute("aggression", atk_state1["fatigue_level"])
         agg2 = atk2.get_effective_attribute("aggression", atk_state2["fatigue_level"])
+
+        # Exchange beats: ~40% chance when both aggression > 40
+        if phase not in ("feeling_out",) and not Position.is_ground(self.position_system.current_position):
+            if random.random() < 0.40 and agg1 > 40 and agg2 > 40:
+                if self._simulate_exchange(atk1, def1, def_state1, atk2, def2, def_state2, phase):
+                    return
+
         if random.random() < agg1 / (agg1 + agg2 + 1):
             attacker, defender, atk_state, def_state, atk_strategy, df_strategy = \
                 atk1, def1, atk_state1, def_state1, strat1, strat2
@@ -1391,7 +1405,18 @@ class Fight:
         else:
             self._execute_single_strike(attacker, defender, atk_state, def_state, atk_strategy, phase, state_mods)
 
-        # Counter opportunity for defender (20% after every committed action)
+        # Defender answers back immediately (~35% after strikes for back-and-forth)
+        if not self.winner and not Position.is_ground(self.position_system.current_position):
+            if random.random() < 0.35:
+                ans_mods = self.f1_machine.get_stat_modifier() if defender == self.fighter1 else self.f2_machine.get_stat_modifier()
+                if ans_mods["accuracy"] > 0.4 and def_state["stamina"] >= 5:
+                    ans_type = self._select_strike(self.position_system.current_position, df_strategy, phase)
+                    if ans_type not in ("takedown_attempt", "clinch_attempt") and not self.winner:
+                        ans_target = self._select_target(ans_type, self.position_system.current_position, atk_state, df_strategy)
+                        self._perform_strike(defender, attacker, def_state, atk_state, ans_type, ans_target,
+                                            df_strategy, phase, ans_mods)
+
+        # Counter opportunity for defender
         if not self.winner and random.random() < 0.20:
             self._simulate_counter(attacker, defender, atk_state, def_state, atk_strategy, df_strategy, phase)
 
@@ -1428,7 +1453,7 @@ class Fight:
         if not combo_data:
             self._execute_single_strike(attacker, defender, atk_state, def_state, strategy, phase, state_mods)
             return
-        strikes = combo_data["strikes"]
+        strikes = combo_data["strikes"][:2]
         combo_name = combo_key.replace("-", " ")
 
         stamina_mult = combo_data.get("stamina_mult", 1.0)
