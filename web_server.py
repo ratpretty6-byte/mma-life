@@ -1343,7 +1343,6 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
 
             elif path == "/api/balance_test":
                 """Run multiple simulated fights and return aggregate stats."""
-                from fight import Fight
                 from generator import generate_single_fighter
                 sid = body.get("sid", "")
                 iterations = body.get("iterations", 100)
@@ -1398,7 +1397,6 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
 
             elif path == "/api/bulk_simulate":
                 """Advanced bulk simulation with configurable fighters."""
-                from fight import Fight
                 from generator import generate_single_fighter
                 iterations = body.get("iterations", 100)
                 f1_mean = body.get("f1_mean", 50)
