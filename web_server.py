@@ -113,6 +113,41 @@ def ensure_regional_opponents(session):
         promo.sign_fighter(fighter)
     promo.update_rankings()
 
+def ensure_available_opponents(session):
+    """Replenish opponent pool for the player's current promotion tier."""
+    f = session.get("fighter")
+    promo = session.get("current_promotion")
+    if not f or not promo:
+        return
+    wc = f.weight_class
+
+    if promo.tier_name == "Regional":
+        ensure_regional_opponents(session)
+        return
+
+    available = [opp for opp in promo.rankings.get(wc, [])
+                 if opp != f and opp.nationality == f.nationality and opp.is_available()]
+    if len(available) >= 3:
+        return
+
+    from generator import generate_single_fighter
+    wc_data = next((wc_item for wc_item in utils.WEIGHT_CLASSES if wc_item["name"] == wc), None)
+    if not wc_data:
+        return
+
+    to_create = 6 - len(available)
+    for i in range(to_create):
+        fighter = generate_single_fighter(
+            random.randint(wc_data["min"], wc_data["max"]),
+            skill_mean=utils.gaussian_random(50, 10, 30, 70),
+            skill_std=utils.gaussian_random(12, 3, 6, 18)
+        )
+        fighter.nationality = f.nationality
+        fighter.home_region = f.home_region
+        promo.sign_fighter(fighter)
+    promo.update_rankings()
+
+
 def seed_regional_division(nationality: str, home_region: str, weight_class: str, count: int = 8):
     """Pre-seed the regional promotion with fighters matching a nationality."""
     from generator import generate_single_fighter
@@ -551,6 +586,7 @@ class Handler(BaseHTTPRequestHandler):
                 ensure_initialized()
                 sid = params.get("sid", [""])[0]
                 session = get_or_create_session(sid)
+                ensure_available_opponents(session)
                 self.json_resp({"opponents": get_opponents_data(session)})
 
             elif path == "/api/free_agent_offers":
@@ -844,16 +880,22 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 if not f or not promo:
                     self.json_resp({"error": "Not signed"})
                     return
-                opps = promo.get_available_opponents(f)
+                all_promos = [gs.get("world"), gs.get("national"), gs.get("regional")]
+                opps = promo.get_available_opponents(f, all_promotions=[p for p in all_promos if p and p != promo])
                 target = None
+                opp_name_clean = opp_name.strip().lower()
                 for o, d in opps:
-                    if o.name == opp_name:
+                    if o.name.strip().lower() == opp_name_clean:
                         target = o
                         break
+                # Fallback: search all promotions' fighters with case-insensitive match
                 if not target:
-                    for o in promo.fighters:
-                        if o.name == opp_name and o.weight_class == f.weight_class:
-                            target = o
+                    for p in [promo] + [ap for ap in all_promos if ap and ap != promo]:
+                        for o in p.fighters:
+                            if o.name.strip().lower() == opp_name_clean and o.weight_class == f.weight_class:
+                                target = o
+                                break
+                        if target:
                             break
                 if not target:
                     self.json_resp({"error": "Opponent not found"})

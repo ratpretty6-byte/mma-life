@@ -2033,6 +2033,30 @@ class Fight:
                 stamina_drain_mod = bd_effects["stamina_drain"]
                 def_state["stamina"] = max(0, def_state["stamina"] - int(stamina_drain_mod * 15))
 
+        # Build and log the strike entry BEFORE stun/KD checks
+        _pref = {
+            "Blocked": ["blocks", "smothers", "deflects"],
+            "Glancing": ["glances off", "grazes", "barely clips"],
+            "Clean": ["lands a clean", "connects with a", "stings with a", "finds the mark with a", "touches up with a"],
+            "Solid": ["lands a solid", "cracks with a", "hammers home a", "rips a", "unloads a"],
+            "Flush": ["cracks with a flush", "hits flush with a", "buries a", "drills a", "catches with a clean"],
+            "Devastating": ["DEVASTATES with a", "DESTROYS with a", "OBLITERATES with a", "UNLEASHES a", "CRUSHES with a"],
+            "CRITICAL Glancing": ["barely grazes but CRITICAL", "magically clips"],
+            "CRITICAL Clean": ["SMASHES a critical", "DETONATES a", "EXPLODES with a"],
+            "CRITICAL Solid": ["THUNDERS home a critical", "ANNIHILATES with a perfect"],
+            "CRITICAL Flush": ["DELIVERS a devastating critical", "OBLITERATES with a perfect"],
+            "CRITICAL Devastating": ["UNLEASHES a fight-ending", "LANDS THE SHOT OF THE NIGHT"],
+        }
+        prefix_opts = _pref.get(tier["name"], ["lands a"])
+        severity_prefix = random.choice(prefix_opts)
+
+        group = "HEAD" if target in ("head", "jaw", "temple", "nose", "left_eye", "right_eye") else (
+                "BODY" if target in ("body", "chest", "solar_plexus", "liver", "ribs") else "LEGS")
+        log_entry = f"{attacker.name} {severity_prefix} {strike_type.replace('_', ' ')} to {defender.name}'s {group}"
+        if is_critical:
+            log_entry += " — CRITICAL HIT!"
+        self.fight_log.append(log_entry)
+
         # Check for stun and state transitions
         head_pct = defender.get_group_health("head")
         body_pct = defender.get_group_health("body")
@@ -2062,38 +2086,15 @@ class Fight:
             self._check_knockdown(attacker, defender, atk_state, def_state, target, actual_damage,
                                    atk_state["fatigue_level"], strike_type)
 
-        # Generate commentary
-        strike_commentary = self.commentary.generate_strike_commentary(
-            attacker, defender, strike_type, target,
-            self.position_system.current_position)
-
-        # Prefix with severity descriptor
-        _pref = {
-            "Blocked": ["blocks", "smothers", "deflects"],
-            "Glancing": ["glances off", "grazes", "barely clips"],
-            "Clean": ["lands a clean", "connects with a", "stings with a", "finds the mark with a", "touches up with a"],
-            "Solid": ["lands a solid", "cracks with a", "hammers home a", "rips a", "unloads a"],
-            "Flush": ["cracks with a flush", "hits flush with a", "buries a", "drills a", "catches with a clean"],
-            "Devastating": ["DEVASTATES with a", "DESTROYS with a", "OBLITERATES with a", "UNLEASHES a", "CRUSHES with a"],
-            "CRITICAL Glancing": ["barely grazes but CRITICAL", "magically clips"],
-            "CRITICAL Clean": ["SMASHES a critical", "DETONATES a", "EXPLODES with a"],
-            "CRITICAL Solid": ["THUNDERS home a critical", "ANNIHILATES with a perfect"],
-            "CRITICAL Flush": ["DELIVERS a devastating critical", "OBLITERATES with a perfect"],
-            "CRITICAL Devastating": ["UNLEASHES a fight-ending", "LANDS THE SHOT OF THE NIGHT"],
-        }
-        prefix_opts = _pref.get(tier["name"], ["lands a"])
-        severity_prefix = random.choice(prefix_opts)
+        # If knockdown happened, update the strike log entry with a DROPS marker
+        if def_state.get("knockdown", False):
+            for i in range(len(self.fight_log) - 1, -1, -1):
+                if attacker.name in self.fight_log[i] and "DROPS" not in self.fight_log[i]:
+                    self.fight_log[i] += f" — DROPS {defender.name}!"
+                    break
 
         # Update combo tracking
         atk_state["combo_count"] += 1
-
-        # Map specific zone to body group for display clarity
-        group = "HEAD" if target in ("head", "jaw", "temple", "nose", "left_eye", "right_eye") else (
-                "BODY" if target in ("body", "chest", "solar_plexus", "liver", "ribs") else "LEGS")
-        log_entry = f"{attacker.name} {severity_prefix} {strike_type.replace('_', ' ')} to {defender.name}'s {group}"
-        if is_critical:
-            log_entry += " — CRITICAL HIT!"
-        self.fight_log.append(log_entry)
 
         # Vision impairment update
         vision_damage = tier.get("vision_damage", 0) * 100
@@ -2531,32 +2532,44 @@ class Fight:
 
         unanswered = def_state.get("unanswered_ground_strikes", 0)
         just_kd = def_state.get("knockdown", False)
-        boosted = 5 if just_kd else 1  # Faster stoppage after knockdown
+
+        if just_kd:
+            # Post-knockdown: fighter is already hurt/dazed, faster stoppage
+            side_tko = 5
+            mount_tko = 4
+            warning_map = {3: "close_mount"}
+        else:
+            # Takedown: must dominate a fresh fighter — much higher threshold
+            side_tko = 18
+            mount_tko = 14
+            warning_map = {8: "watching", 12: "mount", 15: "survival"}
 
         # TKO buildup warnings
         if not self.winner:
-            if unanswered == 4 and not just_kd:
-                self.fight_log.append(f"The referee is watching {defender.name} closely — not defending intelligently!")
-            elif unanswered == 6 and pos == Position.GROUND_MOUNT:
-                self.fight_log.append(f"{defender.name} is covering up but taking heavy punishment! Ref might step in!")
-            elif unanswered >= 7 / boosted and pos in (Position.GROUND_SIDE, Position.GROUND_MOUNT):
-                self.fight_log.append(f"{attacker.name} is relentless! {defender.name} needs to escape or this is over!")
-            elif unanswered >= 8 / boosted and pos in (Position.GROUND_SIDE,):
-                self.fight_log.append(f"These ground strikes are adding up! {defender.name} is in survival mode!")
+            if unanswered in warning_map:
+                wtype = warning_map[unanswered]
+                if wtype == "watching":
+                    self.fight_log.append(f"The referee is watching {defender.name} closely — not defending intelligently!")
+                elif wtype == "mount" and not just_kd:
+                    self.fight_log.append(f"{defender.name} is covering up but taking heavy punishment! Ref might step in!")
+                elif wtype == "survival":
+                    self.fight_log.append(f"These ground strikes are adding up! {defender.name} is in survival mode!")
+                elif wtype == "close_mount":
+                    self.fight_log.append(f"{attacker.name} is relentless! {defender.name} needs to escape or this is over!")
 
-        if unanswered >= 10 / boosted and pos not in (Position.GROUND_GUARD,):
-            self.winner = attacker
-            self.loser = defender
-            self.win_method = "TKO (Ground Strikes)"
-            self.win_round = self.current_round
-            self.fight_log.append(f"The referee steps in! {defender.name} can't defend themselves!")
-            return
-        elif unanswered >= 7 / boosted and pos == Position.GROUND_MOUNT:
+        if unanswered >= mount_tko and pos == Position.GROUND_MOUNT:
             self.winner = attacker
             self.loser = defender
             self.win_method = "TKO (Ground Strikes)"
             self.win_round = self.current_round
             self.fight_log.append(f"The referee steps in! {defender.name} is taking too much damage from mount!")
+            return
+        elif unanswered >= side_tko and pos in (Position.GROUND_SIDE, Position.GROUND_MOUNT):
+            self.winner = attacker
+            self.loser = defender
+            self.win_method = "TKO (Ground Strikes)"
+            self.win_round = self.current_round
+            self.fight_log.append(f"The referee steps in! {defender.name} can't defend themselves!")
             return
 
         if defender.get_group_health("head") <= 5:
@@ -2796,7 +2809,6 @@ class Fight:
         def_state["unanswered_ground_strikes"] = 0
 
         self.fight_log.append(f"!!! {self.commentary.generate_knockdown_commentary(defender)}")
-        self.fight_log.append(f"{defender.name} goes down! {attacker.name} follows them to the ground!")
 
         # Check if this is an instant KO (head critical damage or stage 4)
         if ko_stage >= 4 or overall_head <= 4 or (ko_stage >= 3 and overall_head <= 15):
@@ -2807,7 +2819,18 @@ class Fight:
             self.fight_log.append(f"{defender.name} is out cold!")
             return True
 
-        self.position_system._set_ground(attacker, defender, Position.GROUND_GUARD)
+        # Decide whether to chase to the ground or let them back up
+        atk_agg = attacker.get_effective_attribute("aggression", atk_state["fatigue_level"])
+        atk_fiq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
+        finish_chance = min(0.9, 0.50 + (atk_agg / 200.0) + (atk_fiq / 300.0))
+
+        if random.random() < finish_chance:
+            self.fight_log.append(f"{defender.name} goes down! {attacker.name} swarms, looking for the finish!")
+            self.position_system._set_ground(attacker, defender, Position.GROUND_GUARD)
+        else:
+            self.fight_log.append(f"{defender.name} is down! {attacker.name} lets them back up — wants to keep it standing!")
+            def_state["knockdown"] = False  # Ground game doesn't get fast TKO
+
         return True
 
     # ============================================================

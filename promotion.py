@@ -254,6 +254,16 @@ class Promotion:
                             opponents.append((opp, d))
                             if len(opponents) >= 10:
                                 break
+                # For National, if still too few, expand to any nationality
+                if len(opponents) < 3 and self.tier_name == "National":
+                    for opp in ranked:
+                        if opp != fighter and opp.is_available() and opp not in [o[0] for o in opponents]:
+                            opp_rank_diff = abs(opp.rank - fighter.rank)
+                            if opp_rank_diff <= 10:
+                                d = "even matchup"
+                                opponents.append((opp, d))
+                                if len(opponents) >= 5:
+                                    break
         return opponents[:10]
 
 def create_promotions(weight_classes: List[str]) -> List[Promotion]:
