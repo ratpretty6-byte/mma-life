@@ -71,7 +71,9 @@ class WorldSimulator:
                 if len(active) >= 15:
                     continue
                 to_create = 20 - len(active)
-                wc_data = utils.get_weight_class(wc)
+                wc_data = next((wc_item for wc_item in utils.WEIGHT_CLASSES if wc_item["name"] == wc), None)
+                if not wc_data:
+                    continue
                 for _ in range(to_create):
                     fighter = generate_single_fighter(
                         random.randint(wc_data["min"], wc_data["max"]),

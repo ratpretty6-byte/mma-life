@@ -99,7 +99,9 @@ def ensure_regional_opponents(session):
         return
     to_create = 8 - len(available)
     from generator import generate_single_fighter
-    wc_data = utils.get_weight_class(wc)
+    wc_data = next((wc_item for wc_item in utils.WEIGHT_CLASSES if wc_item["name"] == wc), None)
+    if not wc_data:
+        return
     for i in range(to_create):
         fighter = generate_single_fighter(
             random.randint(wc_data["min"], wc_data["max"]),
@@ -122,7 +124,13 @@ def seed_regional_division(nationality: str, home_region: str, weight_class: str
     to_create = max(0, count - len(existing))
     if to_create <= 0:
         return
-    wc_data = utils.get_weight_class(weight_class)
+    wc_data = None
+    for wc in utils.WEIGHT_CLASSES:
+        if wc["name"] == weight_class:
+            wc_data = wc
+            break
+    if not wc_data:
+        return
     for _ in range(to_create):
         fighter = generate_single_fighter(
             random.randint(wc_data["min"], wc_data["max"]),
@@ -1344,7 +1352,10 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 if not f:
                     self.json_resp({"error": "No fighter in session"})
                     return
-                wc_data = utils.get_weight_class(f.weight_class)
+                wc_data = next((wc_item for wc_item in utils.WEIGHT_CLASSES if wc_item["name"] == f.weight_class), None)
+                if not wc_data:
+                    self.json_resp({"error": "Unknown weight class"})
+                    return
                 # Generate a generic opponent of same weight class
                 opponent = generate_single_fighter(
                     random.randint(wc_data["min"], wc_data["max"]),
