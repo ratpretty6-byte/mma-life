@@ -756,6 +756,12 @@ class Fight:
             # Determine number of actions this round (~based on pace)
             total_actions = self._determine_actions_this_round(round_num)
 
+            # Carryover context from previous round damage
+            if round_num > 1:
+                for f_obj, f_state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
+                    if f_state.get("stunned", False):
+                        yield {"type": "between_round", "text": f"{f_obj.name} is still recovering from that punishment in Round {round_num - 1}!"}
+
             yield {"type": "round_start", "round": round_num,
                    "text": self.commentary.generate_round_start(round_num, self.fighter1, self.fighter2)}
 
@@ -772,7 +778,7 @@ class Fight:
                     break
 
                 phase_progress = action_idx / max(1, total_actions)
-                phase = self._get_phase(phase_progress)
+                phase = self._get_round_phase(action_idx, total_actions)
 
                 # Check referee standup (MMA-specific)
                 if self.referee.should_stand_up(self, round_num):
@@ -1047,28 +1053,248 @@ class Fight:
 
     def _determine_actions_this_round(self, round_num: int) -> int:
         """
-        Determine how many actions in this round based on fight pace.
-        Round-by-round fatigue acceleration:
+        Fewer, more meaningful actions per round.
         R1: 1.0x, R2: 1.0x, R3: 1.5x, R4: 1.8x, R5: 2.2x
+        Returns count of major beats (each beat may group multiple strikes).
         """
-        base_actions = random.randint(28, 40)
+        base_actions = random.randint(20, 30)
         avg_fatigue = (self.f1_state["fatigue_level"] + self.f2_state["fatigue_level"]) / 2
-
         fatigue_mult = {1: 1.0, 2: 1.0, 3: 1.5, 4: 1.8, 5: 2.2}.get(round_num, 1.5)
         reduction = avg_fatigue * fatigue_mult * 2
-        base_actions = max(15, int(base_actions - reduction))
+        base_actions = max(12, int(base_actions - reduction))
         return base_actions
 
-    def _get_phase(self, progress: float) -> str:
-        if progress < 0.15:
+    def _get_round_phase(self, action_idx: int, total_actions: int) -> str:
+        """4-phase round system: feeling_out → exchanges → urgency → finish_hunt"""
+        pct = action_idx / max(1, total_actions)
+        if pct < 0.25:
             return "feeling_out"
-        elif progress > 0.75:
-            return "desperation"
-        return "exchanges"
+        elif pct < 0.70:
+            return "exchanges"
+        elif pct < 0.90:
+            return "urgency"
+        return "finish_hunt"
 
     # ============================================================
     # CORE ACTION SIMULATION
     # ============================================================
+
+    def _simulate_fighter_reaction(self, attacker, defender, atk_state, def_state, atk_strategy, phase):
+        """When a fighter is hurt/stunned, they react instead of attacking normally."""
+        if atk_state["cardio_zone"] == "oxygen_debt" and random.random() < 0.08:
+            atk_state["stamina"] = max(0, atk_state["stamina"] - 2)
+            atk_state["fatigue_level"] = 1.0 - (atk_state["stamina"] / 100)
+            self.fight_log.append(f"{attacker.name} is gassed, taking a moment to breathe!")
+            self.referee.record_damage_taken(defender, True, attacker=attacker)
+            return True
+
+        is_stunned = atk_state.get("stunned", False)
+        is_hurt = atk_state.get("hurt", False)
+        if not is_stunned and not is_hurt:
+            return False
+
+        comp = attacker.get_effective_attribute("composure", atk_state["fatigue_level"])
+        fiq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
+        agg = attacker.get_effective_attribute("aggression", atk_state["fatigue_level"])
+
+        if is_stunned:
+            if fiq > 60 or comp > 65:
+                self.fight_log.append(f"{attacker.name} shells up and covers, trying to recover!")
+                def_num = 1 if defender == self.fighter1 else 2
+                self._update_momentum(def_num, 1)
+                self.referee.record_damage_taken(defender, True, attacker=attacker)
+                return True
+            if agg > 70:
+                self.fight_log.append(f"{attacker.name} swings wildly, hurt and desperate!")
+                def_num = 1 if defender == self.fighter1 else 2
+                self._update_momentum(def_num, 2)
+                self.referee.record_damage_taken(defender, True, attacker=attacker)
+                return True
+            if comp < 40:
+                self.fight_log.append(f"{attacker.name} is frozen! Can't mount any offense!")
+                def_num = 1 if defender == self.fighter1 else 2
+                self._update_momentum(def_num, 2)
+                self.referee.record_damage_taken(defender, True, attacker=attacker)
+                return True
+
+        if is_hurt and not is_stunned:
+            if random.random() < 0.4:
+                self.fight_log.append(f"{attacker.name} ties up in the clinch to recover!")
+                self._simulate_clinch_attempt(attacker, defender, atk_state["fatigue_level"], atk_strategy)
+                self.referee.record_damage_taken(defender, True, attacker=attacker)
+                return True
+            if random.random() < 0.3 and comp < 50:
+                self.fight_log.append(f"{attacker.name} circles away, trying to clear their head!")
+                self.referee.record_damage_taken(defender, True, attacker=attacker)
+                return True
+        return False
+
+    def _simulate_movement(self, attacker, defender, atk_state, def_state, phase):
+        """Non-strike movement/positioning actions."""
+        if Position.is_ground(self.position_system.current_position):
+            return False
+        if self.position_system.current_position == Position.CLINCH:
+            return False
+
+        r = random.random()
+        if r < 0.30:
+            self.fight_log.append(f"{attacker.name} circles, finding range.")
+        elif r < 0.55:
+            self.fight_log.append(f"{attacker.name} steps into the pocket, cutting off the cage.")
+        elif r < 0.75:
+            self.fight_log.append(f"{attacker.name} feints a level change and steps back.")
+        elif r < 0.90:
+            self.fight_log.append(f"{attacker.name} switches stance, changing the look.")
+        else:
+            self.fight_log.append(f"Both fighters circle in the center, neither committing.")
+        self.referee.record_damage_taken(defender, True, attacker=attacker)
+        return True
+
+    def _simulate_feint_sequence(self, attacker, defender, atk_state, def_state, atk_strategy, phase):
+        """Feint → opponent reacts → real strike/combo."""
+        pos = self.position_system.current_position
+        fiq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
+        def_iq = defender.get_effective_attribute("fight_iq", def_state["fatigue_level"])
+        def_adapt = defender.get_effective_attribute("adaptability", def_state["fatigue_level"])
+        feint_mods = atk_strategy.get_modifiers()
+        feint_chance = calculate_feint_chance(fiq, feint_mods)
+        if phase == "feeling_out":
+            feint_chance = min(0.7, feint_chance * 1.8)
+
+        if random.random() >= feint_chance:
+            return False
+
+        recognized = random.random() < calculate_feint_recognition(def_iq, def_adapt)
+
+        if recognized:
+            # Defender reads it, gains momentum
+            self.fight_log.append(f"{defender.name} reads the feint from {attacker.name} and doesn't bite!")
+            atk_state["feint_count"] = max(0, atk_state.get("feint_count", 0) - 1)
+            def_num = 1 if defender == self.fighter1 else 2
+            self._update_momentum(def_num, 1)
+            self.referee.record_damage_taken(defender, True, attacker=attacker)
+            return True
+
+        # Feint works — build stack and throw real strike
+        atk_state["feint_count"] = min(3, atk_state.get("feint_count", 0) + 1)
+        atk_state["feinted_last_action"] = True
+        atk_state["stamina"] = max(0, atk_state["stamina"] - 1)
+
+        # Describe the feint
+        feint_desc = [
+            f"{attacker.name} feints high, drawing {defender.name}'s hands up — then goes to the body!",
+            f"{attacker.name} sells the jab, {defender.name} flinches, and {attacker.name} capitalizes!",
+            f"{attacker.name} feints a level change, {defender.name} drops his hands — shot lands!",
+            f"{attacker.name} shows a kick, pulls it back, and steps in with a punch!",
+            f"{attacker.name} fakes the takedown, {defender.name} sprawls, and eats a kick to the head!",
+        ]
+        self.fight_log.append(random.choice(feint_desc))
+
+        # Throw a real strike after the feint
+        strike_type = self._select_strike(pos, atk_strategy, phase)
+        if strike_type not in ("takedown_attempt", "clinch_attempt"):
+            target = self._select_target(strike_type, pos, def_state, atk_strategy)
+            state_mods = self.f1_machine.get_stat_modifier() if attacker == self.fighter1 else self.f2_machine.get_stat_modifier()
+            self._perform_strike(attacker, defender, atk_state, def_state, strike_type, target,
+                                atk_strategy, phase, state_mods, combo_bonus=0.15)
+        self.referee.record_damage_taken(defender, True, attacker=attacker)
+        return True
+
+    def _simulate_counter(self, attacker, defender, atk_state, def_state, atk_strategy, df_strategy, phase):
+        """Defender slips/blocks/parries and counters with their own strike."""
+        pos = self.position_system.current_position
+        defense_action = self._select_defense(defender, df_strategy)
+        fight_iq = defender.get_effective_attribute("fight_iq", def_state["fatigue_level"])
+
+        if defense_action == "slip" and random.random() < 0.25 + fight_iq / 500:
+            self.fight_log.append(f"{defender.name} slips the strike and fires back with a counter!")
+            counter_type = self._select_specific_strike(pos, fight_iq, df_strategy)
+            if counter_type not in ("takedown_attempt", "clinch_attempt"):
+                c_target = self._select_target(counter_type, pos, def_state, df_strategy)
+                state_mods = self.f1_machine.get_stat_modifier() if defender == self.fighter1 else self.f2_machine.get_stat_modifier()
+                self._perform_strike(defender, attacker, def_state, atk_state, counter_type, c_target,
+                                    df_strategy, phase, state_mods, combo_bonus=0.12)
+                def_num = 1 if defender == self.fighter1 else 2
+                self._update_momentum(def_num, 2)
+            return True
+
+        if defense_action == "parry" and random.random() < 0.2 + fight_iq / 600:
+            self.fight_log.append(f"{defender.name} parries and creates an opening, stepping in with a strike!")
+            counter_type = "cross"
+            c_target = self._select_target(counter_type, pos, def_state, df_strategy)
+            state_mods = self.f1_machine.get_stat_modifier() if defender == self.fighter1 else self.f2_machine.get_stat_modifier()
+            self._perform_strike(defender, attacker, def_state, atk_state, counter_type, c_target,
+                                df_strategy, phase, state_mods, combo_bonus=0.08)
+            def_num = 1 if defender == self.fighter1 else 2
+            self._update_momentum(def_num, 1)
+            return True
+
+        if defense_action == "block" and random.random() < 0.10:
+            self.fight_log.append(f"{defender.name} blocks the strike and answers with a sharp cross!")
+            c_target = self._select_target("cross", pos, def_state, df_strategy)
+            state_mods = self.f1_machine.get_stat_modifier() if defender == self.fighter1 else self.f2_machine.get_stat_modifier()
+            self._perform_strike(defender, attacker, def_state, atk_state, "cross", c_target,
+                                df_strategy, phase, state_mods)
+            def_num = 1 if defender == self.fighter1 else 2
+            self._update_momentum(def_num, 1)
+            return True
+
+        return False
+
+    def _simulate_exchange(self, atk1, def1, def_state1, atk2, def2, def_state2, phase):
+        """Both fighters act in the same beat — one narrative exchange."""
+        if Position.is_ground(self.position_system.current_position):
+            return False
+        if self.position_system.current_position == Position.CLINCH:
+            return False
+
+        if not (atk1.get_effective_attribute("aggression", def_state1["fatigue_level"]) > 55 and
+                atk2.get_effective_attribute("aggression", def_state2["fatigue_level"]) > 55):
+            return False
+
+        pos = self.position_system.current_position
+        action1 = self._select_specific_strike(pos, 50, self.strategy1)
+        action2 = self._select_specific_strike(pos, 50, self.strategy2)
+
+        roles = [
+            (atk1, def1, def_state1, 1, self.strategy1, action1),
+            (atk2, def2, def_state2, 2, self.strategy2, action2),
+        ]
+        random.shuffle(roles)
+
+        results = []
+        for i, (a, d, d_state, num, strat, act) in enumerate(roles):
+            if act in ("takedown_attempt", "clinch_attempt"):
+                results.append(f"{a.name} tries to change levels")
+                continue
+            if a is self.fighter1:
+                state_mods = self.f1_machine.get_stat_modifier()
+            else:
+                state_mods = self.f2_machine.get_stat_modifier()
+            if state_mods["accuracy"] <= 0.4:
+                results.append(f"{a.name} can't get going")
+                continue
+            target = self._select_target(act, pos, d_state, strat)
+            atk_state = self.f1_state if a == self.fighter1 else self.f2_state
+            def_state = self.f2_state if a == self.fighter1 else self.f1_state
+            self._perform_strike(a, d, atk_state, def_state, act, target, strat, phase, state_mods)
+
+            # Check if the last log entry mentions this striker
+            if self.fight_log:
+                last = self.fight_log[-1]
+                if a.name in last:
+                    results.append(last)
+                    self.fight_log.pop()
+
+        if results:
+            combined = f"Both fighters trade! {' — '.join(results[:2])}"
+            self.fight_log.append(combined)
+            self.f1_round_attempts += 1
+            self.f2_round_attempts += 1
+            self.referee.record_damage_taken(def1, True, attacker=atk1)
+            self.referee.record_damage_taken(def2, True, attacker=atk2)
+            return True
+        return False
 
     def _simulate_action(self, phase="exchanges"):
         """Simulate one action exchange between fighters."""
@@ -1078,10 +1304,8 @@ class Fight:
             self.fighter2, self.fighter1, self.f2_state, self.f1_state, self.strategy2)
 
         # Determine who is the attacker this exchange
-        # Higher aggression = higher chance to initiate
         agg1 = atk1.get_effective_attribute("aggression", atk_state1["fatigue_level"])
         agg2 = atk2.get_effective_attribute("aggression", atk_state2["fatigue_level"])
-
         if random.random() < agg1 / (agg1 + agg2 + 1):
             attacker, defender, atk_state, def_state, atk_strategy, df_strategy = \
                 atk1, def1, atk_state1, def_state1, strat1, strat2
@@ -1098,16 +1322,6 @@ class Fight:
         if state_mods["accuracy"] <= 0.4:
             return
 
-        # === INVOLUNTARY REST (Oxygen Debt) ===
-        if atk_state["cardio_zone"] == "oxygen_debt" and random.random() < 0.08:
-            atk_state["stamina"] = max(0, atk_state["stamina"] - 2)
-            atk_state["fatigue_level"] = 1.0 - (atk_state["stamina"] / 100)
-            self.fight_log.append(f"{attacker.name} is gassed, taking a moment to breathe!")
-            self.referee.record_damage_taken(defender,
-                self.position_system.current_position in (Position.POCKET, Position.DISTANCE, Position.CLINCH),
-                attacker=attacker)
-            return
-
         # === SECOND WIND CHECK ===
         if self._check_second_wind(atk_state, attacker):
             self.fight_log.append(f"{attacker.name} digs deep and finds a second wind!")
@@ -1119,70 +1333,26 @@ class Fight:
             self.referee.record_damage_taken(defender, False, attacker=attacker)
             return
 
-        # === FEINT SYSTEM ===
-        fight_iq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
-        fatigue = atk_state["fatigue_level"]
-
-        # Check for feint
-        feint_mods = atk_strategy.get_modifiers()
-        feint_chance = calculate_feint_chance(fight_iq, feint_mods)
-        is_feint = random.random() < feint_chance
-
-        # Recognized feint? Defender with high IQ can see through it
-        def_iq = defender.get_effective_attribute("fight_iq", def_state["fatigue_level"])
-        def_adapt = defender.get_effective_attribute("adaptability", def_state["fatigue_level"])
-        feint_recognized = random.random() < calculate_feint_recognition(def_iq, def_adapt)
-
-        if is_feint and not feint_recognized and not Position.is_ground(self.position_system.current_position):
-            # Feint successful — build up feint stack
-            atk_state["feint_count"] = min(3, atk_state.get("feint_count", 0) + 1)
-            atk_state["feinted_last_action"] = True
-            # Stamina cost for feinting (minimal)
-            atk_state["stamina"] = max(0, atk_state["stamina"] - 1)
-            # Commentary
-            feint_lines = [
-                f"{attacker.name} feints high!",
-                f"{attacker.name} sells the jab!",
-                f"{attacker.name} feints a level change!",
-                f"{attacker.name} shows a kick, pulls it back!",
-                f"{attacker.name} fakes the takedown!",
-            ]
-            self.fight_log.append(random.choice(feint_lines))
-            self.referee.record_damage_taken(defender, True, attacker=attacker)
-            return
-        elif is_feint and feint_recognized:
-            # Defender read the feint — no penalty, and defender gains small momentum
-            self.fight_log.append(f"{defender.name} reads the feint by {attacker.name}!")
-            atk_state["feint_count"] = max(0, atk_state.get("feint_count", 0) - 1)
-            atk_state["feinted_last_action"] = True
-            def_num = 1 if defender == self.fighter1 else 2
-            self._update_momentum(def_num, 1)
-            self.referee.record_damage_taken(defender, True, attacker=attacker)
+        # === FIGHTER REACTION (stunned/hurt) ===
+        if self._simulate_fighter_reaction(attacker, defender, atk_state, def_state, atk_strategy, phase):
             return
 
-        # Reset feint flag for real actions
-        atk_state["feinted_last_action"] = False
+        # === MOVEMENT (feeling_out phase) ===
+        if phase == "feeling_out" and random.random() < 0.25:
+            if self._simulate_movement(attacker, defender, atk_state, def_state, phase):
+                return
+
+        # === FEINT SEQUENCE ===
+        if self._simulate_feint_sequence(attacker, defender, atk_state, def_state, atk_strategy, phase):
+            return
 
         # Track action in opponent history (for pattern recognition)
-        def_state.get("opponent_action_history", []).append(f"{fight_iq:.0f}_{atk_strategy.current_strategy.get('id', 'unknown') if atk_strategy.current_strategy else 'unknown'}")
+        fight_iq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
+        def_state.get("opponent_action_history", []).append(
+            f"{fight_iq:.0f}_{atk_strategy.current_strategy.get('id', 'unknown') if atk_strategy.current_strategy else 'unknown'}")
         hist = def_state.get("opponent_action_history", [])
         if len(hist) > 12:
             def_state["opponent_action_history"] = hist[-12:]
-
-        # Low IQ freeze check (Phase 3C)
-        recog_iq = fight_iq * 0.6  # Recognition component
-        if recog_iq < 30 and atk_state.get("hurt", False) and random.random() < 0.15:
-            self.fight_log.append(f"{attacker.name} freezes up after getting hurt!")
-            self.referee.record_damage_taken(defender,
-                self.position_system.current_position in (Position.POCKET, Position.DISTANCE, Position.CLINCH),
-                attacker=attacker)
-            return
-
-        # High IQ trap setting (Phase 3C)
-        adapt_iq = fight_iq * 0.4  # Adaptation component
-        if adapt_iq > 70 and random.random() < 0.05 and def_state.get("feint_count", 0) > 0:
-            self.fight_log.append(f"{attacker.name} sets a trap, baiting a reaction!")
-            atk_state["feint_count"] = min(3, atk_state.get("feint_count", 0) + 1)
 
         # Zone-based combo chance adjustment
         cardio_zone = atk_state.get("cardio_zone", "aerobic")
@@ -1195,13 +1365,16 @@ class Fight:
         elif self.position_system.current_position == Position.CLINCH:
             pos_for_combo = "clinch"
 
+        fatigue = atk_state["fatigue_level"]
         combo_type = None
         combo_chance = utils.calculate_combo_chance(fight_iq, fatigue) * zone_combo_mod
+        if phase == "feeling_out":
+            combo_chance *= 0.3
+
         if random.random() < combo_chance:
             available_combos = get_combos_for_position(pos_for_combo)
             available_combos = [c for c in available_combos if c["iq_req"] <= fight_iq]
             if available_combos:
-                # Heavier combos need more IQ to attempt
                 iq_weighted = []
                 for c in available_combos:
                     weight = max(0.2, 1.0 - (c["iq_req"] - fight_iq) / 100.0)
@@ -1211,11 +1384,16 @@ class Fight:
 
         if combo_type:
             self._execute_combo(attacker, defender, atk_state, def_state, atk_strategy, combo_type, phase, state_mods)
+        elif phase == "feeling_out" and random.random() < 0.35:
+            if self._simulate_movement(attacker, defender, atk_state, def_state, phase):
+                return
+            self._execute_single_strike(attacker, defender, atk_state, def_state, atk_strategy, phase, state_mods)
         else:
             self._execute_single_strike(attacker, defender, atk_state, def_state, atk_strategy, phase, state_mods)
 
-        # Check defensive action for defender
-        self._execute_defense(attacker, defender, atk_state, def_state, atk_strategy, df_strategy, phase)
+        # Counter opportunity for defender (20% after every committed action)
+        if not self.winner and random.random() < 0.20:
+            self._simulate_counter(attacker, defender, atk_state, def_state, atk_strategy, df_strategy, phase)
 
         # Track consecutive unanswered damage
         self.referee.record_damage_taken(defender,
@@ -1251,52 +1429,61 @@ class Fight:
             self._execute_single_strike(attacker, defender, atk_state, def_state, strategy, phase, state_mods)
             return
         strikes = combo_data["strikes"]
-        self.fight_log.append(f"{attacker.name} throws a {combo_key.replace('-', ' ')}!")
+        combo_name = combo_key.replace("-", " ")
 
         stamina_mult = combo_data.get("stamina_mult", 1.0)
         base_bonus = combo_data.get("power_bonus", 0.0)
 
-        # Feint bonus applies to all strikes in the combo
         feint_stack = atk_state.get("feint_count", 0)
-        combo_feint_bonus = 1.0 + feint_stack * 0.03  # smaller bonus per strike in combo
+        combo_feint_bonus = 1.0 + feint_stack * 0.03
         combo_power_bonus = base_bonus * combo_feint_bonus
 
+        results = []
+        landed = 0
         for i, strike_type in enumerate(strikes):
             if self.winner:
                 break
-
             pos = self.position_system.current_position
-
-            # For combos, some strike types need position mapping
             actual_strike = strike_type
             if strike_type == "kick" and pos != Position.DISTANCE:
-                actual_strike = "cross"  # adapt to position
+                actual_strike = "cross"
             elif strike_type in ("knee", "elbow") and not Position.is_ground(pos) and pos != Position.CLINCH:
-                actual_strike = random.choice(["hook", "uppercut"])  # adapt to position
-
+                actual_strike = random.choice(["hook", "uppercut"])
             target = self._select_target(actual_strike, pos, def_state, strategy)
-
-            # Combos have slightly reduced accuracy on later strikes
             accuracy_penalty = 1.0 - (i * 0.07)
             mod_copy = state_mods.copy()
             mod_copy["accuracy"] *= accuracy_penalty
 
+            group = "HEAD" if target in ("head", "jaw", "temple", "nose", "left_eye", "right_eye") else (
+                    "BODY" if target in ("body", "chest", "solar_plexus", "liver", "ribs") else "LEGS")
+
+            before_len = len(self.fight_log)
             self._perform_strike(attacker, defender, atk_state, def_state, actual_strike, target,
                                 strategy, phase, mod_copy, combo_bonus=combo_power_bonus, stamina_mult=stamina_mult)
 
-            # Reset feint stack after combo finishes
-            if i == len(strikes) - 1:
-                atk_state["feint_count"] = 0
+            # Capture what _perform_strike logged and remove it for grouping
+            if len(self.fight_log) > before_len:
+                last_entry = self.fight_log.pop()
+                if not last_entry.endswith("— CRITICAL HIT!"):
+                    last_entry = last_entry.rsplit(" — ", 1)[0] if " — " in last_entry else last_entry
+                results.append(f"{last_entry.split(' to ')[-1] if ' to ' in last_entry else last_entry}")
+                landed += 1
+            else:
+                results.append(f"missed {actual_strike}")
 
-            # Defender can be staggered mid-combo
-            head_pct = defender.get_zone_health_pct("jaw") * 0.5 + defender.get_zone_health_pct("temple") * 0.5
-            if head_pct < 40 and random.random() < 0.3:
-                self.fight_log.append(f"{defender.name} is staggered by the combination!")
-                break
+        if i == len(strikes) - 1:
+            atk_state["feint_count"] = 0
 
-            # Check if combo broke
-            if def_state.get("state") == "DOWN" or self.winner:
-                break
+        head_pct = defender.get_zone_health_pct("jaw") * 0.5 + defender.get_zone_health_pct("temple") * 0.5
+        if head_pct < 40 and random.random() < 0.3:
+            results.append(f"{defender.name} staggered by the combination!")
+
+        if def_state.get("state") == "DOWN" or self.winner:
+            pass
+
+        if results:
+            detail = ", ".join([r for r in results[:4]])
+            self.fight_log.append(f"{attacker.name} throws a {combo_name}! Landed {landed}/{len(strikes)}: {detail}")
 
     def _execute_defense(self, attacker, defender, atk_state, def_state, atk_strategy, df_strategy, phase):
         """Simulate defender's active defense — sometimes they block/slip/parry."""
@@ -1334,7 +1521,7 @@ class Fight:
         if phase == "feeling_out":
             weights = {k: v * 0.7 for k, v in weights.items()}
             weights["strike"] = weights.get("strike", 0.7) * 1.3  # Jab-heavy early
-        elif phase == "desperation":
+        elif phase in ("urgency", "finish_hunt"):
             weights["takedown"] *= 0.5  # Less takedowns when desperate
             weights["clinch"] *= 0.6
 
@@ -1538,7 +1725,7 @@ class Fight:
         hs_mod = modifiers.get("hand_speed", 1.0)
 
         # Phase power scaling
-        phase_power = {"feeling_out": 0.75, "desperation": 1.3}.get(phase, 1.0)
+        phase_power = {"feeling_out": 0.75, "exchanges": 1.0, "urgency": 1.15, "finish_hunt": 1.3}.get(phase, 1.0)
 
         # Reach advantage
         reach_mod = self.position_system.get_reach_advantage(attacker, defender)
@@ -1599,7 +1786,7 @@ class Fight:
 
         # Composite accuracy calculation
         accuracy = raw_accuracy * (speed / 100) * reach_mod * (1.0 + fight_iq / 600)
-        accuracy *= (0.8 if phase == "feeling_out" else (1.15 if phase == "desperation" else 1.0))
+        accuracy *= (0.8 if phase == "feeling_out" else (1.15 if phase in ("urgency", "finish_hunt") else 1.0))
         accuracy *= state_mods.get("accuracy", 1.0)
         accuracy *= acc_stance_mod * feint_acc_bonus * precision
 
@@ -1875,8 +2062,10 @@ class Fight:
         # Update combo tracking
         atk_state["combo_count"] += 1
 
-        # Log the action (commentary will be generated)
-        log_entry = f"{attacker.name} {severity_prefix} {strike_type.replace('_', ' ')} to {defender.name}'s {target}"
+        # Map specific zone to body group for display clarity
+        group = "HEAD" if target in ("head", "jaw", "temple", "nose", "left_eye", "right_eye") else (
+                "BODY" if target in ("body", "chest", "solar_plexus", "liver", "ribs") else "LEGS")
+        log_entry = f"{attacker.name} {severity_prefix} {strike_type.replace('_', ' ')} to {defender.name}'s {group}"
         if is_critical:
             log_entry += " — CRITICAL HIT!"
         self.fight_log.append(log_entry)
@@ -2318,6 +2507,18 @@ class Fight:
         unanswered = def_state.get("unanswered_ground_strikes", 0)
         just_kd = def_state.get("knockdown", False)
         boosted = 5 if just_kd else 1  # Faster stoppage after knockdown
+
+        # TKO buildup warnings
+        if not self.winner:
+            if unanswered == 4 and not just_kd:
+                self.fight_log.append(f"The referee is watching {defender.name} closely — not defending intelligently!")
+            elif unanswered == 6 and pos == Position.GROUND_MOUNT:
+                self.fight_log.append(f"{defender.name} is covering up but taking heavy punishment! Ref might step in!")
+            elif unanswered >= 7 / boosted and pos in (Position.GROUND_SIDE, Position.GROUND_MOUNT):
+                self.fight_log.append(f"{attacker.name} is relentless! {defender.name} needs to escape or this is over!")
+            elif unanswered >= 8 / boosted and pos in (Position.GROUND_SIDE,):
+                self.fight_log.append(f"These ground strikes are adding up! {defender.name} is in survival mode!")
+
         if unanswered >= 10 / boosted and pos not in (Position.GROUND_GUARD,):
             self.winner = attacker
             self.loser = defender
@@ -2569,7 +2770,7 @@ class Fight:
         def_state["stunned_timer"] = 0
         def_state["unanswered_ground_strikes"] = 0
 
-        self.fight_log.append(self.commentary.generate_knockdown_commentary(defender))
+        self.fight_log.append(f"!!! {self.commentary.generate_knockdown_commentary(defender)}")
         self.fight_log.append(f"{defender.name} goes down! {attacker.name} follows them to the ground!")
 
         # Check if this is an instant KO (head critical damage or stage 4)

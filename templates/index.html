@@ -76,6 +76,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; colo
 .fight-log .ev-defensive { color: #888; }
 .fight-log .ev-hurt { color: #ffd700; font-weight: 600; }
 .fight-log .ev-stunned { color: #ff4a4a; font-weight: 700; }
+.fight-log .ev-knockdown { color: #ff0000; font-weight: 900; font-size: 14px; text-shadow: 0 0 6px rgba(255,0,0,0.4); }
+.fight-log .ev-combo { color: #4affda; border-left: 3px solid #4affda; padding-left: 3px; font-size: 12px; }
+.fight-log .ev-counter { color: #4a9eff; border-left: 3px solid #4a9eff; padding-left: 3px; }
+.fight-log .ev-exchange { color: #ffd700; font-weight: 600; border-left: 3px solid #ffd700; padding-left: 3px; }
+.fight-log .ev-reaction { color: #ff9a4a; font-style: italic; }
+.fight-log .ev-movement { color: #888; font-style: italic; }
+.fight-log .ev-feint { color: #b07cff; font-style: italic; }
+.fight-log .ev-carryover { color: #ff9a4a; font-weight: 600; border-left: 3px solid #ff9a4a; padding-left: 3px; }
 .fight-log .ev-f1 { border-left: 3px solid #e62400; padding-left: 3px; }
 .fight-log .ev-f2 { border-left: 3px solid #4a9eff; padding-left: 3px; }
 
@@ -1706,6 +1714,9 @@ async function replayFightEvents(fightResult) {
       el.innerHTML = "Score: " + escHtml(ev.score);
     } else if (ev.type === "between_round") {
       el.innerHTML = escHtml(ev.text || "").replace(/\n/g, "<br>");
+    } else if (ev.type === "carryover") {
+      el.innerHTML = escHtml(ev.text || "");
+      el.className += " ev-carryover";
     } else if (ev.type === "strategy_prompt") {
       if (ev.f1_health) {
         updateHealthBars(ev.f1_health, ev.f2_health);
@@ -1725,7 +1736,15 @@ async function replayFightEvents(fightResult) {
       const t = ev.text || "";
       const sev = ev.severity || "";
       let actCls = "ev-strike";
-      if (/CRITICAL/.test(sev)) actCls = "ev-critical";
+
+      if (t.startsWith("!!!")) actCls = "ev-knockdown";
+      else if (t.startsWith("Both fighters trade")) actCls = "ev-exchange";
+      else if (/throws a .+! Landed \d+\/\d+:/.test(t)) actCls = "ev-combo";
+      else if (/slips.*and fires back|parries.*and creates|blocks.*and answers/.test(t)) actCls = "ev-counter";
+      else if (/shells up|circles away|swings wildly|is frozen|ties up to recover/.test(t)) actCls = "ev-reaction";
+      else if (/circles|steps into the pocket|switches stance|finding range/.test(t)) actCls = "ev-movement";
+      else if (/feints.*draws|sells the jab.*flinches|fakes the takedown.*eats/.test(t)) actCls = "ev-feint";
+      else if (/CRITICAL/.test(sev)) actCls = "ev-critical";
       else if (sev === "Devastating") actCls = "ev-critical";
       else if (sev === "Flush") actCls = "ev-heavy";
       else if (sev === "Solid") actCls = "ev-strike";
@@ -1744,6 +1763,8 @@ async function replayFightEvents(fightResult) {
       const f2N = qs("#f2NameBar") ? qs("#f2NameBar").textContent : "";
       if (f1N && t.startsWith(f1N)) el.className += " ev-f1";
       else if (f2N && t.startsWith(f2N)) el.className += " ev-f2";
+
+      el.innerHTML = (ev.time ? "[" + escHtml(ev.time) + "] " : "") + escHtml(t);
     }
 
     if (el.textContent || el.innerHTML) {
@@ -1763,8 +1784,8 @@ async function replayFightEvents(fightResult) {
       const delays = {
         action: 800, round_start: 1200, round_end: 1200, round_summary: 1000,
         knockout: 2500, submission: 2500, decision: 2000, post_fight: 1500,
-        pre_fight: 1500, walkout: 1500, between_round: 2000, score_update: 600,
-        damage: 1000, post_fight_reaction: 1200,
+        pre_fight: 1500, walkout: 1500, between_round: 2000, carryover: 1500,
+        damage: 1000, score_update: 600, post_fight_reaction: 1200,
       };
       await sleep((delays[ev.type] || 800) / fightSpeed);
     }
@@ -1799,12 +1820,12 @@ async function showStrategyPrompt(data) {
     const f2n = data.f2Name || "Opponent";
     statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;background:#1a1a2a;border-radius:6px;padding:8px;font-size:11px">
       <div><strong style="color:#e62400">${escHtml(f1n)}</strong><br>
-        Strikes: ${s1.sig_strikes}/${s1.strikes_attempted || s1.sig_strikes}<br>
+        <span title="Significant Strikes Landed / Total Actions">Sig Strikes: ${s1.sig_strikes}</span><br>
         Takedowns: ${s1.takedowns}/${s1.takedowns_attempted || s1.takedowns}<br>
         Sub Att: ${s1.sub_attempts || 0}<br>
         Fatigue: ${s1.fatigue || 0}%</div>
       <div><strong style="color:#4a9eff">${escHtml(f2n)}</strong><br>
-        Strikes: ${s2.sig_strikes}/${s2.strikes_attempted || s2.sig_strikes}<br>
+        <span title="Significant Strikes Landed / Total Actions">Sig Strikes: ${s2.sig_strikes}</span><br>
         Takedowns: ${s2.takedowns}/${s2.takedowns_attempted || s2.takedowns}<br>
         Sub Att: ${s2.sub_attempts || 0}<br>
         Fatigue: ${s2.fatigue || 0}%</div>

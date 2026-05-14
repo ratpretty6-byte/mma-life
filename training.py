@@ -286,7 +286,10 @@ class TrainingSystem:
         return result
 
     def _advance_week_day(self):
+        prev = self.current_week_day
         self.current_week_day = (self.current_week_day + 1) % 7
+        if prev == 6 and self.current_week_day == 0:
+            self.film_study_sessions = 0
 
     def _generate_injury(self) -> Dict:
         injuries = [

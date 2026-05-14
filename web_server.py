@@ -859,6 +859,7 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     self.json_resp({"error": "Opponent not found"})
                     return
                 opponent = copy.deepcopy(target)
+                session["_opponent_original"] = target
                 is_title = promo.champions.get(f.weight_class) is not None and opponent.name == promo.champions[f.weight_class].name
                 fight_date = game_date + timedelta(weeks=weeks_out)
                 es = session.get("event_sys")
@@ -1006,6 +1007,15 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 is_draw = winner is None
                 method = fight.win_method or "Decision"
                 fb.complete(winner, method, fight.win_round)
+                original_opp = session.get("_opponent_original")
+                if original_opp:
+                    original_opp.wins = opponent.wins
+                    original_opp.losses = opponent.losses
+                    original_opp.draws = opponent.draws
+                    original_opp.knockouts = opponent.knockouts
+                    original_opp.submissions = opponent.submissions
+                    original_opp.win_streak = opponent.win_streak
+                    original_opp.loss_streak = opponent.loss_streak
                 if winner:
                     f.shake_ring_rust()
                     opponent.shake_ring_rust()
