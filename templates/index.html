@@ -1131,8 +1131,40 @@ function updateGymTab() {
   }
 
   qs("#btnStartTraining").classList.add("hidden");
-    qs("#btnStartCamp").classList.add("hidden");
+  qs("#btnStartCamp").classList.add("hidden");
+  qs("#btnStopTraining").classList.add("hidden");
+  qs("#btnEndCamp").classList.add("hidden");
+  qs("#fatigueBar").classList.add("hidden");
+
+  if (t) {
+    const fatigue = t.fatigue || 0;
+    if (t.in_training) {
+      qs("#fatigueBar").classList.remove("hidden");
+      const fill = qs("#fatigueFill");
+      fill.style.width = fatigue + "%";
+      if (fatigue > 70) fill.style.background = "#ff4a4a";
+      else if (fatigue > 40) fill.style.background = "#ffd700";
+      else fill.style.background = "#4aff6a";
+
+      if (t.in_camp) {
+        qs("#trainingStatus").innerHTML = `<span style="color:#4aff6a">Camp: ${escHtml(t.camp_name)}</span> &mdash; ${escHtml(t.drill_name)} | Day ${t.days_trained}/${t.camp_weeks*7} | Fatigue: ${fatigue}%`;
+        qs("#btnEndCamp").classList.remove("hidden");
+        qs("#btnStopTraining").classList.remove("hidden");
+      } else {
+        qs("#trainingStatus").innerHTML = `<span style="color:#4a9eff">Base Training</span> &mdash; ${escHtml(t.drill_name)} | Fatigue: ${fatigue}%`;
+        qs("#btnStopTraining").classList.remove("hidden");
+        qs("#btnStartCamp").classList.remove("hidden");
+      }
+    } else {
+      qs("#trainingStatus").innerHTML = `<span style="color:#888">Not training</span>`;
+      qs("#btnStartTraining").classList.remove("hidden");
+      qs("#btnStartCamp").classList.remove("hidden");
+    }
+  } else {
+    qs("#trainingStatus").innerHTML = `<span style="color:#888">Not training</span>`;
+    qs("#btnStartTraining").classList.remove("hidden");
   }
+
   const fss = qs("#filmStudyStatus");
   if (t && t.film_study_available) {
     fss.textContent = "Film study: available (2x/week)";
@@ -1144,17 +1176,6 @@ function updateGymTab() {
   if (t && t.recovery_active) {
     fss.textContent = "Recovery active: " + (t.recovery_type || "processing");
     fss.style.color = "#4a9eff";
-  }
-  updateScheduleGrid();
-}
-    } else {
-      qs("#trainingStatus").innerHTML = `<span style="color:#888">Not training</span>`;
-      qs("#btnStartTraining").classList.remove("hidden");
-      qs("#btnStartCamp").classList.remove("hidden");
-    }
-  } else {
-    qs("#trainingStatus").innerHTML = `<span style="color:#888">Not training</span>`;
-    qs("#btnStartTraining").classList.remove("hidden");
   }
   updateScheduleGrid();
 }
