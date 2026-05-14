@@ -616,7 +616,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not name or name.strip() == "":
                     first, last = utils.generate_name()
                     name = f"{first} {last}"
-                age = body.get("age", 25)
+                try:
+                    age = int(body.get("age", 25))
+                except:
+                    age = 25
                 bg = body.get("background", "mma")
                 wc_param = body.get("weight_class", 3)
                 
