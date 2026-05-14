@@ -29,6 +29,10 @@ class WorldSimulator:
             prospect_news = self._generate_prospects(game_date)
             results.extend(prospect_news)
 
+        # Replenish thin divisions: if any weight class has < 15 fighters, generate more
+        replenish_news = self._replenish_thin_divisions(game_date)
+        results.extend(replenish_news)
+
         # Retirement simulation
         retirement_news = self._simulate_retirements(game_date)
         results.extend(retirement_news)
@@ -56,6 +60,35 @@ class WorldSimulator:
                         "promotion": promo.name,
                     })
                     break
+        return news
+
+    def _replenish_thin_divisions(self, game_date: datetime) -> List[Dict]:
+        """Top up any per-promotion weight class that has fewer than 15 active fighters."""
+        news = []
+        for promo in self.promotions:
+            for wc in promo.weight_classes:
+                active = [f for f in promo.rankings.get(wc, []) if not f.retired]
+                if len(active) >= 15:
+                    continue
+                to_create = 20 - len(active)
+                wc_data = utils.get_weight_class(wc)
+                for _ in range(to_create):
+                    fighter = generate_single_fighter(
+                        random.randint(wc_data["min"], wc_data["max"]),
+                        skill_mean=utils.gaussian_random(45, 10, 25, 65),
+                        skill_std=utils.gaussian_random(14, 3, 6, 20)
+                    )
+                    fighter.age = random.randint(20, 30)
+                    fighter.months_inactive = 0
+                    promo.sign_fighter(fighter)
+                promo.update_rankings()
+                if to_create > 0 and self.month_counter % 3 == 0:
+                    news.append({
+                        "type": "replenish",
+                        "promotion": promo.name,
+                        "weight_class": wc,
+                        "count": to_create,
+                    })
         return news
 
     def _simulate_retirements(self, game_date: datetime) -> List[Dict]:

@@ -41,7 +41,7 @@ def ensure_initialized():
         weight_classes = [wc["name"] for wc in utils.WEIGHT_CLASSES]
         promotions = create_promotions(weight_classes)
         world, national, regional = promotions
-        all_fighters = generate_fighter_pool(promotions, 8000)
+        all_fighters = generate_fighter_pool(promotions, 3000)
         gs["sessions"] = {}
         gs["sessions_lock"] = Lock()
         gs["promotions"] = promotions
@@ -111,6 +111,29 @@ def ensure_regional_opponents(session):
         promo.sign_fighter(fighter)
     promo.update_rankings()
 
+def seed_regional_division(nationality: str, home_region: str, weight_class: str, count: int = 8):
+    """Pre-seed the regional promotion with fighters matching a nationality."""
+    from generator import generate_single_fighter
+    regional_promo = gs.get("regional")
+    if not regional_promo:
+        return
+    existing = [f for f in regional_promo.rankings.get(weight_class, [])
+                if f.nationality == nationality and f.is_available()]
+    to_create = max(0, count - len(existing))
+    if to_create <= 0:
+        return
+    wc_data = utils.get_weight_class(weight_class)
+    for _ in range(to_create):
+        fighter = generate_single_fighter(
+            random.randint(wc_data["min"], wc_data["max"]),
+            skill_mean=utils.gaussian_random(40, 8, 25, 55),
+            skill_std=utils.gaussian_random(12, 3, 6, 18)
+        )
+        fighter.nationality = nationality
+        fighter.home_region = home_region
+        regional_promo.sign_fighter(fighter)
+    regional_promo.update_rankings()
+
 def get_state_dict(session):
     f = session.get("fighter")
     if not f:
@@ -160,7 +183,7 @@ def get_state_dict(session):
             "suspension": max(0, (f.medical_suspension_end - game_date).days) if f.medical_suspension_end else 0,
             "retired": f.retired,
             "stance": f.stance,
-        "signature_strike": f.get_signature_strike(),
+            "signature_strike": f.get_signature_strike(),
             "career_damage": round(f.career_damage_taken, 1),
             "career_fights": f.career_total_fights,
             "ko_losses": f.career_ko_losses,
@@ -656,6 +679,8 @@ class Handler(BaseHTTPRequestHandler):
                 session["current_fight_booking"] = None
                 session["current_fight"] = None
                 session["game_date"] = game_date
+
+                seed_regional_division(nationality, region, f.weight_class, 10)
                 
                 # Check if this is a form submission (not AJAX)
                 if "application/x-www-form-urlencoded" in content_type:
@@ -1058,6 +1083,7 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     return
                 career.sign_with_promotion(promo, 4, game_date)
                 session["current_promotion"] = promo
+                ensure_regional_opponents(session)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/accept_promotion":
@@ -1075,6 +1101,7 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     return
                 career.sign_with_promotion(offer, 4, game_date)
                 session["current_promotion"] = offer
+                ensure_regional_opponents(session)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/advance_time":

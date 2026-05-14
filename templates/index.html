@@ -843,33 +843,39 @@ document.getElementById('startCareerBtn').addEventListener('click', async functi
 init();
 
 async function createFighter() {
-  const name = qs("#fName").value.trim() || "";
-  const age = parseInt(qs("#fAge").value);
-  const bg = qs("#fBackground").value;
-  const wc = parseInt(qs("#fWeightClass").value);
-  const nationality = qs("#fNationality").value;
-  const region = qs("#fRegion").value;
-  const traitBtn = qs("#traitGrid .selected");
-  const trait_id = traitBtn ? traitBtn.dataset.trait : null;
-  const persBtn = qs("#personalityGrid .selected");
-  const personality_id = persBtn ? persBtn.dataset.pers || "humble" : "humble";
-  const stance = qs("#fStance").value;
-
   const btn = qs("#startCareerBtn");
   btn.textContent = "Creating...";
   btn.disabled = true;
-  const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id, stance });
-  btn.textContent = "START CAREER";
-  btn.disabled = false;
-  if (resp.success) {
-    state = resp.state;
-    if (state.strategies) STRATS = state.strategies;
-    qs("#screen-create").classList.add("hidden");
-    qs("#screen-game").classList.remove("hidden");
-    updateAllUI();
-    toast("Fighter created! Welcome to the pros.", "success");
-  } else {
-    toast("Error: " + (resp.error || "Unknown"), "error");
+  try {
+    const name = qs("#fName").value.trim() || "";
+    const age = parseInt(qs("#fAge").value);
+    const bg = qs("#fBackground").value;
+    const wc = parseInt(qs("#fWeightClass").value);
+    const nationality = qs("#fNationality").value;
+    const region = qs("#fRegion").value;
+    const traitBtn = qs("#traitGrid .selected");
+    const trait_id = traitBtn ? traitBtn.dataset.trait : null;
+    const persBtn = qs("#personalityGrid .selected");
+    const personality_id = persBtn ? persBtn.dataset.pers || "humble" : "humble";
+    const stance = qs("#fStance").value;
+
+    const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id, stance });
+    if (resp.success) {
+      state = resp.state;
+      if (state.strategies) STRATS = state.strategies;
+      qs("#screen-create").classList.add("hidden");
+      qs("#screen-game").classList.remove("hidden");
+      updateAllUI();
+      toast("Fighter created! Welcome to the pros.", "success");
+    } else {
+      toast("Error: " + (resp.error || "Unknown"), "error");
+    }
+  } catch(e) {
+    console.error("Create fighter error:", e);
+    toast("Error creating fighter: " + (e.message || "Unknown"), "error");
+  } finally {
+    btn.textContent = "START CAREER";
+    btn.disabled = false;
   }
 }
 

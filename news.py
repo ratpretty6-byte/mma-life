@@ -17,6 +17,7 @@ def format_news_item(item: Dict) -> Dict:
         "award": _format_award,
         "title_stripped": _format_title_stripped,
         "prospect": _format_prospect,
+        "replenish": _format_replenish,
     }
     formatter = formatters.get(news_type, _format_unknown)
     result = formatter(item)
@@ -221,6 +222,14 @@ def _format_prospect(item: Dict) -> Dict:
     promo = item.get("promotion", "?")
     headline = f"New prospect alert: {fighter} enters the {wc} division!"
     body = f"A new {age}-year-old prospect, {fighter}, has signed with {promo}. One to watch in the {wc} division."
+    return {"headline": headline, "body": body, "severity": "routine"}
+
+def _format_replenish(item: Dict) -> Dict:
+    promo = item.get("promotion", "?")
+    wc = item.get("weight_class", "?")
+    count = item.get("count", 0)
+    headline = f"{count} new fighters join {promo}'s {wc} division"
+    body = f"{promo} has signed {count} new fighters to bolster their {wc} roster."
     return {"headline": headline, "body": body, "severity": "routine"}
 
 
