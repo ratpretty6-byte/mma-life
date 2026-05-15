@@ -192,11 +192,11 @@ def assign_to_promotions(fighters: List[Fighter], promotions: List[Promotion]):
         rating = fighter.get_overall_rating()
         win_pct = fighter.wins / max(1, fighter.wins + fighter.losses)
         if rating >= 68 and win_pct >= 0.60:
-            world.sign_fighter(fighter)
-        elif rating >= 35:  # Lowered from 42 to increase National pool depth
-            national.sign_fighter(fighter)
+            world._add_fighter_batch(fighter)
+        elif rating >= 35:
+            national._add_fighter_batch(fighter)
         else:
-            regional.sign_fighter(fighter)
+            regional._add_fighter_batch(fighter)
 
     # Apply tier-based stat floors — elite fighters should be clearly better
     for f in world.fighters:
@@ -208,6 +208,10 @@ def assign_to_promotions(fighters: List[Fighter], promotions: List[Promotion]):
     for f in regional.fighters:
         for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
             f.attributes[attr] = max(f.attributes[attr], 25)
+
+    # Re-rank all promotions once after batch
+    for p in promotions:
+        p.update_rankings()
 
 def generate_fighters(total: int = 8000) -> List[Fighter]:
     weight_probs = [0.10, 0.12, 0.14, 0.18, 0.16, 0.14, 0.10, 0.10]

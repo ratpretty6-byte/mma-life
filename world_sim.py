@@ -19,7 +19,6 @@ class WorldSimulator:
 
     def _init_champions(self):
         for promo in self.promotions:
-            promo.update_rankings()
             for wc in promo.weight_classes:
                 if wc not in promo.champions or promo.champions.get(wc) is None:
                     ranked = promo.rankings.get(wc, [])

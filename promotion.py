@@ -64,6 +64,16 @@ class Promotion:
         self._last_ranking_update: Dict[str, datetime] = {}
         self._mandatory_challenges: Dict[str, Fighter] = {}
 
+    def _add_fighter_batch(self, fighter: Fighter):
+        """Add a fighter without updating rankings (for batch imports)."""
+        if fighter in self.fighters:
+            return
+        self.fighters.append(fighter)
+        self.contracts[fighter] = Contract(fighter, self, 4, self.base_pay, self.base_pay * 0.5, self.perf_bonus)
+        if fighter.weight_class in self.rankings:
+            self.rankings[fighter.weight_class].append(fighter)
+        fighter.current_contract = self.contracts[fighter]
+
     def sign_fighter(self, fighter: Fighter, fights: int = 4, game_date: datetime = None) -> Contract:
         if fighter in self.fighters:
             return self.contracts[fighter]
