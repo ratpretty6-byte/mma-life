@@ -23,7 +23,8 @@ class WorldSimulator:
                 if wc not in promo.champions or promo.champions.get(wc) is None:
                     ranked = promo.rankings.get(wc, [])
                     if ranked:
-                        promo.set_champion(ranked[0])
+                        promo.champions[wc] = ranked[0]
+            promo.update_rankings()
 
     def simulate_month(self, game_date: datetime, event_sys: EventSystem) -> List[Dict]:
         results = []

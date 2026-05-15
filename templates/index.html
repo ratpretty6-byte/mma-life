@@ -472,6 +472,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
           <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Net Worth</span><br><span class="stat-value" id="hNet" style="font-size:14px">$0</span></div>
         </div>
         <div class="stat-row"><span class="stat-label">Streak</span><span class="stat-value" id="hStreak">--</span></div>
+        <div class="stat-row"><span class="stat-label">Stance</span><span class="stat-value" id="hStance">--</span></div>
         <div class="stat-row"><span class="stat-label">Next Fight</span><span class="stat-value" id="hNextFight">Not booked</span></div>
         <div class="stat-row"><span class="stat-label">Injuries</span><span class="stat-value" id="hInjuries">None</span></div>
         <div class="stat-row"><span class="stat-label">Gym</span><span class="stat-value" id="hGym">None</span></div>
@@ -1167,7 +1168,7 @@ function returnToMenu() {
 }
 
 function timeSince(julianDay) {
-  if (!julianDay) return "recently";
+  if (!julianDay || typeof julianDay !== "number") return "recently";
   // Julian day to JS date: JD - 2440587.5 = Unix days
   const unixDays = julianDay - 2440587.5;
   const unixMs = unixDays * 86400000;
@@ -2079,7 +2080,7 @@ function loadStrategySelect(containerId) {
 
 function setSpeed(s) {
   fightSpeed = s;
-  qsa(".speed-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.speed) === s));
+  qsa(".speed-btn").forEach(b => b.classList.toggle("active", parseFloat(b.dataset.speed) === s));
 }
 
 async function startFight() {

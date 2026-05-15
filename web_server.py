@@ -153,6 +153,8 @@ def _persist_world():
 
 def _auto_save(sid, session):
     """Auto-save to slot 0 on key game events."""
+    if not _gs_get("initialized"):
+        return
     try:
         if not session or not session.get("fighter"):
             return
@@ -207,7 +209,7 @@ def ensure_regional_opponents(session):
         )
         fighter.nationality = f.nationality
         fighter.home_region = f.home_region
-        promo.sign_fighter(fighter)
+        promo._add_fighter_batch(fighter)
         all_fighters = gs.get("all_fighters")
         if all_fighters is not None:
             all_fighters.append(fighter)
@@ -244,7 +246,7 @@ def ensure_available_opponents(session):
         )
         fighter.nationality = f.nationality
         fighter.home_region = f.home_region
-        promo.sign_fighter(fighter)
+        promo._add_fighter_batch(fighter)
         all_fighters = gs.get("all_fighters")
         if all_fighters is not None:
             all_fighters.append(fighter)
@@ -277,7 +279,7 @@ def seed_regional_division(nationality: str, home_region: str, weight_class: str
         )
         fighter.nationality = nationality
         fighter.home_region = home_region
-        regional_promo.sign_fighter(fighter)
+        regional_promo._add_fighter_batch(fighter)
     regional_promo.update_rankings()
 
 def get_state_dict(session):
@@ -1273,6 +1275,7 @@ class Handler(BaseHTTPRequestHandler):
                 })
 
             elif path == "/api/sign_free_agent":
+                ensure_initialized()
                 sid = body.get("sid", "")
                 tier_name = body.get("tier", "Regional")
                 session = get_or_create_session(sid)
@@ -1317,6 +1320,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/advance_time":
+                ensure_initialized()
                 sid = body.get("sid", "")
                 days = body.get("days", 7)
                 session = get_or_create_session(sid)
@@ -1686,6 +1690,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_resp({"success": True, "results": results})
 
             elif path == "/api/save_game":
+                ensure_initialized()
                 sid = body.get("sid", "")
                 slot_index = int(body.get("slot", 0))
                 display_name = body.get("name", "Save")
@@ -1713,6 +1718,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": f"Save failed: {e}"})
 
             elif path == "/api/load_game":
+                ensure_initialized()
                 sid = body.get("sid", "")
                 slot_index = int(body.get("slot", 0))
                 if not sid:
@@ -1744,6 +1750,10 @@ class Handler(BaseHTTPRequestHandler):
                                     break
                         if found:
                             loaded_session["fighter"] = found
+                            for key in ["career", "training", "finance", "health", "media"]:
+                                obj = loaded_session.get(key)
+                                if obj:
+                                    obj.fighter = found
 
                     # Replace global world state with snapshot
                     with _gs_lock:
