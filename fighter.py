@@ -1,6 +1,7 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 import random
+import numpy as np
 import utils
 
 
@@ -11,12 +12,20 @@ class Fighter:
         "takedown_power", "takedown_accuracy", "wrestling_defense",
         "clinch_control", "clinch_escapes", "clinch_strikes", "clinch_throws",
         "top_control", "bottom_control", "submission_offense", "submission_defense",
-        "cardio", "durability", "athleticism"
+        "cardio", "durability", "athleticism",
+        # Defensive striking
+        "head_movement", "footwork_defense", "blocking", "parrying", "counter_timing",
+        # Takedown / grappling defense
+        "sprawl_technique", "chain_wrestling", "guard_retention", "scrambling",
+        "ground_striking_defense", "submission_awareness",
+        # Physical differentiation
+        "explosiveness", "flexibility",
     ]
 
     MENTAL_ATTRS = [
         "mental_toughness", "fight_iq", "heart", "discipline",
-        "charisma", "aggression", "composure", "adaptability"
+        "charisma", "aggression", "composure", "adaptability",
+        "danger_recognition", "pace_management",
     ]
 
     # Prime age range: 24-33 is peak performance
@@ -25,10 +34,10 @@ class Fighter:
     DECLINE_START = 34
     STEEP_DECLINE = 39
 
-    # 10 body zones — more granular than old head/body/legs model
+    # 11 body zones — more granular than old head/body/legs model
     BODY_ZONES = [
         "left_eye", "right_eye", "jaw", "temple", "nose",
-        "chest", "solar_plexus", "liver",
+        "chest", "solar_plexus", "liver", "ribs",
         "lead_leg", "rear_leg"
     ]
 
@@ -37,7 +46,7 @@ class Fighter:
         "jaw": 1.4, "temple": 1.8, "nose": 1.0,
         "left_eye": 0.7, "right_eye": 0.7,
         "solar_plexus": 1.3, "liver": 1.5, "ribs": 0.9,
-        "chest": 0.6, "kidneys": 0.8,
+        "chest": 0.6,
         "lead_leg": 0.5, "rear_leg": 0.6
     }
 
@@ -51,7 +60,7 @@ class Fighter:
 
     def __init__(self, name: str, age: int, weight_lbs: float, background: str = "mma", archetype: str = "balanced",
                  nationality: str = "American", home_region: str = "California", trait_id: str = None, personality_id: str = "humble",
-                 stance: str = None, game_date: datetime = None):
+                 stance: str = None, game_date: datetime = None, height: int = None, reach: int = None):
         self.name = name
         self.age = age
         self.base_weight_lbs = weight_lbs
@@ -67,8 +76,20 @@ class Fighter:
         self.personality_id = personality_id
         self.stance = stance or utils.get_stance_for_background(background)
 
-        self.height = random.randint(64, 80)
-        self.reach = random.randint(64, 84)
+        # Height and reach based on weight class, with explicit parameter override
+        if height is not None and reach is not None:
+            self.height = height
+            self.reach = reach
+        else:
+            hr_range = utils.get_height_reach_range(self.weight_class)
+            self.height = utils.gaussian_random(
+                (hr_range["height_min"] + hr_range["height_max"]) // 2, 3,
+                hr_range["height_min"], hr_range["height_max"]
+            )
+            self.reach = utils.gaussian_random(
+                (hr_range["reach_min"] + hr_range["reach_max"]) // 2, 3,
+                hr_range["reach_min"], hr_range["reach_max"]
+            )
 
         self.attributes = {}
         self._init_attributes()
@@ -104,6 +125,8 @@ class Fighter:
 
         self.weight_cut_lbs = 0.0
         self.weigh_in_pass = True
+        self.hydration_level = 80.0  # 0-100, affects recovery post-weigh-in
+        self.cut_history = []  # list of dicts: {cut_lbs: float, success: bool, fight_date: datetime}
 
         self.retired = False
         self.retirement_date = None
@@ -130,17 +153,57 @@ class Fighter:
     def _init_attributes(self):
         base = 50
         bg_bonuses = {
-            "wrestling": {"takedown_power": 15, "takedown_accuracy": 15, "wrestling_defense": 15, "top_control": 10, "clinch_control": 10},
-            "bjj": {"submission_offense": 20, "submission_defense": 15, "bottom_control": 15, "clinch_escapes": 10},
-            "muay_thai": {"kick_power": 15, "kick_accuracy": 10, "clinch_control": 15, "clinch_strikes": 15, "clinch_throws": 10},
-            "boxing": {"striking_power": 15, "striking_accuracy": 10, "hand_speed": 15, "composure": 5},
-            "judo": {"clinch_throws": 20, "clinch_control": 15, "top_control": 10, "wrestling_defense": 5},
-            "taekwondo": {"kick_power": 10, "kick_accuracy": 15, "kick_speed": 10, "athleticism": 10},
-            "karate": {"striking_accuracy": 15, "hand_speed": 10, "composure": 10, "adaptability": 5, "fight_iq": 5},
-            "sambo": {"takedown_power": 10, "takedown_accuracy": 10, "submission_offense": 10, "top_control": 10, "wrestling_defense": 5},
-            "kickboxing": {"striking_power": 10, "kick_power": 10, "cardio": 10, "aggression": 5, "hand_speed": 5},
-            "capoeira": {"athleticism": 15, "kick_accuracy": 10, "striking_accuracy": 10, "adaptability": 10, "composure": 5},
-            "mma": {attr: 5 for attr in self.PHYSICAL_ATTRS + self.MENTAL_ATTRS}
+            "wrestling": {
+                "takedown_power": 12, "takedown_accuracy": 12, "wrestling_defense": 12,
+                "top_control": 10, "clinch_control": 8, "chain_wrestling": 10,
+                "sprawl_technique": 8, "explosiveness": 8,
+                "ground_striking_defense": 5, "scrambling": 5,
+            },
+            "bjj": {
+                "submission_offense": 15, "submission_defense": 12, "bottom_control": 12,
+                "guard_retention": 12, "submission_awareness": 10, "flexibility": 10,
+                "scrambling": 8, "clinch_escapes": 8,
+            },
+            "muay_thai": {
+                "kick_power": 12, "kick_accuracy": 8, "clinch_control": 12,
+                "clinch_strikes": 12, "clinch_throws": 8, "blocking": 8,
+                "parrying": 5, "flexibility": 5,
+            },
+            "boxing": {
+                "striking_power": 10, "striking_accuracy": 8, "hand_speed": 12,
+                "head_movement": 12, "blocking": 8, "parrying": 8,
+                "counter_timing": 10, "footwork_defense": 8, "composure": 5,
+            },
+            "judo": {
+                "clinch_throws": 15, "clinch_control": 12, "top_control": 8,
+                "wrestling_defense": 5, "scrambling": 8, "explosiveness": 8,
+                "flexibility": 8, "guard_retention": 5,
+            },
+            "taekwondo": {
+                "kick_power": 10, "kick_accuracy": 12, "kick_speed": 10,
+                "flexibility": 10, "athleticism": 8, "footwork_defense": 8,
+            },
+            "karate": {
+                "striking_accuracy": 12, "hand_speed": 8, "head_movement": 10,
+                "counter_timing": 8, "composure": 10, "adaptability": 5,
+                "fight_iq": 5, "parrying": 5,
+            },
+            "sambo": {
+                "takedown_power": 8, "takedown_accuracy": 8, "submission_offense": 10,
+                "top_control": 8, "chain_wrestling": 10, "sprawl_technique": 8,
+                "wrestling_defense": 5, "explosiveness": 8,
+            },
+            "kickboxing": {
+                "striking_power": 8, "kick_power": 8, "cardio": 8,
+                "blocking": 8, "footwork_defense": 8, "hand_speed": 5,
+                "aggression": 5,
+            },
+            "capoeira": {
+                "athleticism": 12, "kick_accuracy": 8, "striking_accuracy": 8,
+                "adaptability": 8, "flexibility": 10, "footwork_defense": 8,
+                "composure": 5,
+            },
+            "mma": {attr: 4 for attr in self.PHYSICAL_ATTRS + self.MENTAL_ATTRS}
         }
         bonuses = bg_bonuses.get(self.background, bg_bonuses["mma"])
         for attr in self.PHYSICAL_ATTRS + self.MENTAL_ATTRS:
@@ -175,13 +238,14 @@ class Fighter:
 
         # Some zones naturally have lower health
         zone_base = {
-            "left_eye": 0.75, "right_eye": 0.75,  # eyes are vulnerable
-            "jaw": 0.70,   # jaw = KO hotspot
-            "temple": 0.65, # temple = most dangerous
+            "left_eye": 0.75, "right_eye": 0.75,
+            "jaw": 0.70,
+            "temple": 0.65,
             "nose": 0.85,
             "chest": 0.95,
             "solar_plexus": 0.85,
             "liver": 0.80,
+            "ribs": 0.85,
             "lead_leg": 0.90,
             "rear_leg": 0.90,
         }
@@ -271,13 +335,17 @@ class Fighter:
             if attr in injury.get("affected_attrs", []):
                 injury_penalty += injury["severity"] * 0.1
 
-        cut_penalties = utils.weight_cut_penalty(self.weight_cut_lbs)
+        cut_penalties = utils.weight_cut_penalty(self.weight_cut_lbs, self.hydration_level)
         if attr == "cardio":
             injury_penalty += cut_penalties["cardio_penalty"]
         elif attr == "durability":
             injury_penalty += cut_penalties["durability_penalty"]
         elif attr in ("striking_power", "kick_power"):
             injury_penalty += cut_penalties["strength_penalty"]
+        elif attr in ("hand_speed", "kick_speed"):
+            injury_penalty += cut_penalties["speed_penalty"]
+        elif attr in ("chin_resistance", "mental_toughness"):
+            injury_penalty += cut_penalties["chin_penalty"]
 
         ring_rust = self.get_ring_rust_penalty(in_fight=in_fight)
         confidence_mod = self.get_confidence_modifier()
@@ -399,14 +467,69 @@ class Fighter:
             return best
         return None
 
-    def cut_weight(self, target_weight_lbs: float) -> bool:
+    def cut_weight(self, target_weight_lbs: float, is_title_fight: bool = False) -> bool:
+        """
+        Full weight cutting system.
+        Factors: cut size, discipline, cardio, age, cumulative damage from past cuts.
+        Returns True if weigh-in passed.
+        """
         self.weight_cut_lbs = max(0, self.base_weight_lbs - target_weight_lbs)
-        if self.weight_cut_lbs > 10 and random.random() < 0.3:
-            self.weigh_in_pass = False
-            return False
+
+        if self.weight_cut_lbs <= 0:
+            self.current_weight_lbs = target_weight_lbs
+            self.weigh_in_pass = True
+            self.hydration_level = 90.0
+            return True
+
+        cut_ratio = self.weight_cut_lbs / max(1, self.base_weight_lbs)
+        discipline = self.attributes.get("discipline", 50)
+        cardio = self.attributes.get("cardio", 50)
+        age = self.age
+
+        # Base success chance with modifiers
+        success_chance = 0.92
+        success_chance -= cut_ratio * 0.50
+        success_chance += (discipline - 50) * 0.003
+        success_chance += (cardio - 50) * 0.002
+        success_chance -= max(0, (age - 30)) * 0.008
+        success_chance -= len(self.cut_history) * 0.02
+
+        # Cumulative cut damage - repeated bad cuts make future cuts harder
+        avg_cut = 0.0
+        if self.cut_history:
+            avg_cut = sum(h["cut_lbs"] for h in self.cut_history) / len(self.cut_history)
+            if avg_cut > 12:
+                success_chance -= 0.05
+            if avg_cut > 18:
+                success_chance -= 0.10
+
+        # Title fights add pressure
+        if is_title_fight:
+            success_chance -= 0.05
+
+        success_chance = utils.clamp(success_chance, 0.05, 0.98)
+
+        self.weigh_in_pass = random.random() < success_chance
         self.current_weight_lbs = target_weight_lbs
-        self.weigh_in_pass = True
-        return True
+
+        # Record cut history
+        self.cut_history.append({
+            "cut_lbs": self.weight_cut_lbs,
+            "success": self.weigh_in_pass,
+            "fight_date": datetime.now()
+        })
+
+        # Rehydration
+        if self.weigh_in_pass:
+            base_hydration = 60.0
+            base_hydration += (discipline - 50) * 0.3
+            base_hydration += (cardio - 50) * 0.2
+            base_hydration -= self.weight_cut_lbs * 1.5
+            self.hydration_level = utils.clamp(base_hydration, 10.0, 100.0)
+        else:
+            self.hydration_level = utils.clamp(self.hydration_level - 20, 5.0, 100.0)
+
+        return self.weigh_in_pass
 
     def migrate_weight_class_up(self, target_weight: float) -> bool:
         if self.migration_camps_remaining > 0:

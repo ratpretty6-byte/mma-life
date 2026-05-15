@@ -1,5 +1,6 @@
 import random
 import math
+import numpy as np
 from typing import List, Dict, Tuple
 from fighter import Fighter
 from promotion import Promotion
@@ -39,24 +40,74 @@ def assign_archetype_strategy(fighter: Fighter):
 ATTRIBUTE_GROUPS = {
     "striking": ["striking_power", "striking_accuracy", "hand_speed"],
     "kicking": ["kick_power", "kick_accuracy", "kick_speed"],
-    "takedown": ["takedown_power", "takedown_accuracy", "wrestling_defense"],
+    "takedown": ["takedown_power", "takedown_accuracy", "wrestling_defense", "chain_wrestling"],
     "clinch": ["clinch_control", "clinch_escapes", "clinch_strikes", "clinch_throws"],
     "ground": ["top_control", "bottom_control", "submission_offense", "submission_defense"],
-    "physical": ["cardio", "durability", "athleticism"],
-    "mental": ["mental_toughness", "fight_iq", "heart", "discipline", "composure", "adaptability"],
+    "defensive_striking": ["head_movement", "footwork_defense", "blocking", "parrying", "counter_timing"],
+    "grappling_defense": ["sprawl_technique", "guard_retention", "scrambling", "ground_striking_defense", "submission_awareness"],
+    "physical": ["cardio", "durability", "athleticism", "explosiveness", "flexibility"],
+    "mental": ["mental_toughness", "fight_iq", "heart", "discipline", "composure", "adaptability", "danger_recognition", "pace_management"],
     "personality": ["charisma", "aggression"],
 }
 
 ARCHETYPE_PROFILES = {
-    "brawler": {"striking": {"power": 8, "accuracy": -5}, "physical": {"durability": 5, "cardio": -3}},
-    "counter_striker": {"striking": {"accuracy": 8, "power": -5}, "mental": {"composure": 5}, "hand_speed": 5},
-    "wrestler": {"takedown": {"power": 8, "accuracy": 5}, "clinch": {"control": 3, "throws": 3}, "kicking": {"power": -5, "accuracy": -3}},
-    "submission_artist": {"ground": {"offense": 8, "defense": 5}, "takedown": {"accuracy": 3}, "striking": {"power": -5}},
-    "kickboxer": {"kicking": {"power": 8, "accuracy": 5, "speed": 5}, "striking": {"accuracy": -3}},
-    "boxer": {"striking": {"power": 5, "accuracy": 8, "hand_speed": 8}, "kicking": {"power": -8, "accuracy": -5}},
-    "muay_thai": {"clinch": {"control": 8, "strikes": 8, "throws": 5}, "kicking": {"power": 5}, "striking": {"accuracy": -3}},
-    "clinch_fighter": {"clinch": {"control": 10, "throws": 8, "escapes": 5}, "takedown": {"power": 5}},
-    "balanced": {},
+    "brawler": {
+        "striking": {"power": 10, "accuracy": -5},
+        "physical": {"durability": 8, "cardio": -3},
+        "defensive_striking": {"head_movement": -8, "footwork_defense": -5, "blocking": 5, },
+        "grappling_defense": {"sprawl_technique": -3},
+        "hand_speed": -3,
+    },
+    "counter_striker": {
+        "striking": {"accuracy": 8, "power": -5},
+        "mental": {"composure": 6},
+        "defensive_striking": {"head_movement": 8, "counter_timing": 10, "parrying": 8, "footwork_defense": 6},
+        "hand_speed": 5,
+        "aggression": -5,
+    },
+    "wrestler": {
+        "takedown": {"power": 8, "accuracy": 5},
+        "clinch": {"control": 5, "throws": 5},
+        "kicking": {"power": -5, "accuracy": -5},
+        "defensive_striking": {"head_movement": -5},
+        "grappling_defense": {"sprawl_technique": 8, "scrambling": 6},
+        "explosiveness": 8, "chain_wrestling": 10,
+    },
+    "submission_artist": {
+        "ground": {"offense": 8, "defense": 5},
+        "takedown": {"accuracy": 3},
+        "striking": {"power": -5, "accuracy": -3},
+        "grappling_defense": {"guard_retention": 10, "submission_awareness": 8, "scrambling": 5},
+        "flexibility": 8,
+    },
+    "kickboxer": {
+        "kicking": {"power": 10, "accuracy": 6, "speed": 6},
+        "striking": {"accuracy": -3},
+        "defensive_striking": {"footwork_defense": 6, "blocking": 5},
+        "aggression": -3,
+    },
+    "boxer": {
+        "striking": {"power": 5, "accuracy": 8, "hand_speed": 10},
+        "kicking": {"power": -8, "accuracy": -5},
+        "defensive_striking": {"head_movement": 10, "blocking": 6, "parrying": 8, "counter_timing": 6},
+        "footwork_defense": 5,
+    },
+    "muay_thai": {
+        "clinch": {"control": 8, "strikes": 10, "throws": 5},
+        "kicking": {"power": 5},
+        "striking": {"accuracy": -3},
+        "defensive_striking": {"blocking": 8, "parrying": 3},
+        "flexibility": 5,
+    },
+    "clinch_fighter": {
+        "clinch": {"control": 10, "throws": 8, "escapes": 5},
+        "takedown": {"power": 5},
+        "grappling_defense": {"scrambling": 5},
+        "explosiveness": 8, "chain_wrestling": 5,
+    },
+    "balanced": {
+        "fight_iq": 5, "adaptability": 5, "pace_management": 3,
+    },
 }
 
 NATIONALITY_WEIGHTS = {
@@ -91,8 +142,16 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
                       nationality=nationality, home_region=home_region,
                       trait_id=trait["id"] if trait else None,
                       personality_id=personality["id"])
-    fighter.height = utils.gaussian_random(68, 4, 60, 84)
-    fighter.reach = utils.gaussian_random(72, 4, 60, 88)
+    # Height and reach based on weight class
+    hr_range = utils.get_height_reach_range(fighter.weight_class)
+    fighter.height = utils.gaussian_random(
+        (hr_range["height_min"] + hr_range["height_max"]) // 2, 3,
+        hr_range["height_min"], hr_range["height_max"]
+    )
+    fighter.reach = utils.gaussian_random(
+        (hr_range["reach_min"] + hr_range["reach_max"]) // 2, 3,
+        hr_range["reach_min"], hr_range["reach_max"]
+    )
 
     # Use skill_mean and skill_std as baseline — this is the key fix
     base_val = utils.clamp(utils.gaussian_random(skill_mean, skill_std, 15, 95), 15, 95)
@@ -119,13 +178,17 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
         new_val = utils.clamp(base_val + group_mod + per_attr_var, utils.ATTR_MIN, utils.ATTR_MAX)
         fighter.attributes[attr] = new_val
 
-    # Ensure minimum durability for all fighters to prevent glass jaws
+    # Ensure minimum floors for all fighters to prevent extreme glass jaws / total incompetence
     fighter.attributes["durability"] = max(fighter.attributes.get("durability", 0), 40)
     fighter.attributes["mental_toughness"] = max(fighter.attributes.get("mental_toughness", 0), 35)
     fighter.attributes["heart"] = max(fighter.attributes.get("heart", 0), 35)
     fighter.attributes["composure"] = max(fighter.attributes.get("composure", 0), 30)
     fighter.attributes["aggression"] = max(fighter.attributes.get("aggression", 0), 25)
     fighter.attributes["fight_iq"] = max(fighter.attributes.get("fight_iq", 0), 20)
+    fighter.attributes["head_movement"] = max(fighter.attributes.get("head_movement", 0), 20)
+    fighter.attributes["footwork_defense"] = max(fighter.attributes.get("footwork_defense", 0), 20)
+    fighter.attributes["blocking"] = max(fighter.attributes.get("blocking", 0), 20)
+    fighter.attributes["danger_recognition"] = max(fighter.attributes.get("danger_recognition", 0), 20)
 
     # Apply archetype stat profile
     profile = ARCHETYPE_PROFILES.get(archetype, {})

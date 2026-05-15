@@ -399,6 +399,14 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
         <label style="margin-top:var(--space-3)">Weight Class</label>
         <div id="wcGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px"></div>
         <input type="hidden" id="fWeightClass" name="weight_class" value="3">
+
+        <div id="heightReachSection" style="margin-top:var(--space-3);display:none">
+          <label>Height (<span id="heightValue">68</span> in)</label>
+          <input type="range" id="fHeight" min="60" max="80" value="68" style="width:100%">
+          <label style="margin-top:8px">Reach (<span id="reachValue">72</span> in)</label>
+          <input type="range" id="fReach" min="62" max="84" value="72" style="width:100%">
+          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px;text-align:center" id="heightReachInfo"></div>
+        </div>
       </div>
 
       <!-- Step 3: Background -->
@@ -424,6 +432,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
         <div id="reviewPreview" class="fighter-preview">
           <div class="fp-name" id="reviewName">--</div>
           <div class="fp-meta" id="reviewDetails">--</div>
+          <div class="fp-meta" id="reviewHeightReach" style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:2px">--</div>
           <div style="margin-top:12px">
             <div class="fp-attr-label">Physical Rating</div>
             <div class="fp-attr-bar"><div id="reviewPhysBar" style="height:100%;width:50%;background:linear-gradient(90deg,#4a9eff,var(--accent));border-radius:3px;transition:width .3s"></div></div>
@@ -1214,9 +1223,56 @@ function initCreateForm() {
       wcGrid.querySelectorAll(".wc-card").forEach(c => c.classList.remove("selected"));
       card.classList.add("selected");
       qs("#fWeightClass").value = w.idx;
+      updateHeightReachForWC(w.idx);
     };
     wcGrid.appendChild(card);
   });
+
+  // Height & Reach sliders
+  const heightSlider = qs("#fHeight");
+  const reachSlider = qs("#fReach");
+  heightSlider.addEventListener("input", () => {
+    qs("#heightValue").textContent = heightSlider.value;
+    updateHeightReachInfo();
+  });
+  reachSlider.addEventListener("input", () => {
+    qs("#reachValue").textContent = reachSlider.value;
+    updateHeightReachInfo();
+  });
+
+  function updateHeightReachForWC(wcIdx) {
+    const wcName = WC_DATA[wcIdx].name;
+    // Fetch weight class height/reach ranges from server
+    api("/api/weight_classes").then(data => {
+      if (!data || !data.weight_classes) return;
+      const wcInfo = data.weight_classes.find(w => w.name === wcName);
+      if (!wcInfo) return;
+      qs("#heightReachSection").style.display = "block";
+      heightSlider.min = wcInfo.height_min;
+      heightSlider.max = wcInfo.height_max;
+      heightSlider.value = Math.round((wcInfo.height_min + wcInfo.height_max) / 2);
+      reachSlider.min = wcInfo.reach_min;
+      reachSlider.max = wcInfo.reach_max;
+      reachSlider.value = Math.round((wcInfo.reach_min + wcInfo.reach_max) / 2);
+      qs("#heightValue").textContent = heightSlider.value;
+      qs("#reachValue").textContent = reachSlider.value;
+      updateHeightReachInfo();
+    }).catch(() => {});
+  }
+
+  function updateHeightReachInfo() {
+    const h = parseInt(heightSlider.value);
+    const r = parseInt(reachSlider.value);
+    const diff = r - h;
+    let desc = `${h}" tall, ${r}" reach`;
+    if (diff > 4) desc += " — long arms for height";
+    else if (diff < 0) desc += " — short reach for height";
+    else desc += " — proportional";
+    qs("#heightReachInfo").textContent = desc;
+  }
+
+  // Init height/reach for default weight class (Lightweight)
+  updateHeightReachForWC(3);
 
   // Background grid (Step 3)
   const bgGrid = qs("#bgGrid");
@@ -1379,7 +1435,10 @@ async function createFighter() {
     const personality_id = persBtn ? persBtn.dataset.pers || "humble" : "humble";
     const stance = qs("#fStance").value;
 
-    const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id, stance });
+    const height = parseInt(qs("#fHeight").value);
+    const reach = parseInt(qs("#fReach").value);
+
+    const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id, stance, height, reach });
     if (resp.success) {
       state = resp.state;
       if (state.strategies) STRATS = state.strategies;
@@ -2251,6 +2310,9 @@ function updateReviewPreview() {
   const traitBtn = qs("#traitGrid .selected");
   const traitName = traitBtn ? traitBtn.dataset.trait : "None";
   qs("#reviewDetails").textContent = `${age}yo | ${wcName} | ${nat} | ${bg} | Trait: ${traitName}`;
+  const h = qs("#fHeight").value;
+  const r = qs("#fReach").value;
+  qs("#reviewHeightReach").textContent = `${h}" height | ${r}" reach`;
   qs("#reviewPhysBar").style.width = Math.floor(30 + Math.random() * 30) + "%";
   qs("#reviewMentBar").style.width = Math.floor(30 + Math.random() * 30) + "%";
 }

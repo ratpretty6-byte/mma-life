@@ -765,6 +765,21 @@ class Handler(BaseHTTPRequestHandler):
                     "sessions": len(gs.get("sessions", {})),
                 })
 
+            elif path == "/api/weight_classes":
+                data = []
+                for wc in utils.WEIGHT_CLASSES:
+                    hr = utils.get_height_reach_range(wc["name"])
+                    data.append({
+                        "name": wc["name"],
+                        "min_weight": wc["min"],
+                        "max_weight": wc["max"],
+                        "height_min": hr["height_min"],
+                        "height_max": hr["height_max"],
+                        "reach_min": hr["reach_min"],
+                        "reach_max": hr["reach_max"],
+                    })
+                self.json_resp({"weight_classes": data})
+
             else:
                 self.send_error(404)
 
@@ -825,7 +840,29 @@ class Handler(BaseHTTPRequestHandler):
                 stance = body.get("stance", None)
                 game_date = datetime(2025, 1, 6)
 
-                f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, stance=stance, game_date=game_date)
+                # Height and reach from request or weight-class defaults
+                wc_name = utils.WEIGHT_CLASSES[wc_idx]["name"]
+                hr_range = utils.get_height_reach_range(wc_name)
+                height = body.get("height")
+                reach = body.get("reach")
+                if height is not None:
+                    try:
+                        height = int(height)
+                    except (ValueError, TypeError):
+                        height = None
+                if reach is not None:
+                    try:
+                        reach = int(reach)
+                    except (ValueError, TypeError):
+                        reach = None
+                # Clamp to weight-class range
+                if height is not None:
+                    height = utils.clamp(height, hr_range["height_min"], hr_range["height_max"])
+                if reach is not None:
+                    reach = utils.clamp(reach, hr_range["reach_min"], hr_range["reach_max"])
+
+                f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id,
+                            stance=stance, game_date=game_date, height=height, reach=reach)
 
                 # Age-scaled starting stats: 18yo starts ~25% below base, 35yo starts at base+5%
                 age_min = 18

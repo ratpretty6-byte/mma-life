@@ -92,18 +92,18 @@ class PositionSystem:
 
         speed_attr = attacker.get_effective_attribute("hand_speed", fatigue)
         athleticism = attacker.get_effective_attribute("athleticism", fatigue)
+        explode = attacker.get_effective_attribute("explosiveness", fatigue)
+        defender_footwork = defender.get_effective_attribute("footwork_defense", fatigue)
         defender_ath = defender.get_effective_attribute("athleticism", fatigue)
-        success_chance = (speed_attr * 0.5 + athleticism * 0.5) - defender_ath * 0.3
+
+        success_chance = (speed_attr * 0.30 + athleticism * 0.25 + explode * 0.25) - (defender_footwork * 0.30 + defender_ath * 0.20)
         success_chance *= reach_mod
         success_chance *= max(0.4, 1.0 - fatigue * 0.3)
-        success_chance = max(20, min(92, success_chance))
+        success_chance = max(15, min(92, success_chance))
 
         if utils.random_roll(1, 100) <= success_chance:
-            # Check if defender is against cage
             if self.cage_position == defender:
-                self.current_position = Position.POCKET
-                self.position_time = 0
-                return True
+                pass
             self.current_position = Position.POCKET
             self.position_time = 0
             return True
@@ -217,19 +217,21 @@ class PositionSystem:
             return False
 
         top_control = top.get_effective_attribute("top_control", fatigue)
+        chain = top.get_effective_attribute("chain_wrestling", fatigue)
+        guard_ret = bottom.get_effective_attribute("guard_retention", fatigue)
+        scramble = bottom.get_effective_attribute("scrambling", fatigue)
         bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
 
-        # Weight difference affects guard passing
         weight_diff = top.base_weight_lbs - bottom.base_weight_lbs
         weight_mod = 1.0 + min(0.15, max(-0.1, weight_diff / 150))
 
-        success_chance = top_control * 0.6 - bottom_control * 0.4
+        # Attacker: top_control + chain_wrestling vs Defender: guard_retention + scrambling + bottom_control
+        success_chance = (top_control * 0.40 + chain * 0.35) - (guard_ret * 0.35 + scramble * 0.20 + bottom_control * 0.15)
         success_chance *= weight_mod
         success_chance *= max(0.4, 1.0 - fatigue * 0.3)
         success_chance = max(8, min(80, success_chance))
 
         if utils.random_roll(1, 100) <= success_chance:
-            # Guard pass goes to half-guard
             self.current_position = Position.GROUND_HALF_GUARD
             self.position_time = 0
             return True
@@ -240,11 +242,14 @@ class PositionSystem:
             return False
 
         top_control = top.get_effective_attribute("top_control", fatigue)
+        chain = top.get_effective_attribute("chain_wrestling", fatigue)
+        guard_ret = bottom.get_effective_attribute("guard_retention", fatigue)
+        scramble = bottom.get_effective_attribute("scrambling", fatigue)
         bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
         weight_diff = top.base_weight_lbs - bottom.base_weight_lbs
         weight_mod = 1.0 + min(0.15, max(-0.1, weight_diff / 150))
 
-        success_chance = top_control * 0.55 - bottom_control * 0.35
+        success_chance = (top_control * 0.35 + chain * 0.30) - (guard_ret * 0.30 + scramble * 0.20 + bottom_control * 0.15)
         success_chance *= weight_mod
         success_chance *= max(0.4, 1.0 - fatigue * 0.3)
         success_chance = max(6, min(75, success_chance))
@@ -427,11 +432,13 @@ class PositionSystem:
 
         bottom_control = bottom_fighter.get_effective_attribute("bottom_control", fatigue)
         top_control = top_fighter.get_effective_attribute("top_control", fatigue)
+        scramble = bottom_fighter.get_effective_attribute("scrambling", fatigue)
+        top_scramble = top_fighter.get_effective_attribute("scrambling", fatigue)
 
         # Weight advantage for the bottom fighter helps sweeps
         weight_mod = 1.0 + min(0.15, max(-0.1, (bottom_fighter.base_weight_lbs - top_fighter.base_weight_lbs) / 800))
 
-        success_chance = (bottom_control * 0.6 - top_control * 0.4) * pos_factor * weight_mod
+        success_chance = (bottom_control * 0.40 + scramble * 0.30 - top_control * 0.30 - top_scramble * 0.10) * pos_factor * weight_mod
         success_chance *= max(0.3, 1.0 - fatigue * 0.4)
         success_chance = max(4, min(70, success_chance))
 
@@ -459,8 +466,9 @@ class PositionSystem:
         bottom_control = bottom_fighter.get_effective_attribute("bottom_control", fatigue)
         top_control = top_fighter.get_effective_attribute("top_control", fatigue)
         athleticism = bottom_fighter.get_effective_attribute("athleticism", fatigue)
+        scramble = bottom_fighter.get_effective_attribute("scrambling", fatigue)
 
-        success_chance = (bottom_control * 0.3 + athleticism * 0.5 - top_control * 0.4) * pos_factor
+        success_chance = (bottom_control * 0.20 + athleticism * 0.30 + scramble * 0.30 - top_control * 0.35) * pos_factor
         success_chance *= max(0.3, 1.0 - fatigue * 0.4)
         success_chance = max(4, min(75, success_chance))
 

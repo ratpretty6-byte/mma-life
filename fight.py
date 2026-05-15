@@ -1,5 +1,6 @@
 import random
 import math
+import numpy as np
 from typing import Dict, Optional, List, Generator
 from fighter import Fighter
 from positions import PositionSystem, Position
@@ -638,6 +639,7 @@ class Fight:
             "pattern_read_bonus": 1.0,
             "second_wind_used": False,
             "involuntary_rest_timer": 0,
+            "stunned_since_action": 0,
         }
 
     # ============================================================
@@ -1288,7 +1290,9 @@ class Fight:
             state_mods["striking_power"] = state_mods.get("striking_power", 1.0) * 0.8
 
     def _simulate_fighter_reaction(self, attacker, defender, atk_state, def_state, atk_strategy, phase):
-        """When a fighter is hurt/stunned, they react instead of attacking normally."""
+        """When a fighter is hurt/stunned, they react instead of attacking normally.
+        Fixed: never repeats 'frozen', adds varied reactions, and prevents
+        stunned fighters from going on offense."""
         if atk_state["cardio_zone"] == "oxygen_debt" and random.random() < 0.08:
             atk_state["stamina"] = max(0, atk_state["stamina"] - 2)
             atk_state["fatigue_level"] = 1.0 - (atk_state["stamina"] / 100)
@@ -1304,34 +1308,66 @@ class Fight:
         comp = attacker.get_effective_attribute("composure", atk_state["fatigue_level"])
         fiq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
         agg = attacker.get_effective_attribute("aggression", atk_state["fatigue_level"])
+        dr = attacker.get_effective_attribute("danger_recognition", atk_state["fatigue_level"])
 
         if is_stunned:
-            if fiq > 60 or comp > 65:
-                self.fight_log.append(f"{attacker.name} shells up and covers, trying to recover!")
-                def_num = 1 if defender == self.fighter1 else 2
-                self._update_momentum(def_num, 1)
-                self.referee.record_damage_taken(defender, True, attacker=attacker)
-                return True
-            if agg > 70:
-                self.fight_log.append(f"{attacker.name} swings wildly, hurt and desperate!")
-                def_num = 1 if defender == self.fighter1 else 2
-                self._update_momentum(def_num, 2)
-                self.referee.record_damage_taken(defender, True, attacker=attacker)
-                return True
-            if comp < 40:
-                self.fight_log.append(f"{attacker.name} is frozen! Can't mount any offense!")
-                def_num = 1 if defender == self.fighter1 else 2
-                self._update_momentum(def_num, 2)
+            # Track how many actions we've been stunned for
+            stunned_since = atk_state.get("stunned_since_action", 0)
+            atk_state["stunned_since_action"] = atk_state.get("stunned_since_action", 0) + 1
+
+            # Smart fighter: shells up defensively
+            if fiq > 55 or comp > 60 or dr > 55:
+                if stunned_since <= 1:
+                    self.fight_log.append(f"{attacker.name} shells up and covers, trying to recover!")
+                elif stunned_since <= 3:
+                    self.fight_log.append(f"{attacker.name} clinches desperately to survive!")
+                    self._simulate_clinch_attempt(attacker, defender, atk_state["fatigue_level"], atk_strategy)
+                else:
+                    self.fight_log.append(f"{attacker.name} retreats to the fence, covering up!")
+                self._update_momentum(1 if defender == self.fighter1 else 2, 1)
                 self.referee.record_damage_taken(defender, True, attacker=attacker)
                 return True
 
+            # Aggressive fighter: swings wild (bad idea when stunned)
+            if agg > 70:
+                if random.random() < 0.6:
+                    self.fight_log.append(f"{attacker.name} swings wildly, hurt and desperate!")
+                    self._update_momentum(1 if defender == self.fighter1 else 2, 2)
+                    self.referee.record_damage_taken(defender, True, attacker=attacker)
+                    return True
+                else:
+                    self.fight_log.append(f"{attacker.name} shells up despite their instincts!")
+                    self._update_momentum(1 if defender == self.fighter1 else 2, 1)
+                    self.referee.record_damage_taken(defender, True, attacker=attacker)
+                    return True
+
+            # Low composure: varied frozen reactions (only first time per stun)
+            if comp < 40 or dr < 30:
+                reactions = [
+                    f"{attacker.name} is frozen! Can't mount any offense!",
+                    f"{attacker.name} stumbles back, trying to clear their head!",
+                    f"{attacker.name} covers up against the cage, just trying to survive!",
+                    f"{attacker.name} is out on their feet, legs wobbling!",
+                ]
+                idx = min(stunned_since, len(reactions) - 1)
+                self.fight_log.append(reactions[idx])
+                self._update_momentum(1 if defender == self.fighter1 else 2, 2)
+                self.referee.record_damage_taken(defender, True, attacker=attacker)
+                return True
+
+            # Default stunned behavior: shell up
+            self.fight_log.append(f"{attacker.name} shells up on the cage, unable to respond!")
+            self._update_momentum(1 if defender == self.fighter1 else 2, 1)
+            self.referee.record_damage_taken(defender, True, attacker=attacker)
+            return True
+
         if is_hurt and not is_stunned:
-            if random.random() < 0.4:
+            if random.random() < 0.35:
                 self.fight_log.append(f"{attacker.name} ties up in the clinch to recover!")
                 self._simulate_clinch_attempt(attacker, defender, atk_state["fatigue_level"], atk_strategy)
                 self.referee.record_damage_taken(defender, True, attacker=attacker)
                 return True
-            if random.random() < 0.3 and comp < 50:
+            if random.random() < 0.25 and comp < 50:
                 self.fight_log.append(f"{attacker.name} circles away, trying to clear their head!")
                 self.referee.record_damage_taken(defender, True, attacker=attacker)
                 return True
@@ -2082,10 +2118,13 @@ class Fight:
         # Clamp accuracy
         accuracy = utils.clamp(accuracy, 3, 98)
 
-        # Determine if strike lands and at what severity
-        defense_score = self._get_composite_defense(defender, def_state, atk_state)
-        tier = utils.determine_severity(accuracy, defense_score, power, composure,
-                                         self.get_adrenaline(1 if attacker == self.fighter1 else 2))
+        # Determine if strike lands and at what severity (target-zone-aware)
+        defense_score = self._get_composite_defense(defender, def_state, atk_state, target)
+        tier = utils.determine_severity(
+            accuracy, defense_score, power, composure,
+            self.get_adrenaline(1 if attacker == self.fighter1 else 2),
+            attacker_stats=atk_state, defender_stats=def_state, target=target
+        )
 
         self._last_severity = tier["name"]
         is_critical = utils.check_critical_hit(accuracy, composure,
@@ -2325,6 +2364,7 @@ class Fight:
         if head_pct < 30:
             defender_state["stunned"] = True
             defender_state["stunned_timer"] = max(defender_state["stunned_timer"], 2)
+            defender_state["stunned_since_action"] = 0
             self._transition_fighter_state(defender, def_state, "STUNNED")
 
         # Stun check from strike severity
@@ -2336,6 +2376,7 @@ class Fight:
         if random.random() < stun_chance:
             defender_state["stunned"] = True
             defender_state["stunned_timer"] = random.randint(2, 4)
+            defender_state["stunned_since_action"] = 0
             self._transition_fighter_state(defender, def_state, "STUNNED")
 
         # Check for knockdown (KO threshold) — minimum round 2 before KOs
@@ -2417,27 +2458,22 @@ class Fight:
             fighter = self.fighter1 if fighter_num == 1 else self.fighter2
             self.fight_log.append(f"{fighter.name}'s rear leg is giving out!")
 
-    def _get_composite_defense(self, defender, def_state, atk_state) -> float:
+    def _get_composite_defense(self, defender, def_state, atk_state, target: str = "head") -> float:
         """
-        Calculate complete defensive rating for this moment.
-        Uses 6 stats: durability, composure, fight IQ, adaptability, athleticism + stance familiarity.
+        Calculate complete defensive rating, target-zone-aware.
+        Uses new per-zone stats: head_movement, blocking, footwork_defense,
+        parrying for striking defense.
         """
         fatigue = def_state["fatigue_level"]
-        durability = defender.get_effective_attribute("durability", fatigue)
-        composure = defender.get_effective_attribute("composure", fatigue)
-        fight_iq = defender.get_effective_attribute("fight_iq", fatigue)
-        adaptability = defender.get_effective_attribute("adaptability", fatigue)
-        athleticism = defender.get_effective_attribute("athleticism", fatigue)
 
-        # Base defense score — multi-stat blend
-        defense = (durability * 0.35 + composure * 0.20 + fight_iq * 0.15
-                   + adaptability * 0.10 + athleticism * 0.05)
+        # Per-zone defense using the new multi-stat system
+        defense = utils.calculate_striking_defense(defender, fatigue, target)
 
-        # Stance familiarity bonus: same stance predicts telegraphs better
+        # Stance familiarity bonus
         d_stance = self.fighter2_stance if defender == self.fighter2 else self.fighter1_stance
         a_stance = self.fighter1_stance if defender == self.fighter2 else self.fighter2_stance
         if d_stance == a_stance:
-            defense *= 1.03  # +3% defense when same stance
+            defense *= 1.03
 
         # State modifiers
         state_name = def_state.get("state", "NORMAL")
@@ -2451,23 +2487,18 @@ class Fight:
         # Fatigue reduces defense
         defense *= max(0.5, 1.0 - fatigue * 0.3)
 
-        # Vision impairment reduces defense
+        # Vision impairment
         vision = def_state.get("vision_impairment", 0)
         if vision > 20:
             defense *= max(0.6, 1.0 - (vision - 20) / 200.0)
 
-        # Leg damage reduces defensive movement
+        # Leg damage
         leg_mod = self._get_leg_damage_modifier(def_state)
         defense *= (0.6 + 0.4 * leg_mod)
 
-        # Pattern read bonus — defender reads attacker's patterns
+        # Pattern read bonus
         if def_state.get("pattern_read"):
             defense *= def_state.get("pattern_read_bonus", 1.0)
-
-        # Guard up when hurt — bonus defense but costs stamina
-        if def_state["hurt"]:
-            # Higher fight IQ = better defensive reads when hurt
-            defense += fight_iq * 0.1
 
         return utils.clamp(defense, 10, 95)
 
@@ -2561,29 +2592,66 @@ class Fight:
                 self.fight_log.append(f"{fighter.name} is STUNNED!")
 
     # ============================================================
-    # TAKEDOWN SYSTEM
+    # TAKEDOWN SYSTEM (rebuilt with sprawl_technique, chain_wrestling, explosiveness)
     # ============================================================
 
     def _simulate_takedown(self, attacker, defender, fatigue, strategy):
         td_mod = self._get_mod("takedown_power", strategy)
         tda_mod = self._get_mod("takedown_accuracy", strategy)
         wd_mod = self._get_mod("wrestling_defense", strategy)
+        cw_mod = self._get_mod("chain_wrestling", strategy)
 
-        # Weight class advantage in grappling
-        weight_advantage = (attacker.base_weight_lbs - defender.base_weight_lbs) / 50.0
-        weight_advantage = utils.clamp(weight_advantage, -0.3, 0.3)
-
-        # Per-leg damage reduces takedown power (attacker) and helps defense (defender)
+        # New multi-stat takedown calculation
         att_state = self._get_attacker_state(attacker)
         def_state = self._get_opponent_state(attacker)
+
+        # Attacker: power + accuracy + chain_wrestling + explosiveness
+        td_power = attacker.get_effective_attribute("takedown_power", fatigue) * td_mod
+        td_acc = attacker.get_effective_attribute("takedown_accuracy", fatigue) * tda_mod
+        chain = attacker.get_effective_attribute("chain_wrestling", fatigue) * cw_mod
+        explode = attacker.get_effective_attribute("explosiveness", fatigue)
+        att_score = td_power * 0.35 + td_acc * 0.25 + chain * 0.25 + explode * 0.15
+
+        # Defender: sprawl_technique + wrestling_defense + footwork_defense + athleticism
+        sprawl = defender.get_effective_attribute("sprawl_technique", fatigue)
+        wd = defender.get_effective_attribute("wrestling_defense", fatigue) * wd_mod
+        footwork = defender.get_effective_attribute("footwork_defense", fatigue)
+        ath = defender.get_effective_attribute("athleticism", fatigue)
+        def_score = sprawl * 0.35 + wd * 0.25 + footwork * 0.20 + ath * 0.20
+
+        # Weight class advantage
+        weight_advantage = (attacker.base_weight_lbs - defender.base_weight_lbs) / 50.0
+        weight_advantage = utils.clamp(weight_advantage, -0.3, 0.3)
+        att_score *= (1.0 + weight_advantage)
+
+        # Height mod: shorter = lower CoG = harder to takedown
+        height_diff = attacker.height - defender.height
+        height_mod = 1.0 - max(0, height_diff) * 0.003 if height_diff > 0 else 1.0 + min(0.15, abs(height_diff) * 0.002)
+        att_score *= height_mod
+
+        # Leg damage
         att_leg_mod = self._get_leg_takedown_penalty(att_state)
         def_leg_mod = self._get_leg_takedown_penalty(def_state)
+        att_score *= att_leg_mod
+        def_score *= def_leg_mod
+
+        # Fatigue
+        att_score *= max(0.3, 1.0 - fatigue * 0.4)
+        def_score *= max(0.3, 1.0 - fatigue * 0.3)
+
+        success_chance = utils.clamp(att_score - def_score * 0.5 + np.random.normal(0, 8), 5, 92)
 
         is_clinch = self.position_system.current_position == Position.CLINCH
         if is_clinch:
-            success = self.position_system.takedown_from_clinch(attacker, defender, fatigue, td_mod=td_mod, tda_mod=tda_mod, wd_mod=wd_mod, weight_advantage=weight_advantage, att_leg_mod=att_leg_mod, def_leg_mod=def_leg_mod)
+            # Clinch takedowns favor chain_wrestling more
+            success_chance = utils.clamp(success_chance + chain * 0.10, 5, 92)
+            success = utils.random_roll(1, 100) <= success_chance
+            if success:
+                self.position_system._set_ground(attacker, defender, Position.GROUND_GUARD)
         else:
-            success = self.position_system.attempt_takedown(attacker, defender, fatigue, td_mod=td_mod, tda_mod=tda_mod, wd_mod=wd_mod, weight_advantage=weight_advantage, att_leg_mod=att_leg_mod, def_leg_mod=def_leg_mod)
+            success = utils.random_roll(1, 100) <= success_chance
+            if success:
+                self.position_system._set_ground(attacker, defender, Position.GROUND_GUARD)
 
         att_state["takedowns_attempted"] = att_state.get("takedowns_attempted", 0) + 1
         self._apply_stamina_cost(
@@ -2604,11 +2672,9 @@ class Fight:
                 self.f2_control_time += 2
                 self.f2_state["takedowns_landed"] += 1
                 self.f2_state["effective_grappling_points"] += 3.0
-            def_state = self._get_opponent_state(attacker)
             def_state["unanswered_ground_strikes"] = 0
         else:
-            # Defended takedown — counter opportunity
-            if random.random() < 0.2:
+            if random.random() < 0.2 + chain * 0.002:
                 self.fight_log.append(f"{defender.name} stuffs it and looks for a guillotine!")
 
     def _simulate_clinch_attempt(self, attacker, defender, fatigue, strategy):
@@ -2939,7 +3005,9 @@ class Fight:
         target = random.choice(["head", "body"])
         sp_mod = self._get_mod("striking_power", strategy)
         power = attacker.get_effective_attribute("striking_power", fatigue) * sp_mod
+        gsd = defender.get_effective_attribute("ground_striking_defense", 1.0 - (def_state["stamina"] / 100))
         durability = defender.get_effective_attribute("durability", 1.0 - (def_state["stamina"] / 100))
+        blocking = defender.get_effective_attribute("blocking", 1.0 - (def_state["stamina"] / 100))
 
         pos_power = {Position.GROUND_GUARD: 0.30, Position.GROUND_HALF_GUARD: 0.35,
                      Position.GROUND_SIDE: 0.45, Position.GROUND_NORTH_SOUTH: 0.50,
@@ -2954,6 +3022,7 @@ class Fight:
         ground_strike_bonus = strategy.get_modifiers().get("ground_strike_damage", 1.0)
 
         raw = (power / 50) * 5 * pos_bonus * top_bonus * ground_strike_bonus
+        raw *= max(0.85, 1.0 - gsd / 500.0)  # gsd provides small flat reduction
         damage = max(1, int(raw * (1 - durability / 200)))
 
         actual_damage = defender.apply_damage_to_zone(target, damage, self)
@@ -3074,6 +3143,9 @@ class Fight:
         sub_def = defender.get_effective_attribute("submission_defense", fatigue) * sd_mod
         mental = defender.get_effective_attribute("mental_toughness", fatigue)
         cardio = defender.get_effective_attribute("cardio", fatigue)
+        att_flex = attacker.get_effective_attribute("flexibility", fatigue)
+        def_flex = defender.get_effective_attribute("flexibility", fatigue)
+        sub_aware = defender.get_effective_attribute("submission_awareness", fatigue)
 
         self.fight_log.append(self.commentary.generate_ground_commentary(
             "submission_attempt", attacker=attacker.name, submission=submission))
@@ -3104,10 +3176,12 @@ class Fight:
         threat_key = submission
         current_threat = def_state.get("submission_threat", {}).get(threat_key, 0)
 
-        base_threat = (sub_off * 0.135 - sub_def * 0.025) * pb
+        base_threat = (sub_off * 0.120 + att_flex * 0.030 - sub_def * 0.020) * pb
         mental_resistance = mental / 250.0
         cardio_resistance = cardio / 200.0
-        threat_increment = base_threat * (1.0 - mental_resistance * 0.3) * (1.0 - cardio_resistance * 0.2) * sub_weight_mod
+        aware_resistance = sub_aware / 300.0
+        def_flex_resistance = def_flex / 400.0
+        threat_increment = base_threat * (1.0 - mental_resistance * 0.25) * (1.0 - cardio_resistance * 0.15) * (1.0 - aware_resistance * 0.20) * (1.0 - def_flex_resistance * 0.15) * sub_weight_mod
         threat_increment += random.uniform(-2, 5)
 
         # Previous threats decay slower (0.6x instead of 0.7x)
@@ -3124,11 +3198,13 @@ class Fight:
             self.f2_state["submissions_attempted"] += 1
         self.fight_log.append(f"{attacker.name} hunting for the {submission}!")
 
-        # Defense calculation
+        # Defense calculation (new: includes submission_awareness and flexibility)
         mental_factor = mental / 200.0
         cardio_factor = cardio / 200.0
         sub_def_factor = sub_def / 150.0
-        defense_factor = 0.35 + mental_factor + cardio_factor * 0.4 + sub_def_factor * 0.25
+        aware_factor = sub_aware / 200.0
+        flex_factor = def_flex / 300.0
+        defense_factor = 0.30 + mental_factor + cardio_factor * 0.30 + sub_def_factor * 0.20 + aware_factor * 0.15 + flex_factor * 0.10
 
         # Damage-based urgency: lower health = harder to defend
         defender_health = (defender.get_group_health("head") + defender.get_group_health("body")) / 200.0
