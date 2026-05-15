@@ -320,7 +320,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
     </div>
   </div>
 
-  <div id="screen-create" class="screen">
+  <div id="screen-create" class="hidden screen">
     <div class="screen-title" style="font-size:var(--text-3xl)">CREATE YOUR FIGHTER</div>
 
     <div class="wizard-progress" id="wizardProgress">
@@ -729,278 +729,6 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       </div>
     </div>
   </div>
-
-    <div id="tab-home" class="tab-content fade-in">
-      <div id="freeAgentBanner" class="hidden card" style="border-color:#ffd700;text-align:center">
-        <div class="card-title" style="color:#ffd700">FREE AGENT</div>
-        <p style="font-size:13px;color:#ccc;margin-bottom:6px">You are not signed with any promotion. Sign a contract to start your career!</p>
-        <button class="btn btn-gold" onclick="showContractOffers()">VIEW CONTRACT OFFERS</button>
-      </div>
-      <div class="card">
-        <div class="flex-between">
-          <div><span class="stat-label">Record</span> <span class="stat-value" id="hRecord" style="font-size:18px">0-0-0</span></div>
-          <div><span class="tag tag-promo" id="hPromoTag">Regional</span></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
-          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rank</span><br><span class="stat-value" id="hRank" style="font-size:16px">#--</span></div>
-          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rating</span><br><span class="stat-value" id="hRating" style="font-size:16px">--</span></div>
-          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Net Worth</span><br><span class="stat-value" id="hNet" style="font-size:14px">$0</span></div>
-        </div>
-        <div class="stat-row"><span class="stat-label">Stance</span><span class="stat-value" id="hStance">--</span></div>
-        <div class="stat-row"><span class="stat-label">Streak</span><span class="stat-value" id="hStreak">--</span></div>
-        <div class="stat-row"><span class="stat-label">Next Fight</span><span class="stat-value" id="hNextFight">Not booked</span></div>
-        <div class="stat-row"><span class="stat-label">Injuries</span><span class="stat-value" id="hInjuries">None</span></div>
-        <div class="stat-row"><span class="stat-label">Gym</span><span class="stat-value" id="hGym">None</span></div>
-        <div class="stat-row" id="hFatigueRow"><span class="stat-label">Fatigue</span><span class="stat-value" id="hFatigue">Rested</span></div>
-        <div class="stat-row"><span class="stat-label">Date</span><span class="stat-value" id="hDate">--</span></div>
-      </div>
-
-      <div id="nextActionCard" class="hidden next-action"></div>
-
-      <div class="card" id="advanceCard">
-        <div class="card-title" id="advanceTitle">Today: <span id="todayDay">Monday</span></div>
-        <div id="todayPreview" style="font-size:12px;color:#888;margin-bottom:6px"></div>
-        <div class="flex-row">
-          <button class="btn btn-primary" onclick="advanceDay()" id="btnAdvanceDay" style="font-size:15px;padding:12px 28px">ADVANCE DAY</button>
-          <button class="btn btn-ghost btn-small" onclick="advanceSkip(7)">+1 Week</button>
-          <button class="btn btn-ghost btn-small" onclick="advanceSkip(30)">+1 Month</button>
-          <button class="btn btn-gold btn-small hidden" id="btnFightDay" onclick="switchTab('fight')">GO TO FIGHT</button>
-        </div>
-        <div id="dayResult" class="hidden" style="margin-top:8px;font-size:13px"></div>
-      </div>
-
-      <div id="promoOffer" class="hidden card" style="border-color:#b8860b">
-        <div class="card-title" style="color:#ffd700">Promotion Offer!</div>
-        <div id="promoOfferText"></div>
-        <button class="btn btn-gold btn-small" style="margin-top:6px" onclick="acceptPromotion()">Accept</button>
-      </div>
-
-      <div class="card" id="newsFeed">
-        <div class="card-title">MMA World News</div>
-        <div id="newsList" style="max-height:300px;overflow-y:auto;font-size:12px"></div>
-      </div>
-    </div>
-
-    <div id="tab-gym" class="tab-content hidden fade-in">
-      <div class="card">
-        <div class="card-title">Gym: <span id="gymName">None</span></div>
-        <div id="gymInfo" class="stat-row" style="display:block;border:none;color:#888;font-size:12px"></div>
-        <div style="margin-top:6px">
-          <button class="btn btn-secondary btn-small" onclick="showGymList()">Change Gym</button>
-          <span id="gymStatus" style="margin-left:8px;font-size:12px;color:#888"></span>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Training</div>
-        <div id="trainingStatus"></div>
-        <div id="fatigueBar" class="hidden" style="margin:6px 0;height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden">
-          <div id="fatigueFill" style="height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
-        </div>
-        <div id="trainingActions">
-          <button class="btn btn-primary btn-small hidden" id="btnStartTraining" onclick="showStartTraining()">Start Training</button>
-          <button class="btn btn-primary btn-small hidden" id="btnStartCamp" onclick="showStartCamp()">Start Camp</button>
-          <button class="btn btn-danger btn-small hidden" id="btnStopTraining" onclick="stopTraining()">Stop Training</button>
-          <button class="btn btn-secondary btn-small hidden" id="btnEndCamp" onclick="endCamp()">End Camp</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Recovery &amp; Preparation <span id="filmStudyStatus" style="font-size:11px;color:#888;font-weight:400"></span></div>
-        <div class="flex-row" style="gap:4px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-small" onclick="doRecovery('ice_bath')">&#x2744; Ice Bath</button>
-          <button class="btn btn-ghost btn-small" onclick="doRecovery('sports_massage')">&#x1F4AA; Massage</button>
-          <button class="btn btn-ghost btn-small" onclick="doRecovery('nutrition_plan')">&#x1F966; Nutrition</button>
-          <button class="btn btn-ghost btn-small" onclick="doRecovery('meditation')">&#x1F9D8; Meditation</button>
-          <button class="btn btn-ghost btn-small" onclick="doFilmStudy()">&#x1F3AC; Film Study</button>
-        </div>
-      </div>
-
-      <div class="card" id="gymFightersCard" style="display:none">
-        <div class="card-title">Training Partners <span id="gymFighterCount" style="font-size:11px;color:#888;font-weight:400"></span></div>
-        <div id="gymFighterList" style="max-height:180px;overflow-y:auto;font-size:12px"></div>
-      </div>
-
-      <div class="card" id="scheduleCard">
-        <div class="card-title">Weekly Schedule</div>
-        <div id="scheduleGrid" class="schedule-grid"></div>
-        <div style="font-size:11px;color:#888;margin-top:4px">Click a day to change the drill. Rest days auto-recover fatigue.</div>
-      </div>
-
-      <div id="trainResult" class="hidden card" style="border-color:#2a4a2a"></div>
-    </div>
-
-    <div id="tab-fight" class="tab-content hidden fade-in">
-      <div id="fightPre" class="card">
-        <div class="card-title">Available Opponents</div>
-        <div id="opponentList"></div>
-        <div id="noOpponents" class="hidden" style="color:#888;font-size:13px;text-align:center;padding:12px">No available opponents right now. Advance time to find fights.</div>
-      </div>
-      <div id="scoutSection" class="card hidden">
-        <div class="flex-between"><div class="card-title">Scouting Report</div><span id="scoutLevel" style="font-size:11px;color:#888"></span></div>
-        <div id="scoutBody" style="font-size:12px;color:#ccc"></div>
-        <button class="btn btn-secondary btn-small" style="margin-top:6px" onclick="scoutOpponent()">Spy on Next Opponent</button>
-      </div>
-
-      <div id="fightReady" class="hidden card">
-        <div class="card-title">Fight Week</div>
-        <div id="fightMatchup"></div>
-        <div style="margin-top:8px">
-          <label>Choose Your Strategy:</label>
-          <div id="stratSelect" class="strategy-grid"></div>
-          <button class="btn btn-primary" id="btnStartFight" style="margin-top:8px" onclick="startFight()">START FIGHT</button>
-        </div>
-      </div>
-
-      <div id="fightLive" class="hidden">
-        <div id="fightHealthBars" class="card" style="margin-bottom:6px;padding:10px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div>
-              <div class="flex-between"><span id="f1NameBar" style="font-weight:700;font-size:14px;color:#e0e0e0"></span><span id="f1StateBar" style="font-size:11px"></span></div>
-              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f1HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,#ff9a4a,#4aff6a)"></div></div></div>
-              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f1StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,#4a9eff)"></div></div></div>
-              <div style="margin-top:3px"><div class="hp-label">Blood</div><div class="blood-bar-outer"><div id="f1BloodBar" class="blood-bar-inner" style="width:0%"></div></div></div>
-              <div class="flex-row" style="margin-top:3px;gap:4px">
-                <span style="font-size:9px;color:#888">H:<span id="f1HeadBar" style="color:#e62400">100</span></span>
-                <span style="font-size:9px;color:#888">B:<span id="f1BodyBar" style="color:#e62400">100</span></span>
-                <span style="font-size:9px;color:#888">L:<span id="f1LegBar" style="color:#e62400">100</span></span>
-                <span style="font-size:9px;color:#888">Br:<span id="f1BreathBar" style="color:#e6e600">100</span></span>
-                <span id="f1CardioZone" style="font-size:9px">Aerobic</span>
-              </div>
-            </div>
-            <div>
-              <div class="flex-between"><span id="f2NameBar" style="font-weight:700;font-size:14px;color:#e0e0e0"></span><span id="f2StateBar" style="font-size:11px"></span></div>
-              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f2HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,#4aff6a,#ff9a4a,#ff4a4a);float:right"></div></div></div>
-              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f2StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,#4a9eff,#ff4a4a);float:right"></div></div></div>
-              <div style="margin-top:3px"><div class="hp-label">Blood</div><div class="blood-bar-outer"><div id="f2BloodBar" class="blood-bar-inner" style="width:0%;float:right"></div></div></div>
-              <div class="flex-row" style="margin-top:3px;gap:4px;justify-content:flex-end">
-                <span style="font-size:9px;color:#888">H:<span id="f2HeadBar" style="color:#e62400">100</span></span>
-                <span style="font-size:9px;color:#888">B:<span id="f2BodyBar" style="color:#e62400">100</span></span>
-                <span style="font-size:9px;color:#888">L:<span id="f2LegBar" style="color:#e62400">100</span></span>
-                <span style="font-size:9px;color:#888">Br:<span id="f2BreathBar" style="color:#e6e600">100</span></span>
-                <span id="f2CardioZone" style="font-size:9px">Aerobic</span>
-              </div>
-            </div>
-          </div>
-          <div id="fightScoreBars" style="margin-top:8px;display:none">
-            <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px">
-              <div id="f1ScoreBar" style="flex:1;height:10px;background:#1a2a1a;border-radius:3px;overflow:hidden">
-                <div id="f1ScoreFill" style="height:100%;width:50%;background:#ffd700;border-radius:3px;transition:width .3s"></div>
-              </div>
-              <span id="scoreText" style="font-size:11px;color:#ffd700;min-width:30px;text-align:center;font-weight:700">0-0</span>
-              <div id="f2ScoreBar" style="flex:1;height:10px;background:#2a1a1a;border-radius:3px;overflow:hidden">
-                <div id="f2ScoreFill" style="height:100%;width:50%;background:#ffd700;border-radius:3px;transition:width .3s;float:right"></div>
-              </div>
-            </div>
-          </div>
-          <div id="momentumDisplay" style="margin-top:6px;display:none">
-            <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#888">
-              <span id="f1MomentumLabel" style="flex:1;text-align:right"></span>
-              <div style="flex:2;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-                <div id="f1MomentumFill" style="height:100%;width:50%;background:linear-gradient(90deg,#e62400,#ffd700);border-radius:3px;transition:width .3s"></div>
-              </div>
-              <span style="width:20px;text-align:center">&#x26A1;</span>
-              <div style="flex:2;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-                <div id="f2MomentumFill" style="height:100%;width:50%;background:linear-gradient(90deg,#ffd700,#4a9eff);border-radius:3px;transition:width .3s;float:right"></div>
-              </div>
-              <span id="f2MomentumLabel" style="flex:1;text-align:left"></span>
-            </div>
-            <div id="crowdDisplay" style="font-size:9px;color:#888;text-align:center;margin-top:2px"></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="flex-between">
-            <div class="card-title" style="margin-bottom:0">LIVE FIGHT</div>
-            <div class="speed-row" id="speedControls">
-              <span style="font-size:11px;color:#888">Speed:</span>
-              <button class="speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5x</button>
-              <button class="speed-btn active" data-speed="1" onclick="setSpeed(1)">1x</button>
-              <button class="speed-btn" data-speed="2" onclick="setSpeed(2)">2x</button>
-              <button class="speed-btn" data-speed="4" onclick="setSpeed(4)">4x</button>
-              <button class="speed-btn" data-speed="0" onclick="setSpeed(0)">Skip</button>
-            </div>
-          </div>
-          <div id="fightHeader" style="font-size:12px;color:#888;margin-bottom:4px"></div>
-        </div>
-        <div class="fight-log" id="fightLog"></div>
-        <div id="fightRoundReports" class="card hidden" style="margin-top:6px;background:#0d0d1a">
-          <div class="card-title" style="font-size:12px;color:#aaa">Round Reports</div>
-          <div id="roundReports"></div>
-        </div>
-        <div id="fightStratPrompt" class="hidden card" style="margin-top:6px">
-          <div class="card-title" id="stratPromptTitle">Between Rounds — Adjust Strategy?</div>
-          <div id="stratPromptGrid" class="strategy-grid"></div>
-        </div>
-        <div id="fightResult" class="hidden card" style="margin-top:6px"></div>
-      </div>
-    </div>
-
-    <div id="tab-career" class="tab-content hidden fade-in">
-      <div class="card">
-        <div class="card-title">Record &amp; Ranking</div>
-        <div class="stat-row"><span class="stat-label">Record</span><span class="stat-value" id="cRecord">0-0-0</span></div>
-        <div class="stat-row"><span class="stat-label">By KO</span><span class="stat-value" id="cKOs">0</span></div>
-        <div class="stat-row"><span class="stat-label">By Submission</span><span class="stat-value" id="cSubs">0</span></div>
-        <div class="stat-row"><span class="stat-label">Current Rank</span><span class="stat-value" id="cRank">#--</span></div>
-        <div class="stat-row"><span class="stat-label">Peak Rank</span><span class="stat-value" id="cPeak">#--</span></div>
-        <div class="stat-row"><span class="stat-label">Promotion</span><span class="stat-value" id="cPromo">--</span></div>
-        <div class="stat-row"><span class="stat-label">Champion</span><span class="stat-value" id="cChampion" style="color:#ffd700">No</span></div>
-      </div>
-
-      <div class="card">
-        <div class="flex-between"><div class="card-title">Contract</div><div id="contractChampTag"></div></div>
-        <div class="stat-row"><span class="stat-label">Base Pay</span><span class="stat-value" id="cBasePay">$--</span></div>
-        <div class="stat-row"><span class="stat-label">Win Bonus</span><span class="stat-value" id="cWinBonus">$--</span></div>
-        <div class="stat-row"><span class="stat-label">Fights Left</span><span class="stat-value" id="cFightsLeft">--</span></div>
-      </div>
-
-      <div class="card">
-        <div class="flex-between"><div class="card-title">Physical Attributes</div><span style="font-size:11px;color:#888">Rating: <span id="cRating">--</span></span></div>
-        <div id="physAttrs"></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Mental Attributes</div>
-        <div id="mentAttrs"></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Fighter Info</div>
-        <div class="stat-row"><span class="stat-label">Nationality</span><span class="stat-value" id="cNation">--</span></div>
-        <div class="stat-row"><span class="stat-label">Region</span><span class="stat-value" id="cRegion">--</span></div>
-        <div class="stat-row"><span class="stat-label">Height / Reach</span><span class="stat-value" id="cHeight">--</span></div>
-        <div class="stat-row"><span class="stat-label">Age</span><span class="stat-value" id="cAge">--</span></div>
-        <div class="stat-row"><span class="stat-label">Trait</span><span class="stat-value" id="cTrait">--</span></div>
-        <div class="stat-row"><span class="stat-label">Personality</span><span class="stat-value" id="cPersonality">--</span></div>
-        <div class="stat-row"><span class="stat-label">Prime Status</span><span class="stat-value" id="cPrime">--</span></div>
-        <div class="stat-row"><span class="stat-label">Signature Strike</span><span class="stat-value" id="cSignature">--</span></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Career</div>
-        <div class="stat-row"><span class="stat-label">Title Defenses</span><span class="stat-value" id="cTitles">0</span></div>
-        <div class="stat-row"><span class="stat-label">Career Earnings</span><span class="stat-value" id="cEarnings">$0</span></div>
-        <div class="stat-row"><span class="stat-label">Rivalries</span><span class="stat-value" id="cRivalries">0</span></div>
-        <div class="stat-row"><span class="stat-label">Career Damage</span><span class="stat-value" id="cDamage">0</span></div>
-        <div class="stat-row"><span class="stat-label">Total Fights</span><span class="stat-value" id="cFights">0</span></div>
-        <div class="stat-row"><span class="stat-label">Awards</span><span class="stat-value" id="cAwards">None</span></div>
-      </div>
-    </div>
-
-    <div id="tab-finance" class="tab-content hidden fade-in">
-      <div class="card"><div class="card-title">Financial Overview</div>
-        <div class="stat-row"><span class="stat-label">Net Worth</span><span class="stat-value" id="fNet">$0</span></div>
-        <div class="stat-row"><span class="stat-label">Agent</span><span class="stat-value" id="fAgent">None</span></div>
-        <div class="stat-row"><span class="stat-label">Gym Dues</span><span class="stat-value" id="fGymCost">$0/mo</span></div>
-        <div class="stat-row"><span class="stat-label">Sponsorship</span><span class="stat-value" id="fSponsor">$0/mo</span></div>
-        <div class="stat-row"><span class="stat-label">Monthly Living</span><span class="stat-value">$1,000/mo</span></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Management</div>
-        <div class="flex-row">
-          <button class="btn btn-secondary btn-small" onclick="showAgentList()">Hire/Fire Agent</button>
-          <button class="btn btn-secondary btn-small" onclick="showGymList()">Change Gym</button>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <div class="bottom-tabs hidden" id="bottomTabs">
@@ -1127,18 +855,41 @@ function showModal(html) { qs("#modalContent").innerHTML = html; qs("#modalOverl
 function closeModal(e) { if (!e || e.target === qs("#modalOverlay")) qs("#modalOverlay").classList.add("hidden"); }
 
 async function init() {
-  qs("#headerStatus").textContent = "Loading...";
+  qs("#headerStatus").textContent = "Starting server...";
   try {
     const resp = await api("/api/init");
     if (resp && resp.ready) {
-      qs("#headerStatus").textContent = `World ready: ${resp.promotions.regional}R / ${resp.promotions.national}N / ${resp.promotions.world}W fighters`;
+      if (resp.initialized) {
+        qs("#headerStatus").textContent = "World ready!";
+        initMainMenu();
+        return;
+      }
+      // Poll until initialized
+      qs("#headerStatus").textContent = "Generating fight world...";
+      for (let i = 0; i < 120; i++) {
+        await sleep(2000);
+        try {
+          const hr = await api("/api/health");
+          if (hr && hr.initialized) {
+            qs("#headerStatus").textContent = "World ready!";
+            initMainMenu();
+            return;
+          }
+          qs("#headerStatus").textContent = `Generating world... (${i + 1}s)`;
+        } catch(e) {
+          qs("#headerStatus").textContent = `Waiting for server... (${i + 1}s)`;
+        }
+      }
+      qs("#headerStatus").textContent = "Server taking long. Try refreshing.";
       initMainMenu();
     } else {
       qs("#headerStatus").textContent = "Error: " + (resp ? resp.error : "Unknown");
     }
   } catch(e) {
     console.error("Init error:", e);
-    qs("#headerStatus").textContent = "Error: " + e.message;
+    qs("#headerStatus").textContent = "Connecting...";
+    // Still show the menu even if init fails
+    setTimeout(initMainMenu, 1000);
   }
 }
 

@@ -63,7 +63,7 @@ def ensure_initialized():
                 all_fighters = generate_fighter_pool(promotions, 3000)
                 world_news = []
                 save_world_state(promotions, all_fighters)
-                world_sim = WorldSimulator(promotions)
+                world_sim = WorldSimulator(promotions, all_fighters)
             with _gs_lock:
                 gs["sessions"] = {}
                 gs["sessions_lock"] = Lock()
@@ -72,7 +72,7 @@ def ensure_initialized():
                 gs["national"] = national
                 gs["regional"] = regional
                 gs["all_fighters"] = all_fighters
-                gs["world_sim"] = world_sim or WorldSimulator(promotions)
+                gs["world_sim"] = world_sim or WorldSimulator(promotions, gs.get("all_fighters"))
                 gs["world_news"] = world_news or []
                 gs["initialized"] = True
             print("Game world ready!")
@@ -208,6 +208,9 @@ def ensure_regional_opponents(session):
         fighter.nationality = f.nationality
         fighter.home_region = f.home_region
         promo.sign_fighter(fighter)
+        all_fighters = gs.get("all_fighters")
+        if all_fighters is not None:
+            all_fighters.append(fighter)
     promo.update_rankings()
 
 def ensure_available_opponents(session):
@@ -242,6 +245,9 @@ def ensure_available_opponents(session):
         fighter.nationality = f.nationality
         fighter.home_region = f.home_region
         promo.sign_fighter(fighter)
+        all_fighters = gs.get("all_fighters")
+        if all_fighters is not None:
+            all_fighters.append(fighter)
     promo.update_rankings()
 
 
@@ -619,12 +625,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_resp(get_state_dict(session))
 
             elif path == "/api/init":
-                ensure_initialized()
-                self.json_resp({"ready": True, "promotions": {
-                    "regional": len(gs["regional"].fighters),
-                    "national": len(gs["national"].fighters),
-                    "world": len(gs["world"].fighters),
-                }})
+                initialized = gs.get("initialized", False)
+                if not initialized:
+                    Thread(target=ensure_initialized, daemon=True).start()
+                self.json_resp({"ready": True, "initialized": initialized})
 
             elif path == "/api/has_save":
                 ensure_initialized()

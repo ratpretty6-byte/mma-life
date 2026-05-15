@@ -11,8 +11,9 @@ import math
 import utils
 
 class WorldSimulator:
-    def __init__(self, promotions: List[Promotion]):
+    def __init__(self, promotions: List[Promotion], all_fighters: List = None):
         self.promotions = promotions
+        self.all_fighters = all_fighters
         self.month_counter = 0
         self._init_champions()
 
@@ -66,6 +67,8 @@ class WorldSimulator:
             for promo in self.promotions:
                 if promo.tier_name == "Regional":
                     promo.sign_fighter(fighter)
+                    if self.all_fighters is not None:
+                        self.all_fighters.append(fighter)
                     news.append({
                         "type": "prospect",
                         "fighter": fighter.name,
@@ -97,6 +100,8 @@ class WorldSimulator:
                     fighter.age = random.randint(20, 30)
                     fighter.months_inactive = 0
                     promo.sign_fighter(fighter)
+                    if self.all_fighters is not None:
+                        self.all_fighters.append(fighter)
                 promo.update_rankings()
                 if to_create > 0 and self.month_counter % 3 == 0:
                     news.append({
