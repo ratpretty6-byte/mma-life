@@ -388,9 +388,10 @@ def determine_severity(accuracy: float, defense: float, power: float, composure:
     """
     6-tier severity system.
     Returns dict with tier name, damage multiplier, knockdown chance, vision damage.
+    Uses multiple stats: accuracy, power, composure for offense; defense for defense.
     """
     strike_value = (accuracy * 0.4 + power * 0.35 + composure * 0.15) * adrenaline
-    defense_value = defense * 0.5 + random.gauss(0, 10)
+    defense_value = defense * 0.5 + random.gauss(0, 4) + 2
     delta = strike_value - defense_value
 
     if delta < -20:

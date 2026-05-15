@@ -169,6 +169,37 @@ class CommentaryEngine:
                 "{attacker} is dealing damage every time they step forward with that {strike_type}!",
                 "Sharp exchange ends with {attacker}'s {strike_type} getting through clean!",
                 "{attacker} counters brilliantly — {strike_type} meets {defender} coming in!",
+                # === NEW PLAY-BY-PLAY REALISM TEMPLATES ===
+                "{attacker} snaps a crisp {strike_type} that catches {defender} on the chin!",
+                "{attacker} shifts weight and rips a {strike_type} to {defender}'s {target} — clean connection!",
+                "{attacker} feints the jab and comes over the top with a {strike_type}!",
+                "{attacker} steps in with a {strike_type}, splitting {defender}'s guard!",
+                "{attacker} measures distance and pops a {strike_type} that snaps {defender}'s head back!",
+                "{attacker} doubles up on the {strike_type}, landing the second one flush!",
+                "{attacker} sells the takedown and unloads a {strike_type} as {defender} drops their hands!",
+                "{attacker} switches stance mid-combo and cracks {defender} with a {strike_type}!",
+                "{attacker} is timing {defender}'s movement now — another {strike_type} gets through!",
+                "{attacker} steps to the outside angle and lands a {strike_type} to the {target}!",
+                "{attacker} uses a subtle head fake before firing that {strike_type} straight down the pipe!",
+                "{attacker} paws with the jab, pulls {defender}'s guard up, then goes {strike_type} to the {target}!",
+                "{attacker} catches {defender} loading up, fires a {strike_type} that lands first!",
+                "{attacker} lunges in with a {strike_type} — it crashes off {defender}'s {target}!",
+                "{attacker} fires a {strike_type} in combination, finding the range more each time!",
+                "{attacker} digs a {strike_type} to the {target} — that one will leave a mark!",
+                "{attacker} throws a sharp {strike_type} that slices through {defender}'s defense!",
+                "{attacker} cuts off the cage and plants a {strike_type} on {defender}'s {target}!",
+                "{attacker} is crowding {defender} and firing short {strike_type}s to the {target}!",
+                "{attacker} waits for {defender} to commit, then sidesteps and lands a {strike_type}!",
+                "{attacker} flicks a {strike_type} that seems to come from nowhere — lands clean!",
+                "{attacker} puts more hip into that {strike_type} — massive pop on impact!",
+                "{attacker} feints high, goes low, comes back up with a {strike_type} to the {target}!",
+                "{attacker} is a step ahead of {defender} — that {strike_type} lands with authority!",
+                "{attacker} targets the {target} with a {strike_type}, and it pays off big!",
+                "{attacker} with a beautiful level change in the {strike_type} — {defender} was late on that!",
+                "{attacker} times {defender}'s rhythm and cracks them with a {strike_type}!",
+                "{attacker} slides to the inside and fires a {strike_type} off the back foot!",
+                "{attacker} stays patient, picks the moment, and lands a {strike_type} to the {target}!",
+                "{attacker} uses the jab as a rangefinder, then lands a {strike_type} to the {target}!",
             ],
             "clinch": [
                 "{attacker} lands a knee to {defender}'s {target} from the clinch!",
@@ -614,6 +645,97 @@ class CommentaryEngine:
             "The roof is coming off! What a fight we have here!",
             "You can feel the energy in the building!",
             "The crowd is going WILD! What a moment!",
+            # === NEW EXPANDED CROWD REACTIONS ===
+            "The crowd gasps as that shot lands clean!",
+            "The arena erupts — what a sequence!",
+            "A collective 'OHHH' from the crowd — that one hurt!",
+            "You can hear the thud from the cheap seats!",
+            "The fans are on their feet, sensing a finish!",
+            "The building is rocking! These two are putting on a show!",
+            "A hush falls over the crowd as {defender} is in trouble!",
+            "The crowd noise is deafening! What an atmosphere!",
+            "Pandemonium in the crowd — what a moment!",
+        ]
+
+        self.defensive_narrative_templates = [
+            "{defender} slips the {strike_type} and fires back with a left hook!",
+            "{defender} parries the {strike_type} and creates an angle to escape!",
+            "{defender} checks the kick and counters with a straight right!",
+            "{defender} rolls under the {strike_type} and comes up firing!",
+            "{defender} shells up, absorbing the {strike_type} on the forearms!",
+            "{defender} uses head movement to make the {strike_type} miss by inches!",
+            "{defender} catches the {strike_type} on the elbow — smart defense!",
+            "{defender} leans back, letting the {strike_type} sail past!",
+            "{defender} smothers the {strike_type} by stepping inside and clinching!",
+            "{defender} blocks the {strike_type} high and answers with a body shot!",
+            "{defender} ducks under the {strike_type} and resets to the outside!",
+            "{defender} circles away, avoiding the {strike_type} entirely!",
+            "{defender} catches the kick and counters with a {strike_type} of their own!",
+            "{defender} parries twice in a row, timing {attacker}'s rhythm!",
+        ]
+
+        self.contextual_overlay_phrases = {
+            "fatigue": [
+                " but he's looking tired, losing snap on his punches",
+                " but the body work is slowing him down noticeably",
+                " but his hands are dropping as the fatigue sets in",
+                " but his output is fading fast as the round wears on",
+            ],
+            "momentum": [
+                " — the crowd is roaring, he's feeding off this energy!",
+                " — he's building serious momentum and can't be stopped!",
+                " — the confidence is growing with every exchange!",
+                " — he's in a rhythm now, everything is landing!",
+            ],
+            "leg_damage": [
+                " — he's barely putting weight on that lead leg now",
+                " — his compromised stance is making him a sitting duck",
+                " — those leg kicks have completely changed his movement",
+            ],
+            "body_work": [
+                " — the body work is paying off, his pace is dropping",
+                " — he's starting to wilt from the accumulated body damage",
+                " — you can see the body shots taking effect, slowing his hands",
+                " — his breathing is labored from those body attacks",
+            ],
+        }
+
+        self.exchange_templates = [
+            "Both trade in the pocket! {a} lands {a_result} while {b} answers {b_result}!",
+            "Exchange in the center! {a} fires {a_result} — but {b} counters {b_result}!",
+            "Both throw at once! {a} scores {a_result} and {b} comes back {b_result}!",
+            "Wild exchange! {a} digs {a_result}, {b} fires back {b_result}!",
+            "They trade leather! {a} cracks {a_result} as {b} lands {b_result}!",
+        ]
+
+        self.progressive_finish_templates = [
+            "{fighter} is hurt! On wobbly legs, {opponent} smells blood!",
+            "{fighter} is wobbled! They don't know where they are right now!",
+            "{fighter} is on the verge! One more shot could end this!",
+            "{fighter} is out on their feet! The referee is watching closely!",
+            "{fighter} is in survival mode, just trying to stay upright!",
+            "{fighter} is fading fast — this could be the beginning of the end!",
+        ]
+
+        self.weight_cut_templates = [
+            "{fighter} drained {lbs}lbs this week — the question is how much that took out of him.",
+            "{fighter} looked gaunt at weigh-ins. Will the cardio hold up in the later rounds?",
+            "There are concerns about {fighter}'s weight cut — he looked depleted on the scales.",
+            "{fighter} rehydrated well, but tough weight cuts have a way of catching up to you.",
+            "The weight cut was brutal for {fighter}. He's giving up size tonight.",
+        ]
+
+        self.round_arc_templates = [
+            "An action-packed round! {f1} found the range early and started landing the cross. {f2} is slowing as the body shots accumulate.",
+            "{f1} controlled the clinch and landed heavy knees. {f2} needs to keep this standing and establish the jab.",
+            "All {f1} that round — volume, pressure, and that takedown defense was impenetrable. {f2} needs to make adjustments.",
+            "Close round. {f1}'s leg kicks are adding up, limiting {f2}'s movement significantly. The leg damage could be the story of this fight.",
+            "{f2} survived a late surge from {f1} and looked sharp on the counter. This fight is still very much in the balance.",
+            "{f1} is pulling away. The speed and precision are making the difference. {f2} needs to find something special.",
+            "{f2} came on strong in the final minute, staggering {f1} with a right hand. Momentum swing?",
+            "A dominant round for {f1} — they're in complete control. {f2} is being outclassed so far.",
+            "{f1} with a measured round, using the jab to set up power shots. {f2} can't find the range.",
+            "Both fighters had their moments, but {f1}'s pressure and volume edged it. {f2} needs to let their hands go.",
         ]
 
         self.bonus_templates = [

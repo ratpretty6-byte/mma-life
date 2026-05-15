@@ -10,9 +10,14 @@ class Position(Enum):
     POCKET = "Pocket"
     CLINCH = "Clinch"
     GROUND_GUARD = "Ground (Guard)"
+    GROUND_HALF_GUARD = "Ground (Half Guard)"
     GROUND_SIDE = "Ground (Side Control)"
+    GROUND_NORTH_SOUTH = "Ground (North-South)"
     GROUND_MOUNT = "Ground (Mount)"
     GROUND_BACK = "Ground (Back Mount)"
+    GROUND_TURTLE = "Ground (Turtle)"
+    GROUND_CRUCIFIX = "Ground (Crucifix)"
+    GROUND_SCARF_HOLD = "Ground (Scarf Hold)"
 
     @staticmethod
     def is_standing(pos: "Position") -> bool:
@@ -20,13 +25,17 @@ class Position(Enum):
 
     @staticmethod
     def is_ground(pos: "Position") -> bool:
-        return pos in (Position.GROUND_GUARD, Position.GROUND_SIDE, Position.GROUND_MOUNT, Position.GROUND_BACK)
+        return pos in (Position.GROUND_GUARD, Position.GROUND_HALF_GUARD, Position.GROUND_SIDE,
+                       Position.GROUND_NORTH_SOUTH, Position.GROUND_MOUNT, Position.GROUND_BACK,
+                       Position.GROUND_TURTLE, Position.GROUND_CRUCIFIX, Position.GROUND_SCARF_HOLD)
 
     @staticmethod
     def ground_advancement() -> Dict["Position", "Position"]:
         return {
-            Position.GROUND_GUARD: Position.GROUND_SIDE,
-            Position.GROUND_SIDE: Position.GROUND_MOUNT,
+            Position.GROUND_GUARD: Position.GROUND_HALF_GUARD,
+            Position.GROUND_HALF_GUARD: Position.GROUND_SIDE,
+            Position.GROUND_SIDE: Position.GROUND_NORTH_SOUTH,
+            Position.GROUND_NORTH_SOUTH: Position.GROUND_MOUNT,
             Position.GROUND_MOUNT: Position.GROUND_BACK,
         }
 
@@ -34,13 +43,20 @@ class Position(Enum):
     def ground_hierarchy_rank(pos: "Position") -> int:
         return {
             Position.GROUND_GUARD: 0,
-            Position.GROUND_SIDE: 1,
-            Position.GROUND_MOUNT: 2,
-            Position.GROUND_BACK: 3,
+            Position.GROUND_HALF_GUARD: 1,
+            Position.GROUND_SIDE: 2,
+            Position.GROUND_NORTH_SOUTH: 3,
+            Position.GROUND_MOUNT: 4,
+            Position.GROUND_BACK: 5,
+            Position.GROUND_TURTLE: -1,
+            Position.GROUND_CRUCIFIX: 6,
+            Position.GROUND_SCARF_HOLD: 5,
         }.get(pos, -1)
 
 
-GROUND_POSITIONS = [Position.GROUND_GUARD, Position.GROUND_SIDE, Position.GROUND_MOUNT, Position.GROUND_BACK]
+GROUND_POSITIONS = [Position.GROUND_GUARD, Position.GROUND_HALF_GUARD, Position.GROUND_SIDE,
+                    Position.GROUND_NORTH_SOUTH, Position.GROUND_MOUNT, Position.GROUND_BACK,
+                    Position.GROUND_TURTLE, Position.GROUND_CRUCIFIX, Position.GROUND_SCARF_HOLD]
 
 
 class PositionSystem:
@@ -213,24 +229,63 @@ class PositionSystem:
         success_chance = max(8, min(80, success_chance))
 
         if utils.random_roll(1, 100) <= success_chance:
+            # Guard pass goes to half-guard
+            self.current_position = Position.GROUND_HALF_GUARD
+            self.position_time = 0
+            return True
+        return False
+
+    def pass_half_guard(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
+        if self.current_position != Position.GROUND_HALF_GUARD:
+            return False
+
+        top_control = top.get_effective_attribute("top_control", fatigue)
+        bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+        weight_diff = top.base_weight_lbs - bottom.base_weight_lbs
+        weight_mod = 1.0 + min(0.15, max(-0.1, weight_diff / 150))
+
+        success_chance = top_control * 0.55 - bottom_control * 0.35
+        success_chance *= weight_mod
+        success_chance *= max(0.4, 1.0 - fatigue * 0.3)
+        success_chance = max(6, min(75, success_chance))
+
+        if utils.random_roll(1, 100) <= success_chance:
             self.current_position = Position.GROUND_SIDE
             self.position_time = 0
             return True
         return False
 
-    def advance_to_mount(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
+    def side_to_north_south(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
         if self.current_position != Position.GROUND_SIDE:
             return False
 
         top_control = top.get_effective_attribute("top_control", fatigue)
         bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
-
         weight_mod = 1.0 + min(0.1, max(-0.1, (top.base_weight_lbs - bottom.base_weight_lbs) / 1000))
 
-        success_chance = top_control * 0.5 - bottom_control * 0.3
+        success_chance = top_control * 0.5 - bottom_control * 0.35
         success_chance *= weight_mod
         success_chance *= max(0.3, 1.0 - fatigue * 0.4)
-        success_chance = max(4, min(70, success_chance))
+        success_chance = max(4, min(65, success_chance))
+
+        if utils.random_roll(1, 100) <= success_chance:
+            self.current_position = Position.GROUND_NORTH_SOUTH
+            self.position_time = 0
+            return True
+        return False
+
+    def north_south_to_mount(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
+        if self.current_position != Position.GROUND_NORTH_SOUTH:
+            return False
+
+        top_control = top.get_effective_attribute("top_control", fatigue)
+        bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+        weight_mod = 1.0 + min(0.1, max(-0.1, (top.base_weight_lbs - bottom.base_weight_lbs) / 1000))
+
+        success_chance = top_control * 0.45 - bottom_control * 0.25
+        success_chance *= weight_mod
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(3, min(60, success_chance))
 
         if utils.random_roll(1, 100) <= success_chance:
             self.current_position = Position.GROUND_MOUNT
@@ -238,8 +293,107 @@ class PositionSystem:
             return True
         return False
 
+    def take_back_from_turtle(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
+        if self.current_position != Position.GROUND_TURTLE:
+            return False
+
+        top_control = top.get_effective_attribute("top_control", fatigue) * 1.1
+        bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+
+        success_chance = top_control * 0.5 - bottom_control * 0.3
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(4, min(65, success_chance))
+
+        if utils.random_roll(1, 100) <= success_chance:
+            self.current_position = Position.GROUND_BACK
+            self.position_time = 0
+            return True
+        return False
+
+    def crucifix_from_side(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
+        if self.current_position != Position.GROUND_SIDE:
+            return False
+
+        top_control = top.get_effective_attribute("top_control", fatigue)
+        bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+
+        success_chance = top_control * 0.4 - bottom_control * 0.2
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(2, min(45, success_chance))
+
+        if utils.random_roll(1, 100) <= success_chance:
+            self.current_position = Position.GROUND_CRUCIFIX
+            self.position_time = 0
+            return True
+        return False
+
+    def scarf_hold_from_north_south(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
+        if self.current_position != Position.GROUND_NORTH_SOUTH:
+            return False
+
+        top_control = top.get_effective_attribute("top_control", fatigue)
+        bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+
+        success_chance = top_control * 0.35 - bottom_control * 0.15
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(2, min(40, success_chance))
+
+        if utils.random_roll(1, 100) <= success_chance:
+            self.current_position = Position.GROUND_SCARF_HOLD
+            self.position_time = 0
+            return True
+        return False
+
+    def turtle_roll_to_guard(self, bottom: Fighter, top: Fighter, fatigue: float = 0.0) -> bool:
+        if self.current_position != Position.GROUND_TURTLE:
+            return False
+
+        bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+        top_control = top.get_effective_attribute("top_control", fatigue)
+
+        success_chance = bottom_control * 0.5 - top_control * 0.3
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(4, min(55, success_chance))
+
+        if utils.random_roll(1, 100) <= success_chance:
+            self._set_ground(bottom, top, Position.GROUND_GUARD)
+            return True
+        return False
+
+    def granby_roll_to_guard(self, bottom: Fighter, top: Fighter, fatigue: float = 0.0) -> bool:
+        if self.current_position != Position.GROUND_NORTH_SOUTH:
+            return False
+
+        bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+        top_control = top.get_effective_attribute("top_control", fatigue)
+
+        success_chance = bottom_control * 0.4 - top_control * 0.3
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(3, min(40, success_chance))
+
+        if utils.random_roll(1, 100) <= success_chance:
+            self._set_ground(bottom, top, Position.GROUND_GUARD)
+            return True
+        return False
+
+    def advance_to_mount(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
+        if self.current_position != Position.GROUND_NORTH_SOUTH:
+            return False
+        top_control = top.get_effective_attribute("top_control", fatigue)
+        bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+        weight_mod = 1.0 + min(0.1, max(-0.1, (top.base_weight_lbs - bottom.base_weight_lbs) / 1000))
+        success_chance = top_control * 0.5 - bottom_control * 0.3
+        success_chance *= weight_mod
+        success_chance *= max(0.3, 1.0 - fatigue * 0.4)
+        success_chance = max(4, min(70, success_chance))
+        if utils.random_roll(1, 100) <= success_chance:
+            self.current_position = Position.GROUND_MOUNT
+            self.position_time = 0
+            return True
+        return False
+
     def take_back(self, top: Fighter, bottom: Fighter, fatigue: float = 0.0) -> bool:
-        if self.current_position not in (Position.GROUND_GUARD, Position.GROUND_SIDE):
+        if self.current_position not in (Position.GROUND_GUARD, Position.GROUND_SIDE, Position.GROUND_HALF_GUARD):
             return False
 
         top_control = top.get_effective_attribute("top_control", fatigue) * 0.8
@@ -261,9 +415,14 @@ class PositionSystem:
 
         pos_factor = {
             Position.GROUND_GUARD: 1.0,
+            Position.GROUND_HALF_GUARD: 0.85,
             Position.GROUND_SIDE: 0.7,
+            Position.GROUND_NORTH_SOUTH: 0.6,
             Position.GROUND_MOUNT: 0.4,
             Position.GROUND_BACK: 0.2,
+            Position.GROUND_TURTLE: 0.5,
+            Position.GROUND_CRUCIFIX: 0.15,
+            Position.GROUND_SCARF_HOLD: 0.25,
         }.get(self.current_position, 0.5)
 
         bottom_control = bottom_fighter.get_effective_attribute("bottom_control", fatigue)
@@ -287,9 +446,14 @@ class PositionSystem:
 
         pos_factor = {
             Position.GROUND_GUARD: 1.0,
+            Position.GROUND_HALF_GUARD: 0.8,
             Position.GROUND_SIDE: 0.8,
+            Position.GROUND_NORTH_SOUTH: 0.6,
             Position.GROUND_MOUNT: 0.5,
             Position.GROUND_BACK: 0.3,
+            Position.GROUND_TURTLE: 0.7,
+            Position.GROUND_CRUCIFIX: 0.3,
+            Position.GROUND_SCARF_HOLD: 0.4,
         }.get(self.current_position, 0.5)
 
         bottom_control = bottom_fighter.get_effective_attribute("bottom_control", fatigue)
@@ -342,12 +506,22 @@ class PositionSystem:
             return f"{self.clinch_initiator.name if self.clinch_initiator else 'Unknown'} has secured the clinch."
         elif p == Position.GROUND_GUARD:
             return f"{self.top_fighter.name} is in {self.bottom_fighter.name}'s guard."
+        elif p == Position.GROUND_HALF_GUARD:
+            return f"{self.top_fighter.name} is in {self.bottom_fighter.name}'s half guard."
         elif p == Position.GROUND_SIDE:
             return f"{self.top_fighter.name} has passed guard and is in side control."
+        elif p == Position.GROUND_NORTH_SOUTH:
+            return f"{self.top_fighter.name} is in north-south position over {self.bottom_fighter.name}!"
         elif p == Position.GROUND_MOUNT:
             return f"{self.top_fighter.name} has mounted {self.bottom_fighter.name}!"
         elif p == Position.GROUND_BACK:
             return f"{self.top_fighter.name} has {self.bottom_fighter.name}'s back!"
+        elif p == Position.GROUND_TURTLE:
+            return f"{self.bottom_fighter.name} is turtled up with {self.top_fighter.name} on top."
+        elif p == Position.GROUND_CRUCIFIX:
+            return f"{self.top_fighter.name} has {self.bottom_fighter.name}'s trapped in a crucifix!"
+        elif p == Position.GROUND_SCARF_HOLD:
+            return f"{self.top_fighter.name} has {self.bottom_fighter.name} locked in scarf hold."
         elif self.cage_position is not None:
             return f"{self.cage_position.name} is backed against the cage!"
         return "Unknown position"

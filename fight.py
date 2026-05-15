@@ -71,12 +71,24 @@ class Referee:
         if style == "protective":
             self.tko_threshold = 0.85
             self.standup_speed = 1.0
+            self.foul_detection = 0.85
         elif style == "let_them_fight":
             self.tko_threshold = 1.15
             self.standup_speed = 0.7
+            self.foul_detection = 0.55
         elif style == "strict":
             self.tko_threshold = 1.0
             self.standup_speed = 1.0
+            self.foul_detection = 0.95
+        # Foul tracking
+        self.f1_fouls = []
+        self.f2_fouls = []
+        self.f1_warnings = 0
+        self.f2_warnings = 0
+        self.f1_dq = False
+        self.f2_dq = False
+        self.foul_timeout_active = False
+        self.foul_timeout_actions = 0
 
     def should_stand_up(self, fight, round_num) -> bool:
         """
@@ -149,11 +161,108 @@ class Referee:
 
         return None
 
-    def check_foul(self, position, attacker_action) -> bool:
-        """Basic foul detection — no strikes to back of head, no eye gouging, etc."""
-        # 12-6 elbows (striking downward with elbow) — not allowed in some orgs
-        # For this sim we keep it lenient — elbows allowed everywhere
-        return False
+    def check_foul(self, attacker, defender, fighter_num) -> Optional[str]:
+        """
+        Full foul system: determines if a foul occurs and returns the foul type or None.
+        Foul rate based on fighter discipline, aggression, mental toughness, and dirty trait.
+        """
+        discipline = attacker.get_effective_attribute("discipline", 0)
+        aggression = attacker.get_effective_attribute("aggression", 0)
+        mental_toughness = attacker.get_effective_attribute("mental_toughness", 0)
+
+        # Base foul chance per action
+        base_chance = 0.008  # 0.8%
+
+        # Aggressive fighters commit more fouls
+        if aggression > 70:
+            base_chance += 0.005
+        if aggression > 85:
+            base_chance += 0.008
+
+        # Disciplined fighters commit fewer fouls
+        if discipline < 40:
+            base_chance += 0.010
+        if discipline < 25:
+            base_chance += 0.015
+
+        # Low mental toughness => more desperation fouls
+        if mental_toughness < 35:
+            base_chance += 0.005
+
+        # Dirty fighter trait
+        if getattr(attacker, 'trait_id', None) == 'dirty_fighter':
+            base_chance += 0.020
+
+        if random.random() >= base_chance:
+            return None
+
+        # Determine foul type based on position
+        from positions import Position
+        pos = self.f1_fouls if fighter_num == 1 else self.f2_fouls  # just to access position_ref
+        # Choose foul type
+        fouls = []
+        if random.random() < 0.25:
+            fouls.append("eye poke")
+        elif random.random() < 0.35:
+            fouls.append("low blow")
+        elif random.random() < 0.50:
+            fouls.append("fence grab")
+        elif random.random() < 0.60:
+            fouls.append("12-6 elbow")
+        elif random.random() < 0.75:
+            fouls.append("glove grab")
+        else:
+            fouls.append("back of the head")
+
+        foul_type = random.choice(fouls) if fouls else "eye poke"
+
+        # Detection chance
+        detect_chance = self.foul_detection
+        visible_fouls = ["eye poke", "low blow", "12-6 elbow"]
+        subtle_fouls = ["fence grab", "glove grab"]
+        if foul_type in visible_fouls:
+            detect_chance += 0.15
+        if foul_type in subtle_fouls:
+            detect_chance -= 0.20
+
+        if random.random() >= detect_chance:
+            return None  # Foul not detected
+
+        return foul_type
+
+    def record_foul(self, fighter_num: int, foul_type: str) -> str:
+        """Record a detected foul and return the consequence."""
+        fouls = self.f1_fouls if fighter_num == 1 else self.f2_fouls
+        warnings = self.f1_warnings if fighter_num == 1 else self.f2_warnings
+        dq = self.f1_dq if fighter_num == 1 else self.f2_dq
+
+        fouls.append(foul_type)
+
+        # Count fouls for this fighter
+        total_fouls = len(fouls)
+        undetected = max(0, total_fouls - warnings - (1 if self.f1_dq or self.f2_dq else 0))
+
+        if undetected == 1:
+            return f"verbal"
+        elif undetected == 2:
+            self.f1_warnings += 1 if fighter_num == 1 else 0
+            self.f2_warnings += 1 if fighter_num == 2 else 0
+            return f"official warning"
+        elif undetected == 3:
+            self.f1_warnings += 1 if fighter_num == 1 else 0
+            self.f2_warnings += 1 if fighter_num == 2 else 0
+            return f"point deduction"
+        else:
+            if fighter_num == 1:
+                self.f1_dq = True
+            else:
+                self.f2_dq = True
+            return f"disqualification"
+
+    def is_dq(self, fighter_num: int) -> bool:
+        if fighter_num == 1:
+            return self.f1_dq
+        return self.f2_dq
 
     def reset_consecutive_damage(self):
         self.consecutive_damage_count = 0
@@ -437,6 +546,9 @@ class Fight:
         self.f2_head_damage = 0.0
         self.f1_knockdowns_this_round = 0
         self.f2_knockdowns_this_round = 0
+
+        # Corner advice for next round
+        self.corner_advice_mods = {}
 
         # Action tracking
         self.current_round = 1
@@ -1110,6 +1222,21 @@ class Fight:
         base_actions = max(12, int(base_actions - reduction))
         return base_actions
 
+    def set_corner_advice(self, advice_type: Optional[str]):
+        """Apply corner advice modifiers for the next round."""
+        self.corner_advice_mods = {}
+        if not advice_type:
+            return
+        advice_map = {
+            "aggressive": {"striking_power": 1.05, "hand_speed": 1.02, "aggression": 1.05},
+            "defensive": {"composure": 1.05, "durability": 1.03, "discipline": 1.05},
+            "body_work": {"body_accuracy": 1.08},
+            "takedown": {"takedown_power": 1.10, "takedown_accuracy": 1.10},
+            "keep_standing": {"wrestling_defense": 1.10, "athleticism": 1.03},
+            "pressure": {"cardio": 1.03, "striking_power": 1.03, "aggression": 1.08},
+        }
+        self.corner_advice_mods = advice_map.get(advice_type, {})
+
     def _get_round_phase(self, action_idx: int, total_actions: int) -> str:
         """4-phase round system: feeling_out → exchanges → urgency → finish_hunt"""
         pct = action_idx / max(1, total_actions)
@@ -1124,6 +1251,41 @@ class Fight:
     # ============================================================
     # CORE ACTION SIMULATION
     # ============================================================
+
+    def _apply_damage_aware_behavior(self, attacker, defender, atk_state, def_state, state_mods, phase):
+        """Modify fighter behavior based on accumulated damage.
+        Fighters react to injuries, changing their tactics.
+        """
+        if not atk_state:
+            return
+
+        # === LEG DAMAGE: stop kicking ===
+        leg_dmg = (atk_state.get("lead_leg_damage", 0) + atk_state.get("rear_leg_damage", 0)) / 2
+        if leg_dmg > 50 and random.random() < 0.7:
+            # Reduce kick power and kick accuracy significantly
+            state_mods["kick_power"] = state_mods.get("kick_power", 1.0) * 0.3
+            state_mods["kick_accuracy"] = state_mods.get("kick_accuracy", 1.0) * 0.3
+        elif leg_dmg > 30 and random.random() < 0.4:
+            state_mods["kick_power"] = state_mods.get("kick_power", 1.0) * 0.6
+            state_mods["kick_accuracy"] = state_mods.get("kick_accuracy", 1.0) * 0.6
+
+        # === HEAD/JAW DAMAGE: shell up ===
+        jaw_pct = defender.get_group_health("head")
+        if jaw_pct < 40 and random.random() < 0.6:
+            # Fighter shells up: better defense, worse offense
+            state_mods["accuracy"] = state_mods.get("accuracy", 1.0) * 0.85
+            state_mods["hand_speed"] = state_mods.get("hand_speed", 1.0) * 0.90
+            # Defense is handled via _get_composite_defense which reads state/head health
+
+        # === BODY DAMAGE: reduce takedown attempts ===
+        body_fatigue = atk_state.get("body_fatigue", 0)
+        if body_fatigue > 60 and random.random() < 0.5:
+            state_mods["takedown_power"] = state_mods.get("takedown_power", 1.0) * 0.4
+            state_mods["takedown_accuracy"] = state_mods.get("takedown_accuracy", 1.0) * 0.4
+
+        # === FATIGUE: gassed fighters throw fewer power shots ===
+        if atk_state["fatigue_level"] > 0.7 and random.random() < 0.5:
+            state_mods["striking_power"] = state_mods.get("striking_power", 1.0) * 0.8
 
     def _simulate_fighter_reaction(self, attacker, defender, atk_state, def_state, atk_strategy, phase):
         """When a fighter is hurt/stunned, they react instead of attacking normally."""
@@ -1344,6 +1506,17 @@ class Fight:
 
     def _simulate_action(self, phase="exchanges"):
         """Simulate one action exchange between fighters."""
+        # Increment position time counter
+        self.position_system.position_time += 1
+
+        # === FOUL TIMEOUT CHECK ===
+        if self.referee.foul_timeout_active:
+            self.referee.foul_timeout_actions -= 1
+            if self.referee.foul_timeout_actions <= 0:
+                self.referee.foul_timeout_active = False
+                self.fight_log.append(f"The referee restarts the action!")
+            return
+
         atk1, def1, atk_state1, def_state1, strat1 = (
             self.fighter1, self.fighter2, self.f1_state, self.f2_state, self.strategy1)
         atk2, def2, atk_state2, def_state2, strat2 = (
@@ -1406,6 +1579,9 @@ class Fight:
         hist = def_state.get("opponent_action_history", [])
         if len(hist) > 12:
             def_state["opponent_action_history"] = hist[-12:]
+
+        # === DAMAGE-AWARE AI BEHAVIOR ===
+        self._apply_damage_aware_behavior(attacker, defender, atk_state, def_state, state_mods, phase)
 
         # Zone-based combo chance adjustment
         cardio_zone = atk_state.get("cardio_zone", "aerobic")
@@ -1492,7 +1668,7 @@ class Fight:
         if not combo_data:
             self._execute_single_strike(attacker, defender, atk_state, def_state, strategy, phase, state_mods)
             return
-        strikes = combo_data["strikes"][:2]
+        strikes = combo_data["strikes"]
         combo_name = combo_key.replace("-", " ")
 
         stamina_mult = combo_data.get("stamina_mult", 1.0)
@@ -1501,6 +1677,9 @@ class Fight:
         feint_stack = atk_state.get("feint_count", 0)
         combo_feint_bonus = 1.0 + feint_stack * 0.03
         combo_power_bonus = base_bonus * combo_feint_bonus
+
+        # Scale stamina cost per strike in combo
+        stamina_cost_mult = 1.0
 
         results = []
         landed = 0
@@ -1521,9 +1700,13 @@ class Fight:
             group = "HEAD" if target in ("head", "jaw", "temple", "nose", "left_eye", "right_eye") else (
                     "BODY" if target in ("body", "chest", "solar_plexus", "liver", "ribs") else "LEGS")
 
+            # Scale stamina cost: 1st strike ×1.0, 2nd ×1.15, 3rd ×1.35, 4th+ ×1.55
+            strike_scale = [1.0, 1.15, 1.35, 1.55]
+            scaled_stamina = stamina_mult * (strike_scale[i] if i < len(strike_scale) else 1.55)
+
             before_len = len(self.fight_log)
             self._perform_strike(attacker, defender, atk_state, def_state, actual_strike, target,
-                                strategy, phase, mod_copy, combo_bonus=combo_power_bonus, stamina_mult=stamina_mult)
+                                strategy, phase, mod_copy, combo_bonus=combo_power_bonus, stamina_mult=scaled_stamina)
 
             # Capture what _perform_strike logged and remove it for grouping
             if len(self.fight_log) > before_len:
@@ -1845,9 +2028,24 @@ class Fight:
         else:
             rib_power_penalty = 1.0
 
+        # Confidence modifier: confident fighters hit harder
+        confidence = getattr(attacker, 'confidence', 50)
+        conf_mod = 1.0 + (confidence - 50) / 300.0  # 0.83 at 0, 1.0 at 50, 1.17 at 100
+
+        # Aggression boost: aggressive fighters commit more to strikes
+        aggression = attacker.get_effective_attribute("aggression", atk_state["fatigue_level"])
+        agg_mod = 1.0 + (aggression - 50) / 250.0  # 0.80 at 0, 1.0 at 50, 1.20 at 100
+
+        # Momentum burst: hot streak adds power, cold streak reduces
+        momentum_burst_mod = 1.0 + momentum_mod * 0.15  # ±15% at max momentum swing
+
+        # Corner advice bonus for this round
+        corner_bonus = self.corner_advice_mods.get(power_attr, 1.0)
+
         power = (attacker.get_effective_attribute(power_attr, atk_state["fatigue_level"])
                  * sp_mod * phase_power * momentum_mod * crowd_mod
-                 * power_stance_mod * power_hand_bonus * feint_power_bonus * kick_penalty * rib_power_penalty)
+                 * power_stance_mod * power_hand_bonus * feint_power_bonus
+                 * kick_penalty * rib_power_penalty * conf_mod * agg_mod * momentum_burst_mod * corner_bonus)
         speed = (attacker.get_effective_attribute(speed_attr, atk_state["fatigue_level"])
                  * hs_mod * speed_stance_mod * lead_hand_speed_bonus * leg_speed_mod)
         raw_accuracy = attacker.get_effective_attribute(accuracy_attr, atk_state["fatigue_level"])
@@ -1906,8 +2104,8 @@ class Fight:
         power_contribution = (power / 50.0) ** 0.85
 
         # Defense contribution (non-linear — diminishing returns at high defense)
-        defense_factor = defense_score / 150.0
-        defense_reduction = 1.0 / (1.0 + defense_factor * 1.5)
+        defense_factor = defense_score / 120.0
+        defense_reduction = 1.0 / (1.0 + defense_factor * 2.2)
 
         # Calculate raw damage
         raw_damage = base_damage * power_contribution * damage_multiplier * defense_reduction
@@ -2077,28 +2275,44 @@ class Fight:
                 def_state["stamina"] = max(0, def_state["stamina"] - int(stamina_drain_mod * 15))
 
         # Build and log the strike entry BEFORE stun/KD checks
-        _pref = {
-            "Blocked": ["blocks", "smothers", "deflects"],
-            "Glancing": ["glances off", "grazes", "barely clips"],
-            "Clean": ["lands a clean", "connects with a", "stings with a", "finds the mark with a", "touches up with a"],
-            "Solid": ["lands a solid", "cracks with a", "hammers home a", "rips a", "unloads a"],
-            "Flush": ["cracks with a flush", "hits flush with a", "buries a", "drills a", "catches with a clean"],
-            "Devastating": ["DEVASTATES with a", "DESTROYS with a", "OBLITERATES with a", "UNLEASHES a", "CRUSHES with a"],
-            "CRITICAL Glancing": ["barely grazes but CRITICAL", "magically clips"],
-            "CRITICAL Clean": ["SMASHES a critical", "DETONATES a", "EXPLODES with a"],
-            "CRITICAL Solid": ["THUNDERS home a critical", "ANNIHILATES with a perfect"],
-            "CRITICAL Flush": ["DELIVERS a devastating critical", "OBLITERATES with a perfect"],
-            "CRITICAL Devastating": ["UNLEASHES a fight-ending", "LANDS THE SHOT OF THE NIGHT"],
-        }
-        prefix_opts = _pref.get(tier["name"], ["lands a"])
-        severity_prefix = random.choice(prefix_opts)
-
-        group = "HEAD" if target in ("head", "jaw", "temple", "nose", "left_eye", "right_eye") else (
-                "BODY" if target in ("body", "chest", "solar_plexus", "liver", "ribs") else "LEGS")
-        log_entry = f"{attacker.name} {severity_prefix} {strike_type.replace('_', ' ')} to {defender.name}'s {group}"
+        log_entry = self.commentary.generate_strike_commentary(attacker, defender, strike_type, target, self.position_system.current_position)
         if is_critical:
-            log_entry += " — CRITICAL HIT!"
+            log_entry += " — CRITICAL!"
         self.fight_log.append(log_entry)
+
+        # === FOUL CHECK ===
+        attacker_num = 1 if attacker == self.fighter1 else 2
+        foul_type = self.referee.check_foul(attacker, defender, attacker_num)
+        if foul_type:
+            consequence = self.referee.record_foul(attacker_num, foul_type)
+            if consequence == "verbal":
+                self.fight_log.append(f"VERBAL WARNING: {attacker.name} fouls — {foul_type}! The referee warns them!")
+            elif consequence == "official warning":
+                self.fight_log.append(f"OFFICIAL WARNING: {attacker.name} commits another {foul_type}! The referee issues an official warning!")
+                self._update_momentum(3 - attacker_num, 5)
+            elif consequence == "point deduction":
+                self.fight_log.append(f"POINT DEDUCTION: {attacker.name} is deducted a point for the {foul_type}!")
+                self._update_momentum(3 - attacker_num, 10)
+                # Deduct point from cumulative score
+                if hasattr(self, 'judges') and self.judges and self.judges[0].scores:
+                    for j in self.judges:
+                        if attacker_num == 1 and j.scores:
+                            j.scores[-1][0] = max(0, j.scores[-1][0] - 1)
+                        elif attacker_num == 2 and j.scores:
+                            j.scores[-1][1] = max(0, j.scores[-1][1] - 1)
+            elif consequence == "disqualification":
+                self.fight_log.append(f"DISQUALIFICATION! {attacker.name} is DQed for repeated fouls — the {foul_type}! {defender.name} wins!")
+                self.winner = defender
+                self.loser = attacker
+                self.win_method = "DQ (Fouls)"
+                self.win_round = self.current_round
+                return
+
+            # Low blow / eye poke results in brief timeout
+            if foul_type in ("low blow", "eye poke") and consequence != "disqualification":
+                self.referee.foul_timeout_active = True
+                self.referee.foul_timeout_actions = random.randint(2, 4)
+                self.fight_log.append(f"{defender.name} gets time to recover from the {foul_type}!")
 
         # Check for stun and state transitions
         head_pct = defender.get_group_health("head")
@@ -2206,15 +2420,24 @@ class Fight:
     def _get_composite_defense(self, defender, def_state, atk_state) -> float:
         """
         Calculate complete defensive rating for this moment.
-        Includes: durability, composure, fight IQ, state modifiers, fatigue.
+        Uses 6 stats: durability, composure, fight IQ, adaptability, athleticism + stance familiarity.
         """
         fatigue = def_state["fatigue_level"]
         durability = defender.get_effective_attribute("durability", fatigue)
         composure = defender.get_effective_attribute("composure", fatigue)
         fight_iq = defender.get_effective_attribute("fight_iq", fatigue)
+        adaptability = defender.get_effective_attribute("adaptability", fatigue)
+        athleticism = defender.get_effective_attribute("athleticism", fatigue)
 
-        # Base defense score
-        defense = (durability * 0.40 + composure * 0.25 + fight_iq * 0.20)
+        # Base defense score — multi-stat blend
+        defense = (durability * 0.35 + composure * 0.20 + fight_iq * 0.15
+                   + adaptability * 0.10 + athleticism * 0.05)
+
+        # Stance familiarity bonus: same stance predicts telegraphs better
+        d_stance = self.fighter2_stance if defender == self.fighter2 else self.fighter1_stance
+        a_stance = self.fighter1_stance if defender == self.fighter2 else self.fighter2_stance
+        if d_stance == a_stance:
+            defense *= 1.03  # +3% defense when same stance
 
         # State modifiers
         state_name = def_state.get("state", "NORMAL")
@@ -2433,7 +2656,7 @@ class Fight:
     # ============================================================
 
     def _simulate_ground_action(self, fatigue, action_weights, strat):
-        """Ground game with strategy-weighted decisions."""
+        """Ground game with position-weighted control decisions."""
         pos = self.position_system.current_position
         top = self.position_system.top_fighter
         bottom = self.position_system.bottom_fighter
@@ -2453,8 +2676,32 @@ class Fight:
         top_mod = top_strategy.get_modifiers()
         bottom_mod = bottom_strategy.get_modifiers()
 
-        # Weighted decision based on strategy
-        if random.random() < 0.5:
+        # Weighted decision based on position dominance
+        # Higher top_control = top fighter dictates more; higher bottom_control = bottom dictates more
+        top_control = top.get_effective_attribute("top_control", fatigue)
+        bottom_control = bottom.get_effective_attribute("bottom_control", fatigue)
+        total_control = top_control + bottom_control
+        base_top_weight = top_control / max(1, total_control) if total_control > 0 else 0.5
+
+        # Position-specific base weights
+        pos_weights = {
+            Position.GROUND_GUARD: 0.60,
+            Position.GROUND_HALF_GUARD: 0.55,
+            Position.GROUND_SIDE: 0.70,
+            Position.GROUND_NORTH_SOUTH: 0.70,
+            Position.GROUND_MOUNT: 0.85,
+            Position.GROUND_BACK: 0.20,
+            Position.GROUND_TURTLE: 0.75,
+            Position.GROUND_CRUCIFIX: 0.90,
+            Position.GROUND_SCARF_HOLD: 0.80,
+        }
+        pos_weight = pos_weights.get(pos, 0.60)
+
+        # Blend position weight with control-based weight
+        top_chance = pos_weight * 0.7 + base_top_weight * 0.3
+        top_chance = max(0.15, min(0.92, top_chance))
+
+        if random.random() < top_chance:
             self._process_ground_top_action(top, bottom, top_state, bottom_state, fatigue, top_strategy, action_weights, pos, pt)
         else:
             self._process_ground_bottom_action(top, bottom, top_state, bottom_state, fatigue, bottom_strategy, pos, pt)
@@ -2462,28 +2709,55 @@ class Fight:
     def _process_ground_top_action(self, top, bottom, top_state, bottom_state, fatigue, strategy, action_weights, pos, pt):
         top_cardio = top.get_effective_attribute("cardio", fatigue)
 
-        # Guard pass attempt
-        if pos == Position.GROUND_GUARD and pt > 4 and random.random() < 0.45:
-            if self.position_system.pass_guard(top, bottom, fatigue):
-                self.fight_log.append(self.commentary.generate_ground_transition_commentary(
-                    "pass_guard", fighter=top.name, opponent=bottom.name))
-                top_state["guard_passes"] += 1
-                top_state["effective_grappling_points"] += 4.0
-                self._apply_stamina_cost(top_state, "pass_guard", fatigue, top_cardio)
-                bottom_state["unanswered_ground_strikes"] = 0
-                return
+        # === GUARD ===
+        if pos == Position.GROUND_GUARD and pt > 4:
+            if random.random() < 0.45:
+                if self.position_system.pass_guard(top, bottom, fatigue):
+                    self.fight_log.append(self.commentary.generate_ground_transition_commentary(
+                        "pass_guard", fighter=top.name, opponent=bottom.name))
+                    top_state["guard_passes"] += 1
+                    top_state["effective_grappling_points"] += 4.0
+                    self._apply_stamina_cost(top_state, "pass_guard", fatigue, top_cardio)
+                    bottom_state["unanswered_ground_strikes"] = 0
+                    return
+            self._simulate_ground_strike(top, bottom, top_state, bottom_state, fatigue, strategy, pos)
+            return
 
-        # Side control → mount
+        # === HALF GUARD ===
+        elif pos == Position.GROUND_HALF_GUARD and pt > 4:
+            if random.random() < 0.35:
+                if self.position_system.pass_half_guard(top, bottom, fatigue):
+                    self.fight_log.append(self.commentary.generate_ground_transition_commentary(
+                        "pass_guard", fighter=top.name, opponent=bottom.name))
+                    top_state["guard_passes"] += 1
+                    top_state["effective_grappling_points"] += 4.0
+                    self._apply_stamina_cost(top_state, "pass_guard", fatigue, top_cardio)
+                    bottom_state["unanswered_ground_strikes"] = 0
+                    return
+            # Kimura attempt from half guard
+            if random.random() < 0.08:
+                self._simulate_submission_attempt(top, bottom, fatigue, strategy, pos)
+                return
+            self._simulate_ground_strike(top, bottom, top_state, bottom_state, fatigue, strategy, pos)
+            return
+
+        # === SIDE CONTROL ===
         elif pos == Position.GROUND_SIDE:
             if pt > 3:
-                if random.random() < 0.4 and self.position_system.advance_to_mount(top, bottom, fatigue):
+                if random.random() < 0.30 and self.position_system.side_to_north_south(top, bottom, fatigue):
                     self.fight_log.append(self.commentary.generate_ground_transition_commentary(
-                        "mount", fighter=top.name, opponent=bottom.name))
+                        "pass_guard", fighter=top.name, opponent=bottom.name))
                     top_state["effective_grappling_points"] += 5.0
                     self._apply_stamina_cost(top_state, "advance_mount", fatigue, top_cardio)
                     bottom_state["unanswered_ground_strikes"] = 0
                     return
-                elif random.random() < 0.15 and self.position_system.take_back(top, bottom, fatigue):
+                elif random.random() < 0.10 and self.position_system.crucifix_from_side(top, bottom, fatigue):
+                    self.fight_log.append(f"{top.name} isolates {bottom.name}'s arm and takes crucifix!")
+                    top_state["effective_grappling_points"] += 6.0
+                    self._apply_stamina_cost(top_state, "take_back", fatigue, top_cardio)
+                    bottom_state["unanswered_ground_strikes"] = 0
+                    return
+                elif random.random() < 0.12 and self.position_system.take_back(top, bottom, fatigue):
                     self.fight_log.append(self.commentary.generate_ground_transition_commentary(
                         "back_take", fighter=top.name, opponent=bottom.name))
                     top_state["effective_grappling_points"] += 6.0
@@ -2491,7 +2765,23 @@ class Fight:
                     bottom_state["unanswered_ground_strikes"] = 0
                     return
 
-        # Mount → back take
+        # === NORTH-SOUTH ===
+        elif pos == Position.GROUND_NORTH_SOUTH and pt > 3:
+            if random.random() < 0.25 and self.position_system.north_south_to_mount(top, bottom, fatigue):
+                self.fight_log.append(self.commentary.generate_ground_transition_commentary(
+                    "mount", fighter=top.name, opponent=bottom.name))
+                top_state["effective_grappling_points"] += 5.0
+                self._apply_stamina_cost(top_state, "advance_mount", fatigue, top_cardio)
+                bottom_state["unanswered_ground_strikes"] = 0
+                return
+            elif random.random() < 0.10 and self.position_system.scarf_hold_from_north_south(top, bottom, fatigue):
+                self.fight_log.append(f"{top.name} switches to scarf hold on {bottom.name}!")
+                top_state["effective_grappling_points"] += 4.0
+                self._apply_stamina_cost(top_state, "take_back", fatigue, top_cardio)
+                bottom_state["unanswered_ground_strikes"] = 0
+                return
+
+        # === MOUNT ===
         elif pos == Position.GROUND_MOUNT:
             if pt > 3 and random.random() < 0.15 and self.position_system.take_back(top, bottom, fatigue):
                 self.fight_log.append(self.commentary.generate_ground_transition_commentary(
@@ -2501,8 +2791,34 @@ class Fight:
                 bottom_state["unanswered_ground_strikes"] = 0
                 return
 
-        # Submission attempt from top
-        sub_chance = 0.15 * (1.4 if pos in (Position.GROUND_SIDE, Position.GROUND_MOUNT) else 1.0)
+        # === TURTLE ===
+        elif pos == Position.GROUND_TURTLE and pt > 2:
+            if random.random() < 0.30 and self.position_system.take_back_from_turtle(top, bottom, fatigue):
+                self.fight_log.append(self.commentary.generate_ground_transition_commentary(
+                    "back_take", fighter=top.name, opponent=bottom.name))
+                top_state["effective_grappling_points"] += 6.0
+                self._apply_stamina_cost(top_state, "take_back", fatigue, top_cardio)
+                bottom_state["unanswered_ground_strikes"] = 0
+                return
+
+        # === CRUCIFIX ===
+        elif pos == Position.GROUND_CRUCIFIX:
+            if random.random() < 0.20:
+                self._simulate_submission_attempt(top, bottom, fatigue, strategy, pos)
+                return
+
+        # === SCARF HOLD ===
+        elif pos == Position.GROUND_SCARF_HOLD and pt > 3:
+            if random.random() < 0.12:
+                self._simulate_submission_attempt(top, bottom, fatigue, strategy, pos)
+                return
+
+        # Submission attempt from top (fallback for all positions)
+        sub_chance = {Position.GROUND_GUARD: 0.10, Position.GROUND_HALF_GUARD: 0.10,
+                      Position.GROUND_SIDE: 0.18, Position.GROUND_NORTH_SOUTH: 0.15,
+                      Position.GROUND_MOUNT: 0.22, Position.GROUND_BACK: 0.30,
+                      Position.GROUND_TURTLE: 0.08, Position.GROUND_CRUCIFIX: 0.35,
+                      Position.GROUND_SCARF_HOLD: 0.30}.get(pos, 0.10)
         if random.random() < sub_chance:
             self._simulate_submission_attempt(top, bottom, fatigue, strategy, pos)
         else:
@@ -2517,14 +2833,84 @@ class Fight:
         health_penalty = 1.0 - max(0, (55 - head_pct) / 100) * 0.5 if head_pct < 55 else 1.0
         escape_mod = kd_penalty * health_penalty
 
-        # Guard submissions from bottom — less likely when hurt
-        if pos == Position.GROUND_GUARD and pt > 3 and random.random() < 0.14 * escape_mod:
-            if random.random() < 0.28:
+        # === GUARD: submissions, sweeps, stand-ups ===
+        if pos in (Position.GROUND_GUARD, Position.GROUND_HALF_GUARD) and pt > 3:
+            sub_mod = 0.14 if pos == Position.GROUND_GUARD else 0.08
+            if random.random() < sub_mod * escape_mod:
                 self._simulate_submission_attempt(bottom, top, fatigue, strategy, pos)
                 return
 
-        pos_bonus = 1.0 if pos == Position.GROUND_GUARD else (0.7 if pos == Position.GROUND_SIDE else (0.4 if pos == Position.GROUND_MOUNT else 0.2))
+        pos_bonus = {
+            Position.GROUND_GUARD: 1.0, Position.GROUND_HALF_GUARD: 0.8,
+            Position.GROUND_SIDE: 0.7, Position.GROUND_NORTH_SOUTH: 0.5,
+            Position.GROUND_MOUNT: 0.4, Position.GROUND_BACK: 0.2,
+            Position.GROUND_TURTLE: 0.6, Position.GROUND_CRUCIFIX: 0.1,
+            Position.GROUND_SCARF_HOLD: 0.2,
+        }.get(pos, 0.5)
         sweep_chance = 0.28 * pos_bonus * escape_mod
+
+        # === TURTLE: roll to guard instead of sweep ===
+        if pos == Position.GROUND_TURTLE and pt > 2:
+            if random.random() < 0.20 * escape_mod:
+                if self.position_system.turtle_roll_to_guard(bottom, top, fatigue):
+                    self.fight_log.append(f"{bottom.name} rolls through and gets guard!")
+                    bottom_state["effective_grappling_points"] += 4.0
+                    bottom_state["unanswered_ground_strikes"] = 0
+                    self._apply_stamina_cost(bottom_state, "sweep", fatigue, bottom_cardio)
+                    return
+            elif random.random() < 0.15 * escape_mod:
+                if self.position_system.stand_up_from_bottom(bottom, top, fatigue):
+                    self.fight_log.append(self.commentary.generate_ground_transition_commentary(
+                        "stand_up", fighter=bottom.name))
+                    bottom_state["effective_grappling_points"] += 2.0
+                    bottom_state["unanswered_ground_strikes"] = 0
+                    self._apply_stamina_cost(bottom_state, "stand_up", fatigue, bottom_cardio)
+                    return
+            self.fight_log.append(f"{bottom.name} stays turtled, protecting themself.")
+            return
+
+        # === NORTH-SOUTH: granby roll ===
+        if pos == Position.GROUND_NORTH_SOUTH and pt > 3:
+            if random.random() < 0.10 * escape_mod:
+                if self.position_system.granby_roll_to_guard(bottom, top, fatigue):
+                    self.fight_log.append(f"{bottom.name} granby rolls back to guard!")
+                    bottom_state["effective_grappling_points"] += 4.0
+                    bottom_state["unanswered_ground_strikes"] = 0
+                    self._apply_stamina_cost(bottom_state, "sweep", fatigue, bottom_cardio)
+                    return
+            elif random.random() < 0.12 * escape_mod:
+                if self.position_system.stand_up_from_bottom(bottom, top, fatigue):
+                    self.fight_log.append(self.commentary.generate_ground_transition_commentary(
+                        "stand_up", fighter=bottom.name))
+                    bottom_state["effective_grappling_points"] += 2.0
+                    bottom_state["unanswered_ground_strikes"] = 0
+                    self._apply_stamina_cost(bottom_state, "stand_up", fatigue, bottom_cardio)
+                    return
+
+        # === CRUCIFIX: escape to turtle (only option) ===
+        if pos == Position.GROUND_CRUCIFIX and pt > 3:
+            if random.random() < 0.08 * escape_mod:
+                top_state = self.f1_state if top == self.fighter1 else self.f2_state
+                # Set ground to turtle as bottom escapes partially
+                self.position_system.current_position = Position.GROUND_TURTLE
+                self.fight_log.append(f"{bottom.name} fights the hands and gets to turtle position!")
+                self._apply_stamina_cost(bottom_state, "sweep", fatigue, bottom_cardio)
+                return
+            self.fight_log.append(f"{bottom.name} is trapped in the crucifix!")
+            return
+
+        # === SCARF HOLD: bridge and roll ===
+        if pos == Position.GROUND_SCARF_HOLD and pt > 3:
+            if random.random() < 0.10 * escape_mod:
+                if self.position_system.sweep_from_bottom(bottom, top, fatigue):
+                    self.fight_log.append(f"{bottom.name} bridges and reverses into top position!")
+                    bottom_state["effective_grappling_points"] += 5.0
+                    bottom_state["unanswered_ground_strikes"] = 0
+                    self._apply_stamina_cost(bottom_state, "sweep", fatigue, bottom_cardio)
+                    return
+            self.fight_log.append(f"{bottom.name} is stuck in scarf hold, trying to survive.")
+
+        # === SWEEP ATTEMPTS (guard, half-guard, side, mount, back) ===
         if random.random() < sweep_chance:
             if self.position_system.sweep_from_bottom(bottom, top, fatigue):
                 self.fight_log.append(self.commentary.generate_ground_transition_commentary(
@@ -2535,7 +2921,7 @@ class Fight:
             else:
                 self.fight_log.append(f"{bottom.name} tries to sweep but {top.name} defends.")
         else:
-            stand_chance = 0.28 * escape_mod
+            stand_chance = 0.22 * escape_mod * pos_bonus
             if random.random() < stand_chance:
                 if self.position_system.stand_up_from_bottom(bottom, top, fatigue):
                     self.fight_log.append(self.commentary.generate_ground_transition_commentary(
@@ -2555,8 +2941,11 @@ class Fight:
         power = attacker.get_effective_attribute("striking_power", fatigue) * sp_mod
         durability = defender.get_effective_attribute("durability", 1.0 - (def_state["stamina"] / 100))
 
-        pos_power = {Position.GROUND_GUARD: 0.30, Position.GROUND_SIDE: 0.45,
-                     Position.GROUND_MOUNT: 0.60, Position.GROUND_BACK: 0.35}
+        pos_power = {Position.GROUND_GUARD: 0.30, Position.GROUND_HALF_GUARD: 0.35,
+                     Position.GROUND_SIDE: 0.45, Position.GROUND_NORTH_SOUTH: 0.50,
+                     Position.GROUND_MOUNT: 0.60, Position.GROUND_BACK: 0.35,
+                     Position.GROUND_TURTLE: 0.40, Position.GROUND_CRUCIFIX: 0.50,
+                     Position.GROUND_SCARF_HOLD: 0.50}
         pos_bonus = pos_power.get(pos, 0.3)
 
         tc_mod = self._get_mod("top_control", strategy)
@@ -2612,6 +3001,8 @@ class Fight:
                 elif wtype == "close_mount":
                     self.fight_log.append(f"{attacker.name} is relentless! {defender.name} needs to escape or this is over!")
 
+        dominant_positions = (Position.GROUND_SIDE, Position.GROUND_NORTH_SOUTH,
+                              Position.GROUND_MOUNT, Position.GROUND_CRUCIFIX, Position.GROUND_SCARF_HOLD)
         if unanswered >= mount_tko and pos == Position.GROUND_MOUNT:
             self.winner = attacker
             self.loser = defender
@@ -2619,7 +3010,7 @@ class Fight:
             self.win_round = self.current_round
             self.fight_log.append(f"The referee steps in! {defender.name} is taking too much damage from mount!")
             return
-        elif unanswered >= side_tko and pos in (Position.GROUND_SIDE, Position.GROUND_MOUNT):
+        elif unanswered >= side_tko and pos in dominant_positions:
             self.winner = attacker
             self.loser = defender
             self.win_method = "TKO (Ground Strikes)"
@@ -2641,18 +3032,31 @@ class Fight:
     def _get_available_subs(self, pos, attacker_is_top=True) -> list:
         guard_subs_top = ["kimura", "d'arce choke", "americana", "arm triangle", "gogoplata"]
         guard_subs_bottom = ["triangle choke", "armbar", "guillotine", "omoplata", "kimura"]
+        half_guard_subs_top = ["kimura", "arm triangle", "d'arce choke", "brabo choke"]
+        half_guard_subs_bottom = ["kimura", "sweep to top", "guillotine", "armbar"]
         side_subs = ["kimura", "d'arce choke", "armbar", "arm triangle", "americana"]
+        north_south_subs = ["north-south choke", "kimura", "arm triangle"]
         mount_subs = ["armbar", "mounted triangle", "americana", "arm triangle"]
         back_subs = ["rear naked choke", "armbar"]
+        crucifix_subs = ["armbar", "triangle choke"]
+        scarf_hold_subs = ["americana", "kimura"]
 
         if pos == Position.GROUND_GUARD:
             return guard_subs_top if attacker_is_top else guard_subs_bottom
+        elif pos == Position.GROUND_HALF_GUARD:
+            return half_guard_subs_top if attacker_is_top else half_guard_subs_bottom
         elif pos == Position.GROUND_SIDE:
             return side_subs
+        elif pos == Position.GROUND_NORTH_SOUTH:
+            return north_south_subs
         elif pos == Position.GROUND_MOUNT:
             return mount_subs
         elif pos == Position.GROUND_BACK:
             return back_subs
+        elif pos == Position.GROUND_CRUCIFIX:
+            return crucifix_subs
+        elif pos == Position.GROUND_SCARF_HOLD:
+            return scarf_hold_subs
         return ["armbar", "kimura"]
 
     def _simulate_submission_attempt(self, attacker, defender, fatigue, strategy, pos=Position.GROUND_GUARD):
@@ -2675,8 +3079,10 @@ class Fight:
             "submission_attempt", attacker=attacker.name, submission=submission))
 
         # Positional advantage multiplier
-        pos_bonus = {Position.GROUND_GUARD: 1.0, Position.GROUND_SIDE: 1.2,
-                     Position.GROUND_MOUNT: 1.4, Position.GROUND_BACK: 1.7}
+        pos_bonus = {Position.GROUND_GUARD: 1.0, Position.GROUND_HALF_GUARD: 0.9,
+                     Position.GROUND_SIDE: 1.2, Position.GROUND_NORTH_SOUTH: 1.3,
+                     Position.GROUND_MOUNT: 1.4, Position.GROUND_BACK: 1.7,
+                     Position.GROUND_CRUCIFIX: 1.8, Position.GROUND_SCARF_HOLD: 1.5}
         pb = pos_bonus.get(pos, 1.0)
 
         # Weight class modifier for submissions: heavier = less flexible = harder to sub

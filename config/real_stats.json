@@ -4,7 +4,7 @@
   "total_fights_analyzed": 7423,
   "real_world_rates": {
     "ko_tko_pct": 31.3,
-    "submission_pct": 18.0,
+    "submission_pct": 12.0,
     "decision_pct": 49.4,
     "finish_pct": 49.3
   },
