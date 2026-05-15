@@ -13,11 +13,10 @@ class Position(Enum):
     GROUND_SIDE = "Ground (Side Control)"
     GROUND_MOUNT = "Ground (Mount)"
     GROUND_BACK = "Ground (Back Mount)"
-    BACK_AGAINST_CAGE = "Back Against Cage"
 
     @staticmethod
     def is_standing(pos: "Position") -> bool:
-        return pos in (Position.DISTANCE, Position.POCKET, Position.BACK_AGAINST_CAGE, Position.CLINCH)
+        return pos in (Position.DISTANCE, Position.POCKET, Position.CLINCH)
 
     @staticmethod
     def is_ground(pos: "Position") -> bool:
@@ -122,14 +121,13 @@ class PositionSystem:
         takedown_accuracy = attacker.get_effective_attribute("takedown_accuracy", fatigue) * tda_mod
         wrestling_defense = defender.get_effective_attribute("wrestling_defense", fatigue) * wd_mod
 
-        # Range penalty
-        range_penalty = 0.7 if self.current_position == Position.DISTANCE else 1.0
+        range_penalty = 1.0 if self.current_position == Position.DISTANCE else 1.0
 
         # Height/weight advantage
         height_diff = attacker.height - defender.height
         height_mod = 1.0 - max(0, height_diff) * 0.003 if height_diff > 0 else 1.0 + min(0.15, abs(height_diff) * 0.002)
 
-        success_chance = ((takedown_power * 0.4 + takedown_accuracy * 0.6) - (wrestling_defense * 0.5))
+        success_chance = ((takedown_power * 0.5 + takedown_accuracy * 0.5) - (wrestling_defense * 0.4))
         success_chance *= range_penalty * height_mod
         if weight_advantage != 0.0:
             success_chance *= (1.0 + weight_advantage)
@@ -184,7 +182,7 @@ class PositionSystem:
         # Weight advantage helps in clinch takedowns
         weight_mod = 1.0 + weight_advantage
 
-        success_chance = (td_power * 0.5 - wd * 0.4) * height_mod * weight_mod
+        success_chance = (td_power - wd * 0.3) * height_mod * weight_mod
         success_chance *= att_leg_mod
         success_chance *= max(0.3, 1.0 - fatigue * 0.4)
         success_chance = max(8, min(88, success_chance))
@@ -350,9 +348,8 @@ class PositionSystem:
             return f"{self.top_fighter.name} has mounted {self.bottom_fighter.name}!"
         elif p == Position.GROUND_BACK:
             return f"{self.top_fighter.name} has {self.bottom_fighter.name}'s back!"
-        elif p == Position.BACK_AGAINST_CAGE:
-            cage_fighter = self.cage_position.name if self.cage_position else "Unknown"
-            return f"{cage_fighter} is backed against the cage!"
+        elif self.cage_position is not None:
+            return f"{self.cage_position.name} is backed against the cage!"
         return "Unknown position"
 
     @property

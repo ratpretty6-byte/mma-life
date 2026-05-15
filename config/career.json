@@ -1,0 +1,60 @@
+{
+  "_comment": "MMA Life Simulator — Career & Financial Config",
+  "age": {
+    "prime_start": 24,
+    "prime_end": 33,
+    "decline_start": 34,
+    "steep_decline": 39,
+    "retirement_age": 40,
+    "retirement_loss_streak_age": 35,
+    "retirement_loss_streak_threshold": 3,
+    "comeback_window_years": 2,
+    "max_starting_age": 35,
+    "min_starting_age": 18
+  },
+  "pro_tiers": [
+    {"name": "Regional", "base_pay": 2000, "win_bonus": 2000, "perf_bonus": 5000, "ranking_weight": 1.0},
+    {"name": "National", "base_pay": 8000, "win_bonus": 8000, "perf_bonus": 15000, "ranking_weight": 2.0},
+    {"name": "World", "base_pay": 25000, "win_bonus": 25000, "perf_bonus": 50000, "ranking_weight": 3.0}
+  ],
+  "ranking": {
+    "win_base_points": 10,
+    "loss_penalty": -5,
+    "momentum_bonus_streak_3": 2,
+    "momentum_bonus_streak_5": 5,
+    "inactivity_penalty_days": 180,
+    "inactivity_penalty_points": -10,
+    "title_shot_rank_threshold": 2,
+    "title_strip_days": 180,
+    "mandatory_challenge_months": 12
+  },
+  "finance": {
+    "living_expenses": 1000,
+    "tax_rate": 0.30,
+    "tax_threshold": 50000,
+    "agent_cut_rates": [0.05, 0.10, 0.15, 0.20],
+    "max_gym_fee": 1000,
+    "max_sponsorship_base": 50000,
+    "ppv_share_rate": 0.05
+  },
+  "contract": {
+    "initial_fights": 4,
+    "renegotiation_trigger_wins": 2,
+    "max_contract_length": 6,
+    "ranking_bonus_multiplier": 0.1
+  },
+  "injuries": {
+    "training_injury_chance": 0.05,
+    "fight_injury_chance_base": 0.15,
+    "recovery_base_days": 7,
+    "medical_suspension_ko_days": 30,
+    "medical_suspension_tko_days": 14
+  },
+  "awards": {
+    "year_end_awards_date": "12-25",
+    "fighter_of_year_bonus": 50000,
+    "ko_of_year_bonus": 10000,
+    "sub_of_year_bonus": 10000,
+    "fight_of_year_bonus": 10000
+  }
+}

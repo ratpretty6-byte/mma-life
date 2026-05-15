@@ -5,179 +5,268 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>MMA Life Simulator</title>
 <style>
+:root {
+  --bg-base: #0a0a0f;
+  --bg-surface: #14141f;
+  --bg-elevated: #1a1a2a;
+  --bg-pressed: #22223a;
+  --bg-hover: #2a2a3a;
+  --border-subtle: #2a2a3a;
+  --border-active: #e62400;
+  --text-primary: #f0f0f0;
+  --text-secondary: #b0b0b0;
+  --text-muted: #888;
+  --text-dim: #555;
+  --accent: #e62400;
+  --accent-hover: #ff2e00;
+  --accent-glow: rgba(230,36,0,0.15);
+  --gold: #b8860b;
+  --gold-hover: #daa520;
+  --gold-glow: rgba(184,134,11,0.15);
+  --success: #1a8a3a;
+  --success-glow: rgba(26,138,58,0.15);
+  --danger: #8a1a1a;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px;
+  --space-4: 16px; --space-5: 20px; --space-6: 24px;
+  --space-8: 32px; --space-10: 40px;
+  --text-xs: 11px; --text-sm: 12px; --text-base: 13px;
+  --text-md: 14px; --text-lg: 16px; --text-xl: 18px;
+  --text-2xl: 22px; --text-3xl: 28px;
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+  --shadow-card: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-elevated: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; padding-bottom: 60px; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-base); color: var(--text-primary); min-height: 100vh; padding-bottom: 60px; }
 .container { max-width: 960px; margin: 0 auto; padding: 10px; }
 .hidden { display: none !important; }
-.btn { display: inline-block; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s; -webkit-tap-highlight-color: transparent; min-height: 44px; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 20px; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: var(--text-md); font-weight: 600; transition: transform var(--transition-fast), background var(--transition-fast); min-height: 44px; text-decoration: none; -webkit-tap-highlight-color: transparent; }
 .btn:active { transform: scale(0.97); }
-.btn-primary { background: #e62400; color: #fff; }
-.btn-primary:hover { background: #ff2e00; }
-.btn-secondary { background: #2a2a3a; color: #e0e0e0; }
-.btn-secondary:hover { background: #3a3a4a; }
-.btn-small { padding: 5px 12px; font-size: 12px; min-height: 32px; }
-.btn-success { background: #1a8a3a; color: #fff; }
-.btn-danger { background: #8a1a1a; color: #fff; }
-.btn-gold { background: #b8860b; color: #fff; }
-.btn-gold:hover { background: #daa520; }
-.btn-ghost { background: transparent; color: #888; border: 1px solid #333; }
-.btn-ghost:hover { border-color: #e62400; color: #e62400; }
-.card { background: #14141f; border-radius: 8px; padding: 14px; margin-bottom: 8px; border: 1px solid #2a2a3a; }
-.card-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
-.card-sub { font-size: 12px; color: #888; margin-bottom: 6px; }
-.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid #1a1a2a; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border-subtle); }
+.btn-secondary:hover { background: var(--bg-hover); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-gold { background: var(--gold); color: #fff; }
+.btn-gold:hover { background: var(--gold-hover); }
+.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border-subtle); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-sm { padding: 5px 12px; font-size: var(--text-sm); min-height: 32px; }
+.btn-lg { padding: 14px 28px; font-size: var(--text-lg); min-height: 52px; }
+.btn-mainmenu { width: 90%; max-width: 320px; margin-bottom: var(--space-3); padding: 14px 20px; font-size: var(--text-lg); justify-content: flex-start; border-radius: var(--radius-lg); gap: 12px; }
+
+/* Cards */
+.card { background: var(--bg-surface); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-2); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-card); }
+.card-interactive { cursor: pointer; transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
+.card-interactive:hover { transform: translateY(-1px); box-shadow: var(--shadow-elevated); }
+.card-interactive:active { transform: scale(0.99); }
+.card-highlight { border-color: var(--accent); }
+.card-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+.card-sub { font-size: var(--text-sm); color: var(--text-muted); margin-bottom: 6px; }
+
+/* Stat rows */
+.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--bg-elevated); }
 .stat-row:last-child { border-bottom: none; }
-.stat-label { color: #888; font-size: 13px; }
-.stat-value { color: #fff; font-weight: 600; font-size: 13px; }
-.header { background: #14141f; border-bottom: 2px solid #e62400; padding: 10px 0; margin-bottom: 12px; position: sticky; top: 0; z-index: 50; }
-.header h1 { font-size: 17px; color: #e62400; }
-.header .sub { font-size: 11px; color: #888; }
+.stat-label { color: var(--text-muted); font-size: var(--text-base); }
+.stat-value { color: var(--text-primary); font-weight: 600; font-size: var(--text-base); }
+.stat-group { margin-bottom: var(--space-3); }
+.stat-group .group-title { font-size: var(--text-sm); color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: var(--space-2); }
 
-/* Desktop Tabs */
+/* Header */
+.header { background: var(--bg-surface); border-bottom: 2px solid var(--accent); padding: 10px 0; margin-bottom: 12px; position: sticky; top: 0; z-index: 50; }
+.header h1 { font-size: 17px; color: var(--accent); }
+.header .sub { font-size: var(--text-xs); color: var(--text-muted); }
+
+/* Tabs */
 .desktop-tabs { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 10px; }
-.tab { padding: 8px 14px; background: #1a1a2a; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 12px; font-weight: 600; color: #888; border: 1px solid #2a2a3a; border-bottom: none; -webkit-tap-highlight-color: transparent; user-select: none; transition: all .15s; }
-.tab:hover { color: #e0e0e0; background: #22223a; }
-.tab.active { background: #14141f; color: #e62400; border-color: #e62400; }
+.tab { padding: 8px 14px; background: var(--bg-elevated); border-radius: 6px 6px 0 0; cursor: pointer; font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); border: 1px solid var(--border-subtle); border-bottom: none; -webkit-tap-highlight-color: transparent; user-select: none; transition: color var(--transition-fast), background var(--transition-fast); }
+.tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+.tab.active { background: var(--bg-surface); color: var(--accent); border-color: var(--accent); }
 
-/* Bottom Tab Bar (mobile) */
-.bottom-tabs { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #0d0d18; border-top: 2px solid #e62400; z-index: 200; padding: 4px 0 env(safe-area-inset-bottom, 4px); }
-.bottom-tab { flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 6px 4px; font-size: 10px; color: #666; -webkit-tap-highlight-color: transparent; user-select: none; transition: color .15s; border: none; background: none; }
+/* Bottom tabs */
+.bottom-tabs { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #0d0d18; border-top: 2px solid var(--accent); z-index: 200; padding: 4px 0 env(safe-area-inset-bottom, 4px); }
+.bottom-tab { flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 6px 4px; font-size: 10px; color: #666; -webkit-tap-highlight-color: transparent; user-select: none; transition: color var(--transition-fast); border: none; background: none; }
 .bottom-tab .tab-icon { font-size: 18px; line-height: 1.2; }
-.bottom-tab.active { color: #e62400; }
-.bottom-tab.active .tab-icon { color: #e62400; }
+.bottom-tab.active { color: var(--accent); }
+.bottom-tab.active .tab-icon { color: var(--accent); }
 
-.scroll { max-height: 70vh; overflow-y: auto; }
-.screen-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 12px; text-align: center; }
+/* Screen transitions */
+.screen { transition: opacity var(--transition-base) ease, transform var(--transition-base) ease; }
+.screen-exit { opacity: 0; transform: translateY(8px); pointer-events: none; }
 
-/* Fight Log - enhanced */
-.fight-log { background: #07070c; border: 1px solid #2a2a3a; border-radius: 6px; padding: 8px; height: 280px; overflow-y: auto; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; line-height: 1.5; }
+/* Titles */
+.screen-title { font-size: var(--text-2xl); font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-3); text-align: center; }
+
+/* Fight Log */
+.fight-log { background: #07070c; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-2); height: 280px; overflow-y: auto; font-size: var(--text-base); line-height: 1.5; }
 .fight-log .ev { padding: 2px 6px; margin: 1px 0; border-radius: 3px; }
 .fight-log .ev:nth-child(odd) { background: rgba(255,255,255,0.02); }
 .fight-log .ev-action { color: #ccc; font-size: 12.5px; }
-.fight-log .ev-round { color: #fff; font-weight: 700; font-size: 13px; text-align: center; padding: 6px; background: rgba(230,36,0,0.08); border-radius: 4px; margin: 4px 0; }
-.fight-log .ev-summary { color: #888; font-style: italic; font-size: 12px; text-align: center; }
-.fight-log .ev-big { color: #ffd700; font-weight: 700; font-size: 14px; padding: 4px 6px; background: rgba(255,215,0,0.06); border-radius: 4px; }
-.fight-log .ev-info { color: #4a9eff; font-size: 12px; }
-.fight-log .ev-score { color: #aaa; font-size: 11px; padding-left: 8px; }
-.fight-log .fn { color: #ff9a4a; font-weight: 600; }
-.fight-log .act { color: #4aff6a; font-weight: 500; }
-.fight-log .ko-word { color: #ffd700; font-weight: 900; font-size: 15px; text-shadow: 0 0 8px rgba(255,215,0,0.4); }
-.fight-log .sub-word { color: #4a9eff; font-weight: 900; font-size: 15px; }
-.fight-log .time-tag { color: #555; font-size: 10px; margin-right: 6px; font-family: monospace; }
-.fight-log .ts { color: #444; font-size: 10px; font-family: monospace; margin-right: 4px; user-select: none; }
-.fight-log .dmg { color: #ff4a4a; font-weight: 600; }
+.fight-log .ev-round { color: var(--text-primary); font-weight: 700; font-size: var(--text-base); text-align: center; padding: 6px; background: var(--accent-glow); border-radius: var(--radius-sm); margin: 4px 0; }
+.fight-log .ev-summary { color: var(--text-muted); font-style: italic; font-size: var(--text-sm); text-align: center; }
+.fight-log .ev-big { color: var(--gold); font-weight: 700; font-size: var(--text-md); padding: 4px 6px; background: var(--gold-glow); border-radius: var(--radius-sm); }
+.fight-log .ev-info { color: #4a9eff; font-size: var(--text-sm); }
+.fight-log .ev-score { color: #aaa; font-size: var(--text-xs); padding-left: 8px; }
 .fight-log .ev-strike { color: #e0e0e0; }
 .fight-log .ev-takedown { color: #ff9a4a; }
 .fight-log .ev-clinch { color: #4a9eff; }
 .fight-log .ev-ground { color: #b07cff; }
 .fight-log .ev-sub-attempt { color: #4affda; }
 .fight-log .ev-heavy { color: #ff4a4a; font-weight: 700; }
-.fight-log .ev-critical { color: #ffd700; font-weight: 800; text-shadow: 0 0 4px rgba(255,215,0,0.3); }
-.fight-log .ev-defensive { color: #888; }
-.fight-log .ev-hurt { color: #ffd700; font-weight: 600; }
+.fight-log .ev-critical { color: var(--gold); font-weight: 800; text-shadow: 0 0 4px var(--gold-glow); }
+.fight-log .ev-defensive { color: var(--text-muted); }
+.fight-log .ev-hurt { color: var(--gold); font-weight: 600; }
 .fight-log .ev-stunned { color: #ff4a4a; font-weight: 700; }
-.fight-log .ev-knockdown { color: #ff0000; font-weight: 900; font-size: 14px; text-shadow: 0 0 6px rgba(255,0,0,0.4); }
-.fight-log .ev-combo { color: #4affda; border-left: 3px solid #4affda; padding-left: 3px; font-size: 12px; }
+.fight-log .ev-knockdown { color: #ff0000; font-weight: 900; font-size: var(--text-md); text-shadow: 0 0 6px rgba(255,0,0,0.4); }
+.fight-log .ev-combo { color: #4affda; border-left: 3px solid #4affda; padding-left: 3px; font-size: var(--text-sm); }
 .fight-log .ev-counter { color: #4a9eff; border-left: 3px solid #4a9eff; padding-left: 3px; }
-.fight-log .ev-exchange { color: #ffd700; font-weight: 600; border-left: 3px solid #ffd700; padding-left: 3px; }
+.fight-log .ev-exchange { color: var(--gold); font-weight: 600; border-left: 3px solid var(--gold); padding-left: 3px; }
 .fight-log .ev-reaction { color: #ff9a4a; font-style: italic; }
-.fight-log .ev-movement { color: #888; font-style: italic; }
+.fight-log .ev-movement { color: var(--text-muted); font-style: italic; }
 .fight-log .ev-feint { color: #b07cff; font-style: italic; }
 .fight-log .ev-carryover { color: #ff9a4a; font-weight: 600; border-left: 3px solid #ff9a4a; padding-left: 3px; }
-.fight-log .ev-f1 { border-left: 3px solid #e62400; padding-left: 3px; }
+.fight-log .ev-f1 { border-left: 3px solid var(--accent); padding-left: 3px; }
 .fight-log .ev-f2 { border-left: 3px solid #4a9eff; padding-left: 3px; }
 
-/* Strategy selector */
+/* Strategy */
 .strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-.strategy-btn { padding: 8px; background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 6px; cursor: pointer; color: #e0e0e0; font-size: 12px; text-align: left; -webkit-tap-highlight-color: transparent; min-height: 44px; }
-.strategy-btn:hover { border-color: #e62400; background: #2a1a1a; }
-.strategy-btn.selected { border-color: #e62400; background: #3a2020; }
-.strategy-btn.small { font-size: 11px; padding: 5px 8px; min-height: 36px; }
+.strategy-btn { padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer; color: var(--text-primary); font-size: var(--text-sm); text-align: left; -webkit-tap-highlight-color: transparent; min-height: 44px; }
+.strategy-btn:hover { border-color: var(--accent); background: #2a1a1a; }
+.strategy-btn.selected { border-color: var(--accent); background: #3a2020; }
+.strategy-btn.small { font-size: var(--text-xs); padding: 5px 8px; min-height: 36px; }
 
 /* Opponent cards */
-.opponent-card { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #1a1a2a; border-radius: 6px; margin-bottom: 5px; cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 44px; }
-.opponent-card:hover { background: #2a2a3a; }
-.opponent-card:active { background: #3a3a4a; }
-.opponent-card .name { font-weight: 700; font-size: 13px; }
-.opponent-card .record { color: #888; font-size: 12px; }
-.opponent-card .diff { font-size: 11px; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.opponent-card { display: flex; justify-content: space-between; align-items: center; padding: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); margin-bottom: 5px; cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 44px; transition: background var(--transition-fast); }
+.opponent-card:hover { background: var(--bg-hover); }
+.opponent-card:active { background: var(--bg-pressed); }
+.opponent-card .name { font-weight: 700; font-size: var(--text-base); }
+.opponent-card .record { color: var(--text-muted); font-size: var(--text-sm); }
+.opponent-card .diff { font-size: var(--text-xs); padding: 2px 7px; border-radius: var(--radius-sm); white-space: nowrap; }
 .diff-easy { background: #1a4a2a; color: #4aff6a; }
-.diff-medium { background: #4a4a1a; color: #ffd700; }
+.diff-medium { background: #4a4a1a; color: var(--gold); }
 .diff-hard { background: #4a1a1a; color: #ff4a4a; }
 .diff-pick { background: #2a2a4a; color: #4a9eff; }
 
-/* Health Bars - redesigned */
-.health-bar-outer { height: 16px; background: #1a1a2a; border-radius: 8px; overflow: hidden; position: relative; }
+/* Health bars */
+.health-bar-outer { height: 16px; background: var(--bg-elevated); border-radius: 8px; overflow: hidden; position: relative; }
 .health-bar-inner { height: 100%; border-radius: 8px; transition: width .4s ease; }
-.stamina-bar-outer { height: 10px; background: #1a1a2a; border-radius: 5px; overflow: hidden; }
+.stamina-bar-outer { height: 10px; background: var(--bg-elevated); border-radius: 5px; overflow: hidden; }
 .stamina-bar-inner { height: 100%; border-radius: 5px; transition: width .4s ease; }
-.blood-bar-outer { height: 6px; background: #1a1a2a; border-radius: 3px; overflow: hidden; }
+.blood-bar-outer { height: 6px; background: var(--bg-elevated); border-radius: 3px; overflow: hidden; }
 .blood-bar-inner { height: 100%; border-radius: 3px; background: #8b0000; transition: width .4s ease; }
-.hp-label { font-size: 10px; color: #888; margin-top: 2px; }
+.hp-label { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
-select, input:not([type="radio"]):not([type="checkbox"]) { background: #1a1a2a; color: #e0e0e0; border: 1px solid #2a2a3a; padding: 7px 10px; border-radius: 6px; font-size: 13px; width: 100%; min-height: 44px; }
-select option { background: #1a1a2a; }
-label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin-top: 6px; }
+/* Forms */
+select, input:not([type="radio"]):not([type="checkbox"]) { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border-subtle); padding: 7px 10px; border-radius: var(--radius-md); font-size: var(--text-base); width: 100%; min-height: 44px; }
+select option { background: var(--bg-elevated); }
+label { display: block; color: var(--text-muted); font-size: var(--text-sm); margin-bottom: 3px; margin-top: 6px; }
 
+/* Animations */
 .fade-in { animation: fadeIn .25s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .pulse { animation: pulse 1s ease infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+.damage-flash { animation: damageFlash 300ms ease; }
+@keyframes damageFlash { 0% { filter: brightness(1.5) saturate(2); } 100% { filter: brightness(1) saturate(1); } }
+.slide-up { animation: slideUp 300ms ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.scale-in { animation: scaleIn 200ms ease; }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100; }
-.modal { background: #14141f; border: 1px solid #2a2a3a; border-radius: 12px; padding: 20px; max-width: 560px; width: 92%; max-height: 85vh; overflow-y: auto; }
-.modal h2 { color: #fff; margin-bottom: 10px; font-size: 16px; }
-.modal h3 { color: #e62400; font-size: 14px; margin: 8px 0 4px; }
-.list-item { padding: 10px; background: #1a1a2a; border-radius: 6px; margin-bottom: 4px; cursor: pointer; font-size: 13px; -webkit-tap-highlight-color: transparent; min-height: 44px; }
-.list-item:hover { background: #2a2a3a; }
-.list-item:active { background: #3a3a4a; }
+/* Modals */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(2px); }
+.modal-content { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); padding: var(--space-5); max-width: 560px; width: 92%; max-height: 85vh; overflow-y: auto; }
+.modal-content h2 { color: var(--text-primary); margin-bottom: 10px; font-size: var(--text-lg); }
+.modal-content h3 { color: var(--accent); font-size: var(--text-md); margin: 8px 0 4px; }
 
+/* Wizard */
+.wizard-step { animation: fadeIn .25s ease; }
+.wizard-progress { display: flex; justify-content: center; gap: 8px; margin-bottom: var(--space-5); }
+.wizard-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bg-elevated); border: 2px solid var(--border-subtle); transition: background var(--transition-fast), border-color var(--transition-fast); }
+.wizard-dot.active { background: var(--accent); border-color: var(--accent); }
+.wizard-dot.done { background: var(--success); border-color: var(--success); }
+.wizard-nav { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-5); }
+
+/* List items */
+.list-item { padding: 10px; background: var(--bg-elevated); border-radius: var(--radius-md); margin-bottom: 4px; cursor: pointer; font-size: var(--text-base); -webkit-tap-highlight-color: transparent; min-height: 44px; transition: background var(--transition-fast); }
+.list-item:hover { background: var(--bg-hover); }
+.list-item:active { background: var(--bg-pressed); }
+
+/* Attribute bars */
 .attr-bar { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
-.attr-bar .label { width: 140px; font-size: 12px; color: #aaa; text-align: right; flex-shrink: 0; }
-.attr-bar .track { flex: 1; height: 14px; background: #1a1a2a; border-radius: 7px; overflow: hidden; }
+.attr-bar .label { width: 140px; font-size: var(--text-sm); color: #aaa; text-align: right; flex-shrink: 0; }
+.attr-bar .track { flex: 1; height: 14px; background: var(--bg-elevated); border-radius: 7px; overflow: hidden; }
 .attr-bar .fill { height: 100%; border-radius: 7px; transition: width .3s; }
-.attr-bar .fill.phys { background: linear-gradient(90deg, #4a9eff, #e62400); }
+.attr-bar .fill.phys { background: linear-gradient(90deg, #4a9eff, var(--accent)); }
 .attr-bar .fill.ment { background: linear-gradient(90deg, #8a4aff, #ff6a4a); }
-.attr-bar .val { width: 30px; font-size: 11px; color: #fff; text-align: right; flex-shrink: 0; }
+.attr-bar .val { width: 30px; font-size: var(--text-xs); color: var(--text-primary); text-align: right; flex-shrink: 0; }
 
-.speed-btn { padding: 4px 10px; font-size: 11px; background: #1a1a2a; border: 1px solid #333; border-radius: 4px; color: #888; cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 32px; }
-.speed-btn.active { border-color: #e62400; color: #e62400; background: #2a1515; }
-.speed-btn:hover { border-color: #e62400; }
+/* Speed controls */
+.speed-btn { padding: 4px 10px; font-size: var(--text-xs); background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-muted); cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 32px; }
+.speed-btn.active { border-color: var(--accent); color: var(--accent); background: #2a1515; }
+.speed-btn:hover { border-color: var(--accent); }
 
+/* Schedule */
 .schedule-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 8px 0; }
-.sched-day { text-align: center; padding: 6px 2px; background: #1a1a2a; border-radius: 4px; font-size: 11px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.sched-day:active { background: #2a2a3a; }
-.sched-day.today { border: 1px solid #e62400; }
-.sched-day .day-name { color: #888; font-size: 10px; }
-.sched-day .day-drill { color: #fff; font-size: 10px; margin-top: 2px; }
+.sched-day { text-align: center; padding: 6px 2px; background: var(--bg-elevated); border-radius: var(--radius-sm); font-size: var(--text-xs); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sched-day:active { background: var(--bg-hover); }
+.sched-day.today { border: 1px solid var(--accent); }
+.sched-day .day-name { color: var(--text-muted); font-size: 10px; }
+.sched-day .day-drill { color: var(--text-primary); font-size: 10px; margin-top: 2px; }
 .sched-day .day-drill.rest { color: #4a9eff; }
+
+/* Utilities */
 .speed-row { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
 .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.compare-col { background: #1a1a2a; border-radius: 6px; padding: 10px; }
-.compare-col h4 { color: #e62400; font-size: 13px; margin-bottom: 6px; }
+.compare-col { background: var(--bg-elevated); border-radius: var(--radius-md); padding: 10px; }
+.compare-col h4 { color: var(--accent); font-size: var(--text-base); margin-bottom: 6px; }
 .flex-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
-.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: var(--text-xs); font-weight: 600; }
 .tag-win { background: #1a4a2a; color: #4aff6a; }
 .tag-loss { background: #4a1a1a; color: #ff4a4a; }
 .tag-promo { background: #2a2a4a; color: #4a9eff; }
-.tag-champ { background: #4a4a1a; color: #ffd700; }
+.tag-champ { background: #4a4a1a; color: var(--gold); }
 
+/* Toast */
 .toast-container { position: fixed; top: 60px; right: 10px; z-index: 200; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
-.toast { background: #14141f; border: 1px solid #e62400; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; animation: toastIn .3s ease, toastOut .3s ease 2.7s; max-width: 300px; text-align: center; pointer-events: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-.toast.success { border-color: #4aff6a; }
-.toast.error { border-color: #ff4a4a; }
-@keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+.toast { background: var(--bg-surface); border: 1px solid var(--accent); color: var(--text-primary); padding: 10px 16px; border-radius: var(--radius-md); font-size: var(--text-base); animation: toastIn .3s ease, toastOut .3s ease 2.7s; max-width: 300px; text-align: center; pointer-events: auto; }
 
-.next-action { background: linear-gradient(135deg, #1a2a1a, #14141f); border: 1px solid #4aff6a; border-radius: 8px; padding: 12px; margin-bottom: 8px; text-align: center; }
-.recovery-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-.next-action .action-label { color: #4aff6a; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-.next-action .action-text { color: #fff; font-size: 14px; font-weight: 600; margin-top: 4px; }
+/* Next action card */
+.next-action { background: linear-gradient(135deg, #1a2a1a, var(--bg-surface)); border: 1px solid var(--success); border-radius: var(--radius-md); padding: 12px; margin-bottom: 8px; text-align: center; }
+.next-action .action-label { color: var(--success); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 1px; }
+.next-action .action-text { color: var(--text-primary); font-size: var(--text-md); font-weight: 600; margin-top: 4px; }
 .next-action .action-btn { margin-top: 8px; }
 
-.spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #333; border-top-color: #e62400; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
+/* Spinner */
+.spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border-subtle); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Skeleton loading */
+.skeleton { background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-hover) 50%, var(--bg-elevated) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: var(--radius-sm); }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+/* Wizard weight class cards */
+.wc-card { padding: 10px; background: var(--bg-elevated); border: 2px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer; text-align: center; transition: border-color var(--transition-fast), background var(--transition-fast); -webkit-tap-highlight-color: transparent; }
+.wc-card:hover { border-color: var(--accent); }
+.wc-card.selected { border-color: var(--accent); background: #3a2020; }
+.wc-card .wc-name { font-size: var(--text-base); font-weight: 700; color: var(--text-primary); }
+.wc-card .wc-weight { font-size: var(--text-xs); color: var(--text-muted); }
+
+/* Fighter preview card */
+.fighter-preview { background: linear-gradient(135deg, var(--bg-elevated), var(--bg-surface)); border: 1px solid var(--accent); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; margin-bottom: var(--space-3); }
+.fighter-preview .fp-name { font-size: var(--text-xl); font-weight: 900; color: var(--text-primary); }
+.fighter-preview .fp-record { font-size: var(--text-lg); color: var(--gold); margin: 4px 0; }
+.fighter-preview .fp-meta { font-size: var(--text-sm); color: var(--text-muted); }
+.fighter-preview .fp-attr-label { font-size: var(--text-xs); color: var(--text-muted); margin-top: 6px; }
+.fighter-preview .fp-attr-bar { height: 6px; background: var(--bg-base); border-radius: 3px; overflow: hidden; margin: 2px 0; }
 
 /* Mobile */
 @media (max-width: 768px) {
@@ -186,13 +275,14 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
   body { padding-bottom: 56px; }
   .strategy-grid { grid-template-columns: 1fr; }
   .compare-grid { grid-template-columns: 1fr; }
-  .attr-bar .label { width: 90px; font-size: 11px; }
-  .schedule-grid { grid-template-columns: repeat(7, 1fr); font-size: 10px; }
+  .attr-bar .label { width: 90px; font-size: var(--text-xs); }
+  .schedule-grid { font-size: 10px; }
   .header h1 { font-size: 14px; }
   .container { padding: 6px; }
   .card { padding: 10px; }
-  .screen-title { font-size: 17px; }
-  .fight-log { height: 260px; font-size: 12px; }
+  .screen-title { font-size: var(--text-xl); }
+  .fight-log { height: 260px; font-size: var(--text-sm); }
+  .modal-content { width: 96%; padding: var(--space-4); }
 }
 </style>
 </head>
@@ -208,107 +298,154 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
     <h1>MMA LIFE SIMULATOR</h1>
     <div class="flex-row" style="justify-content:space-between">
       <div class="sub" id="headerStatus">Initializing...</div>
-      <button class="btn btn-ghost btn-small" onclick="forceRefresh()" style="font-size:10px;padding:3px 8px" title="Refresh state from server">&#x21bb;</button>
+      <div class="flex-row" style="gap:4px">
+        <button class="btn btn-ghost btn-small hidden" id="btnSettings" onclick="showSettingsModal()" style="font-size:10px;padding:3px 8px" title="Settings">&#x2699;</button>
+        <button class="btn btn-ghost btn-small hidden" id="btnRefresh" onclick="forceRefresh()" style="font-size:10px;padding:3px 8px" title="Refresh state from server">&#x21bb;</button>
+      </div>
     </div>
   </div>
 </div>
 
 <div class="container" id="app">
-  <div id="screen-create">
-    <div class="screen-title">CREATE YOUR FIGHTER</div>
+  <!-- Main Menu -->
+  <div id="screen-main-menu" class="screen">
+    <div style="text-align:center;padding:60px 10px 20px">
+      <div style="font-size:32px;font-weight:900;color:var(--accent);margin-bottom:2px;letter-spacing:3px;text-shadow:0 0 30px var(--accent-glow)">MMA LIFE</div>
+      <div style="font-size:15px;color:var(--text-muted);margin-bottom:50px;letter-spacing:1px">SIMULATOR</div>
+      <button id="btnContinue" class="btn btn-primary btn-mainmenu" style="display:none"><span style="font-size:20px">&#x25B6;</span> CONTINUE</button>
+      <button id="btnNewGame" class="btn btn-gold btn-mainmenu"><span style="font-size:20px">+</span> NEW CAREER</button>
+      <button id="btnLoadGame" class="btn btn-secondary btn-mainmenu"><span style="font-size:18px">&#x1F4C2;</span> LOAD GAME</button>
+      <button id="btnOptions" class="btn btn-ghost btn-mainmenu" onclick="showOptionsModal()"><span style="font-size:18px">&#x2699;</span> OPTIONS</button>
+      <div style="margin-top:40px;color:var(--text-dim);font-size:var(--text-xs)" id="mainMenuStatus"></div>
+    </div>
+  </div>
+
+  <div id="screen-create" class="screen">
+    <div class="screen-title" style="font-size:var(--text-3xl)">CREATE YOUR FIGHTER</div>
+
+    <div class="wizard-progress" id="wizardProgress">
+      <div class="wizard-dot active" data-step="1"></div>
+      <div class="wizard-dot" data-step="2"></div>
+      <div class="wizard-dot" data-step="3"></div>
+      <div class="wizard-dot" data-step="4"></div>
+      <div class="wizard-dot" data-step="5"></div>
+    </div>
+    <div style="text-align:center;font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-4)" id="wizardStepLabel">Step 1: Identity</div>
+
     <div class="card">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <label>Fighter Name</label>
-          <input id="fName" name="name" value="">
-        </div>
-        <div>
-          <label>Age</label>
-          <select id="fAge" name="age">
-            <option value="18">18</option><option value="19">19</option><option value="20">20</option>
-            <option value="21">21</option><option value="22">22</option><option value="23">23</option>
-            <option value="24">24</option><option value="25" selected>25</option>
-            <option value="26">26</option><option value="27">27</option><option value="28">28</option>
-            <option value="29">29</option><option value="30">30</option>
-            <option value="31">31</option><option value="32">32</option><option value="33">33</option>
-            <option value="34">34</option><option value="35">35</option>
-          </select>
-        </div>
-        <div>
-          <label>Weight Class</label>
-          <select id="fWeightClass" name="weight_class">
-            <option value="0">Flyweight (125)</option><option value="1">Bantamweight (135)</option>
-            <option value="2">Featherweight (145)</option><option value="3" selected>Lightweight (155)</option>
-            <option value="4">Welterweight (170)</option><option value="5">Middleweight (185)</option>
-            <option value="6">Light Heavyweight (205)</option><option value="7">Heavyweight (265)</option>
-          </select>
-        </div>
-        <div>
-          <label>Background</label>
-          <select id="fBackground" name="background">
-            <option value="mma" selected>MMA (All-Rounder)</option>
-            <option value="wrestling">Wrestling</option>
-            <option value="bjj">Brazilian Jiu-Jitsu</option>
-            <option value="muay_thai">Muay Thai</option>
-            <option value="boxing">Boxing</option>
-            <option value="judo">Judo</option>
-            <option value="taekwondo">Taekwondo</option>
-            <option value="karate">Karate</option>
-            <option value="sambo">Sambo</option>
-            <option value="kickboxing">Kickboxing</option>
-            <option value="capoeira">Capoeira</option>
-          </select>
-        </div>
-        <div>
-          <label>Nationality</label>
-          <select id="fNationality" name="nationality">
-            <option value="American">American</option>
-            <option value="Brazilian">Brazilian</option>
-            <option value="Russian">Russian</option>
-            <option value="Japanese">Japanese</option>
-            <option value="British">British</option>
-            <option value="Canadian">Canadian</option>
-            <option value="French">French</option>
-            <option value="Dutch">Dutch</option>
-            <option value="Australian">Australian</option>
-            <option value="Polish">Polish</option>
-            <option value="Korean">Korean</option>
-            <option value="Mexican">Mexican</option>
-            <option value="German">German</option>
-            <option value="Italian">Italian</option>
-          </select>
-        </div>
-        <div>
-          <label>Home Region</label>
-          <select id="fRegion" name="region">
-            <option value="California">California</option>
-            <option value="Texas">Texas</option>
-            <option value="New York">New York</option>
-            <option value="Florida">Florida</option>
-          </select>
-        </div>
-        <div>
-          <label>Stance</label>
-          <select id="fStance" name="stance">
-            <option value="orthodox">Orthodox</option>
-            <option value="southpaw">Southpaw</option>
-          </select>
+      <!-- Step 1: Identity -->
+      <div class="wizard-step" data-step="1">
+        <div class="card-title" style="color:var(--accent)">Who are you?</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="grid-column:1/-1">
+            <label>Fighter Name</label>
+            <input id="fName" name="name" value="">
+          </div>
+          <div>
+            <label>Nationality</label>
+            <select id="fNationality" name="nationality">
+              <option value="American">American</option>
+              <option value="Brazilian">Brazilian</option>
+              <option value="Russian">Russian</option>
+              <option value="Japanese">Japanese</option>
+              <option value="British">British</option>
+              <option value="Canadian">Canadian</option>
+              <option value="French">French</option>
+              <option value="Dutch">Dutch</option>
+              <option value="Australian">Australian</option>
+              <option value="Polish">Polish</option>
+              <option value="Korean">Korean</option>
+              <option value="Mexican">Mexican</option>
+              <option value="German">German</option>
+              <option value="Italian">Italian</option>
+            </select>
+          </div>
+          <div>
+            <label>Home Region</label>
+            <select id="fRegion" name="region">
+              <option value="California">California</option>
+              <option value="Texas">Texas</option>
+              <option value="New York">New York</option>
+              <option value="Florida">Florida</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <label style="margin-top:10px">Trait (tap to select)</label>
-      <div id="traitGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px"></div>
+      <!-- Step 2: Physical -->
+      <div class="wizard-step hidden" data-step="2">
+        <div class="card-title" style="color:var(--accent)">Physical Attributes</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div>
+            <label>Age</label>
+            <select id="fAge" name="age" style="width:100%;">
+              <option value="18">18</option><option value="19">19</option><option value="20">20</option>
+              <option value="21">21</option><option value="22">22</option><option value="23">23</option>
+              <option value="24">24</option><option value="25" selected>25</option>
+              <option value="26">26</option><option value="27">27</option><option value="28">28</option>
+              <option value="29">29</option><option value="30">30</option>
+              <option value="31">31</option><option value="32">32</option><option value="33">33</option>
+              <option value="34">34</option><option value="35">35</option>
+            </select>
+          </div>
+          <div>
+            <label>Stance</label>
+            <select id="fStance" name="stance">
+              <option value="orthodox">Orthodox</option>
+              <option value="southpaw">Southpaw</option>
+            </select>
+          </div>
+        </div>
+        <label style="margin-top:var(--space-3)">Weight Class</label>
+        <div id="wcGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px"></div>
+        <input type="hidden" id="fWeightClass" name="weight_class" value="3">
+      </div>
 
-      <label style="margin-top:8px">Personality</label>
-      <div id="personalityGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px"></div>
+      <!-- Step 3: Background -->
+      <div class="wizard-step hidden" data-step="3">
+        <div class="card-title" style="color:var(--accent)">Fighting Style</div>
+        <label>Background</label>
+        <div id="bgGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px"></div>
+        <input type="hidden" id="fBackground" name="background" value="mma">
+      </div>
 
-      <div style="margin-top:12px;text-align:center">
-        <button id="startCareerBtn" class="btn btn-primary" style="font-size:16px;padding:12px 40px;border:none;cursor:pointer;">START CAREER</button>
+      <!-- Step 4: Traits & Personality -->
+      <div class="wizard-step hidden" data-step="4">
+        <div class="card-title" style="color:var(--accent)">Traits &amp; Personality</div>
+        <label>Special Trait (tap to select)</label>
+        <div id="traitGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px"></div>
+        <label style="margin-top:var(--space-3)">Personality</label>
+        <div id="personalityGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px"></div>
+      </div>
+
+      <!-- Step 5: Review -->
+      <div class="wizard-step hidden" data-step="5">
+        <div class="card-title" style="color:var(--accent)">Review Your Fighter</div>
+        <div id="reviewPreview" class="fighter-preview">
+          <div class="fp-name" id="reviewName">--</div>
+          <div class="fp-meta" id="reviewDetails">--</div>
+          <div style="margin-top:12px">
+            <div class="fp-attr-label">Physical Rating</div>
+            <div class="fp-attr-bar"><div id="reviewPhysBar" style="height:100%;width:50%;background:linear-gradient(90deg,#4a9eff,var(--accent));border-radius:3px;transition:width .3s"></div></div>
+            <div class="fp-attr-label">Mental Rating</div>
+            <div class="fp-attr-bar"><div id="reviewMentBar" style="height:100%;width:50%;background:linear-gradient(90deg,#8a4aff,#ff6a4a);border-radius:3px;transition:width .3s"></div></div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:var(--space-3)">
+          <button id="startCareerBtn" class="btn btn-primary btn-lg" style="width:100%">START CAREER</button>
+        </div>
+      </div>
+
+      <!-- Wizard Navigation -->
+      <div class="wizard-nav">
+        <button id="wizardBack" class="btn btn-ghost btn-sm">&larr; Back</button>
+        <span style="font-size:var(--text-xs);color:var(--text-dim)" id="wizardStepNum">1 / 5</span>
+        <button id="wizardNext" class="btn btn-primary btn-sm">Next &rarr;</button>
       </div>
     </div>
   </div>
 
-  <div id="screen-game" class="hidden">
+  <div id="screen-game" class="hidden screen">
     <div class="desktop-tabs" id="mainTabs">
       <div class="tab active" data-tab="home" onclick="switchTab('home')">Home</div>
       <div class="tab" data-tab="gym" onclick="switchTab('gym')">Gym</div>
@@ -316,6 +453,282 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
       <div class="tab" data-tab="career" onclick="switchTab('career')">Career</div>
       <div class="tab" data-tab="finance" onclick="switchTab('finance')">Finance</div>
     </div>
+
+    <!-- HOME TAB -->
+    <div id="tab-home" class="tab-content fade-in">
+      <div id="freeAgentBanner" class="hidden card card-highlight" style="text-align:center;border-color:var(--gold)">
+        <div class="card-title" style="color:var(--gold)">FREE AGENT</div>
+        <p style="font-size:13px;color:#ccc;margin-bottom:6px">You are not signed with any promotion. Sign a contract to start your career!</p>
+        <button class="btn btn-gold" onclick="showContractOffers()">VIEW CONTRACT OFFERS</button>
+      </div>
+      <div class="card">
+        <div class="flex-between">
+          <div><span class="stat-label">Record</span> <span class="stat-value" id="hRecord" style="font-size:18px">0-0-0</span></div>
+          <div><span class="tag tag-promo" id="hPromoTag">Regional</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rank</span><br><span class="stat-value" id="hRank" style="font-size:16px">#--</span></div>
+          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rating</span><br><span class="stat-value" id="hRating" style="font-size:16px">--</span></div>
+          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Net Worth</span><br><span class="stat-value" id="hNet" style="font-size:14px">$0</span></div>
+        </div>
+        <div class="stat-row"><span class="stat-label">Streak</span><span class="stat-value" id="hStreak">--</span></div>
+        <div class="stat-row"><span class="stat-label">Next Fight</span><span class="stat-value" id="hNextFight">Not booked</span></div>
+        <div class="stat-row"><span class="stat-label">Injuries</span><span class="stat-value" id="hInjuries">None</span></div>
+        <div class="stat-row"><span class="stat-label">Gym</span><span class="stat-value" id="hGym">None</span></div>
+        <div class="stat-row" id="hFatigueRow"><span class="stat-label">Fatigue</span><span class="stat-value" id="hFatigue">Rested</span></div>
+        <div class="stat-row"><span class="stat-label">Date</span><span class="stat-value" id="hDate">--</span></div>
+      </div>
+
+      <div id="nextActionCard" class="hidden next-action"></div>
+
+      <div class="card" id="advanceCard">
+        <div class="card-title" id="advanceTitle">Today: <span id="todayDay">Monday</span></div>
+        <div id="todayPreview" style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:6px"></div>
+        <div class="flex-row">
+          <button class="btn btn-primary btn-lg" onclick="advanceDay()" id="btnAdvanceDay">ADVANCE DAY</button>
+          <button class="btn btn-ghost btn-sm" onclick="advanceSkip(7)">+1 Week</button>
+          <button class="btn btn-ghost btn-sm" onclick="advanceSkip(30)">+1 Month</button>
+          <button class="btn btn-gold btn-sm hidden" id="btnFightDay" onclick="switchTab('fight')">GO TO FIGHT</button>
+        </div>
+        <div id="dayResult" class="hidden" style="margin-top:8px;font-size:var(--text-base)"></div>
+      </div>
+
+      <div id="promoOffer" class="hidden card card-highlight" style="border-color:var(--gold)">
+        <div class="card-title" style="color:var(--gold)">Promotion Offer!</div>
+        <div id="promoOfferText"></div>
+        <button class="btn btn-gold btn-sm" style="margin-top:6px" onclick="acceptPromotion()">Accept</button>
+      </div>
+
+      <div class="card" id="newsFeed">
+        <div class="card-title">MMA World News</div>
+        <div id="newsList" style="max-height:300px;overflow-y:auto;font-size:var(--text-sm)"></div>
+      </div>
+    </div>
+
+    <!-- GYM TAB -->
+    <div id="tab-gym" class="tab-content hidden fade-in">
+      <div class="card">
+        <div class="card-title">Gym: <span id="gymName">None</span></div>
+        <div id="gymInfo" style="color:var(--text-muted);font-size:var(--text-sm);margin-bottom:6px"></div>
+        <div class="flex-row">
+          <button class="btn btn-secondary btn-sm" onclick="showGymList()">Change Gym</button>
+          <span id="gymStatus" style="font-size:var(--text-sm);color:var(--text-muted)"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Training</div>
+        <div id="trainingStatus"></div>
+        <div id="fatigueBar" class="hidden" style="margin:6px 0;height:8px;background:var(--bg-elevated);border-radius:var(--radius-sm);overflow:hidden">
+          <div id="fatigueFill" style="height:100%;width:0%;border-radius:var(--radius-sm);transition:width .3s"></div>
+        </div>
+        <div class="flex-row" style="margin-top:6px;gap:4px" id="trainingActions">
+          <button class="btn btn-primary btn-sm hidden" id="btnStartTraining" onclick="showStartTraining()">Start Training</button>
+          <button class="btn btn-primary btn-sm hidden" id="btnStartCamp" onclick="showStartCamp()">Start Camp</button>
+          <button class="btn btn-danger btn-sm hidden" id="btnStopTraining" onclick="stopTraining()">Stop Training</button>
+          <button class="btn btn-secondary btn-sm hidden" id="btnEndCamp" onclick="endCamp()">End Camp</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Recovery <span id="filmStudyStatus" style="font-size:var(--text-xs);color:var(--text-muted);font-weight:400"></span></div>
+        <div class="flex-row" style="gap:4px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="doRecovery('ice_bath')">&#x2744; Ice Bath</button>
+          <button class="btn btn-ghost btn-sm" onclick="doRecovery('sports_massage')">&#x1F4AA; Massage</button>
+          <button class="btn btn-ghost btn-sm" onclick="doRecovery('nutrition_plan')">&#x1F966; Nutrition</button>
+          <button class="btn btn-ghost btn-sm" onclick="doRecovery('meditation')">&#x1F9D8; Meditation</button>
+          <button class="btn btn-ghost btn-sm" onclick="doFilmStudy()">&#x1F3AC; Film Study</button>
+        </div>
+      </div>
+
+      <div class="card" id="gymFightersCard" style="display:none">
+        <div class="card-title">Training Partners <span id="gymFighterCount" style="font-size:var(--text-xs);color:var(--text-muted);font-weight:400"></span></div>
+        <div id="gymFighterList" style="max-height:180px;overflow-y:auto;font-size:var(--text-sm)"></div>
+      </div>
+
+      <div class="card" id="scheduleCard">
+        <div class="card-title">Weekly Schedule</div>
+        <div id="scheduleGrid" class="schedule-grid"></div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px">Click a day to change the drill. Rest days auto-recover fatigue.</div>
+      </div>
+
+      <div id="trainResult" class="hidden card card-highlight" style="border-color:var(--success)"></div>
+    </div>
+
+    <!-- FIGHT TAB -->
+    <div id="tab-fight" class="tab-content hidden fade-in">
+      <div id="fightPre" class="card">
+        <div class="card-title">Available Opponents</div>
+        <div id="opponentList"></div>
+        <div id="noOpponents" class="hidden" style="color:var(--text-muted);font-size:var(--text-base);text-align:center;padding:12px">No available opponents right now. Advance time to find fights.</div>
+      </div>
+      <div id="scoutSection" class="card hidden card-highlight" style="border-color:#4a9eff">
+        <div class="flex-between"><div class="card-title">Scouting Report</div><span id="scoutLevel" style="font-size:var(--text-xs);color:var(--text-muted)"></span></div>
+        <div id="scoutBody" style="font-size:var(--text-sm);color:#ccc"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="scoutOpponent()">Spy on Next Opponent</button>
+      </div>
+
+      <div id="fightReady" class="hidden card card-highlight">
+        <div class="card-title" style="color:var(--gold)">Fight Week</div>
+        <div id="fightMatchup"></div>
+        <div style="margin-top:8px">
+          <label>Choose Your Strategy:</label>
+          <div id="stratSelect" class="strategy-grid"></div>
+          <button class="btn btn-primary btn-lg" id="btnStartFight" style="margin-top:8px;width:100%" onclick="startFight()">START FIGHT</button>
+        </div>
+      </div>
+
+      <div id="fightLive" class="hidden">
+        <div id="fightHealthBars" class="card" style="margin-bottom:6px;padding:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <div class="flex-between"><span id="f1NameBar" style="font-weight:700;font-size:var(--text-md);color:var(--text-primary)"></span><span id="f1StateBar" style="font-size:var(--text-xs)"></span></div>
+              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f1HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,#ff9a4a,#4aff6a)"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f1StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,#4a9eff)"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Blood</div><div class="blood-bar-outer"><div id="f1BloodBar" class="blood-bar-inner" style="width:0%"></div></div></div>
+              <div class="flex-row" style="margin-top:3px;gap:4px">
+                <span style="font-size:9px;color:var(--text-muted)">H:<span id="f1HeadBar" style="color:var(--accent)">100</span></span>
+                <span style="font-size:9px;color:var(--text-muted)">B:<span id="f1BodyBar" style="color:var(--accent)">100</span></span>
+                <span style="font-size:9px;color:var(--text-muted)">L:<span id="f1LegBar" style="color:var(--accent)">100</span></span>
+                <span style="font-size:9px;color:var(--text-muted)">Br:<span id="f1BreathBar" style="color:#e6e600">100</span></span>
+                <span id="f1CardioZone" style="font-size:9px">Aerobic</span>
+              </div>
+            </div>
+            <div>
+              <div class="flex-between"><span id="f2NameBar" style="font-weight:700;font-size:var(--text-md);color:var(--text-primary)"></span><span id="f2StateBar" style="font-size:var(--text-xs)"></span></div>
+              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f2HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,#4aff6a,#ff9a4a,#ff4a4a);float:right"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f2StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,#4a9eff,#ff4a4a);float:right"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Blood</div><div class="blood-bar-outer"><div id="f2BloodBar" class="blood-bar-inner" style="width:0%;float:right"></div></div></div>
+              <div class="flex-row" style="margin-top:3px;gap:4px;justify-content:flex-end">
+                <span style="font-size:9px;color:var(--text-muted)">H:<span id="f2HeadBar" style="color:var(--accent)">100</span></span>
+                <span style="font-size:9px;color:var(--text-muted)">B:<span id="f2BodyBar" style="color:var(--accent)">100</span></span>
+                <span style="font-size:9px;color:var(--text-muted)">L:<span id="f2LegBar" style="color:var(--accent)">100</span></span>
+                <span style="font-size:9px;color:var(--text-muted)">Br:<span id="f2BreathBar" style="color:#e6e600">100</span></span>
+                <span id="f2CardioZone" style="font-size:9px">Aerobic</span>
+              </div>
+            </div>
+          </div>
+          <div id="fightScoreBars" style="margin-top:8px;display:none">
+            <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px">
+              <div id="f1ScoreBar" style="flex:1;height:10px;background:#1a2a1a;border-radius:3px;overflow:hidden">
+                <div id="f1ScoreFill" style="height:100%;width:50%;background:var(--gold);border-radius:3px;transition:width .3s"></div>
+              </div>
+              <span id="scoreText" style="font-size:var(--text-xs);color:var(--gold);min-width:30px;text-align:center;font-weight:700">0-0</span>
+              <div id="f2ScoreBar" style="flex:1;height:10px;background:#2a1a1a;border-radius:3px;overflow:hidden">
+                <div id="f2ScoreFill" style="height:100%;width:50%;background:var(--gold);border-radius:3px;transition:width .3s;float:right"></div>
+              </div>
+            </div>
+          </div>
+          <div id="momentumDisplay" style="margin-top:6px;display:none">
+            <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-muted)">
+              <span id="f1MomentumLabel" style="flex:1;text-align:right"></span>
+              <div style="flex:2;height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden">
+                <div id="f1MomentumFill" style="height:100%;width:50%;background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:3px;transition:width .3s"></div>
+              </div>
+              <span style="width:20px;text-align:center">&#x26A1;</span>
+              <div style="flex:2;height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden">
+                <div id="f2MomentumFill" style="height:100%;width:50%;background:linear-gradient(90deg,var(--gold),#4a9eff);border-radius:3px;transition:width .3s;float:right"></div>
+              </div>
+              <span id="f2MomentumLabel" style="flex:1;text-align:left"></span>
+            </div>
+            <div id="crowdDisplay" style="font-size:9px;color:var(--text-muted);text-align:center;margin-top:2px"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="flex-between">
+            <div class="card-title" style="margin-bottom:0">LIVE FIGHT</div>
+            <div class="speed-row" id="speedControls">
+              <span style="font-size:var(--text-xs);color:var(--text-muted)">Speed:</span>
+              <button class="speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5x</button>
+              <button class="speed-btn active" data-speed="1" onclick="setSpeed(1)">1x</button>
+              <button class="speed-btn" data-speed="2" onclick="setSpeed(2)">2x</button>
+              <button class="speed-btn" data-speed="4" onclick="setSpeed(4)">4x</button>
+              <button class="speed-btn" data-speed="0" onclick="setSpeed(0)">Skip</button>
+            </div>
+          </div>
+          <div id="fightHeader" style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:4px;text-align:center"></div>
+        </div>
+        <div class="fight-log" id="fightLog"></div>
+        <div id="fightRoundReports" class="card hidden" style="margin-top:6px;background:#0d0d1a">
+          <div class="card-title" style="font-size:var(--text-sm);color:#aaa">Round Reports</div>
+          <div id="roundReports"></div>
+        </div>
+        <div id="fightStratPrompt" class="hidden card" style="margin-top:6px">
+          <div class="card-title" id="stratPromptTitle">Between Rounds</div>
+          <div id="stratPromptGrid" class="strategy-grid"></div>
+        </div>
+        <div id="fightResult" class="hidden card" style="margin-top:6px"></div>
+      </div>
+    </div>
+
+    <!-- CAREER TAB -->
+    <div id="tab-career" class="tab-content hidden fade-in">
+      <div class="card">
+        <div class="card-title">Record &amp; Ranking</div>
+        <div class="stat-row"><span class="stat-label">Record</span><span class="stat-value" id="cRecord">0-0-0</span></div>
+        <div class="stat-row"><span class="stat-label">By KO</span><span class="stat-value" id="cKOs">0</span></div>
+        <div class="stat-row"><span class="stat-label">By Submission</span><span class="stat-value" id="cSubs">0</span></div>
+        <div class="stat-row"><span class="stat-label">Current Rank</span><span class="stat-value" id="cRank">#--</span></div>
+        <div class="stat-row"><span class="stat-label">Peak Rank</span><span class="stat-value" id="cPeak">#--</span></div>
+        <div class="stat-row"><span class="stat-label">Promotion</span><span class="stat-value" id="cPromo">--</span></div>
+        <div class="stat-row"><span class="stat-label">Champion</span><span class="stat-value" id="cChampion" style="color:var(--gold)">No</span></div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between"><div class="card-title">Contract</div><div id="contractChampTag"></div></div>
+        <div class="stat-row"><span class="stat-label">Base Pay</span><span class="stat-value" id="cBasePay">$--</span></div>
+        <div class="stat-row"><span class="stat-label">Win Bonus</span><span class="stat-value" id="cWinBonus">$--</span></div>
+        <div class="stat-row"><span class="stat-label">Fights Left</span><span class="stat-value" id="cFightsLeft">--</span></div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between"><div class="card-title">Physical Attributes</div><span style="font-size:var(--text-xs);color:var(--text-muted)">Rating: <span id="cRating">--</span></span></div>
+        <div id="physAttrs"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Mental Attributes</div>
+        <div id="mentAttrs"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Fighter Info</div>
+        <div class="stat-row"><span class="stat-label">Nationality</span><span class="stat-value" id="cNation">--</span></div>
+        <div class="stat-row"><span class="stat-label">Region</span><span class="stat-value" id="cRegion">--</span></div>
+        <div class="stat-row"><span class="stat-label">Height / Reach</span><span class="stat-value" id="cHeight">--</span></div>
+        <div class="stat-row"><span class="stat-label">Age</span><span class="stat-value" id="cAge">--</span></div>
+        <div class="stat-row"><span class="stat-label">Trait</span><span class="stat-value" id="cTrait">--</span></div>
+        <div class="stat-row"><span class="stat-label">Personality</span><span class="stat-value" id="cPersonality">--</span></div>
+        <div class="stat-row"><span class="stat-label">Prime Status</span><span class="stat-value" id="cPrime">--</span></div>
+        <div class="stat-row"><span class="stat-label">Signature Strike</span><span class="stat-value" id="cSignature">--</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Career</div>
+        <div class="stat-row"><span class="stat-label">Title Defenses</span><span class="stat-value" id="cTitles">0</span></div>
+        <div class="stat-row"><span class="stat-label">Career Earnings</span><span class="stat-value" id="cEarnings">$0</span></div>
+        <div class="stat-row"><span class="stat-label">Rivalries</span><span class="stat-value" id="cRivalries">0</span></div>
+        <div class="stat-row"><span class="stat-label">Career Damage</span><span class="stat-value" id="cDamage">0</span></div>
+        <div class="stat-row"><span class="stat-label">Total Fights</span><span class="stat-value" id="cFights">0</span></div>
+        <div class="stat-row"><span class="stat-label">Awards</span><span class="stat-value" id="cAwards">None</span></div>
+      </div>
+    </div>
+
+    <!-- FINANCE TAB -->
+    <div id="tab-finance" class="tab-content hidden fade-in">
+      <div class="card">
+        <div class="card-title">Financial Overview</div>
+        <div class="stat-row"><span class="stat-label">Net Worth</span><span class="stat-value" id="fNet">$0</span></div>
+        <div class="stat-row"><span class="stat-label">Agent</span><span class="stat-value" id="fAgent">None</span></div>
+        <div class="stat-row"><span class="stat-label">Gym Dues</span><span class="stat-value" id="fGymCost">$0/mo</span></div>
+        <div class="stat-row"><span class="stat-label">Sponsorship</span><span class="stat-value" id="fSponsor">$0/mo</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Management</div>
+        <div class="flex-row">
+          <button class="btn btn-secondary btn-sm" onclick="showAgentList()">Hire/Fire Agent</button>
+          <button class="btn btn-secondary btn-sm" onclick="showGymList()">Change Gym</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
     <div id="tab-home" class="tab-content fade-in">
       <div id="freeAgentBanner" class="hidden card" style="border-color:#ffd700;text-align:center">
@@ -590,7 +1003,7 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
   </div>
 </div>
 
-<div class="bottom-tabs" id="bottomTabs">
+<div class="bottom-tabs hidden" id="bottomTabs">
   <button class="bottom-tab active" data-tab="home" onclick="switchTab('home')"><span class="tab-icon">&#x1F3E0;</span>Home</button>
   <button class="bottom-tab" data-tab="gym" onclick="switchTab('gym')"><span class="tab-icon">&#x1F4AA;</span>Gym</button>
   <button class="bottom-tab" data-tab="fight" onclick="switchTab('fight')"><span class="tab-icon">&#x1F94A;</span>Fight</button>
@@ -598,8 +1011,8 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
   <button class="bottom-tab" data-tab="finance" onclick="switchTab('finance')"><span class="tab-icon">&#x1F4B0;</span>Finance</button>
 </div>
 
-<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">">
-  <div class="modal" id="modalContent"></div>
+<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal-content scale-in" id="modalContent"></div>
 </div>
 
 <div id="toastContainer" class="toast-container"></div>
@@ -608,13 +1021,22 @@ label { display: block; color: #888; font-size: 12px; margin-bottom: 3px; margin
 const BASE = "";
 const urlParams = new URLSearchParams(window.location.search);
 const urlSid = urlParams.get("sid");
-let sid = urlSid || "sess_" + Math.random().toString(36).slice(2);
+let sid = urlSid || localStorage.getItem("mma_sid") || "";
 let state = null;
 let selectedStrategy = "aggressive_striking";
 let STRATS = [];
 let fightSpeed = 1;
 let fightReplaying = false;
 let fightPaused = false;
+let hasActiveGame = false;
+
+function ensureSid() {
+  if (!sid) {
+    sid = "sess_" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    localStorage.setItem("mma_sid", sid);
+  }
+  return sid;
+}
 
 async function api(path, data = {}) {
   try {
@@ -709,23 +1131,8 @@ async function init() {
   try {
     const resp = await api("/api/init");
     if (resp && resp.ready) {
-      qs("#headerStatus").textContent = `World loaded: ${resp.promotions.regional}R / ${resp.promotions.national}N / ${resp.promotions.world}W fighters`;
-      
-      if (urlSid) {
-        try {
-          const stateResp = await api("/api/state?sid=" + encodeURIComponent(sid));
-          if (stateResp && stateResp.fighter) {
-            state = stateResp;
-            if (state.strategies) STRATS = state.strategies;
-            qs("#screen-create").classList.add("hidden");
-            qs("#screen-game").classList.remove("hidden");
-            updateAllUI();
-            return;
-          }
-        } catch(e) {
-          console.log("No existing session, showing create form");
-        }
-      }
+      qs("#headerStatus").textContent = `World ready: ${resp.promotions.regional}R / ${resp.promotions.national}N / ${resp.promotions.world}W fighters`;
+      initMainMenu();
     } else {
       qs("#headerStatus").textContent = "Error: " + (resp ? resp.error : "Unknown");
     }
@@ -733,9 +1140,295 @@ async function init() {
     console.error("Init error:", e);
     qs("#headerStatus").textContent = "Error: " + e.message;
   }
-  if (qs("#screen-game").classList.contains("hidden")) {
-    initCreateForm();
+}
+
+async function initMainMenu() {
+  qs("#screen-main-menu").classList.remove("hidden");
+  qs("#screen-create").classList.add("hidden");
+  qs("#screen-game").classList.add("hidden");
+  qs("#bottomTabs").classList.add("hidden");
+  qs("#btnSettings").classList.add("hidden");
+  qs("#btnRefresh").classList.add("hidden");
+
+  const btnContinue = qs("#btnContinue");
+  btnContinue.style.display = "none";
+  qs("#mainMenuStatus").textContent = "";
+
+  if (sid) {
+    try {
+      const resp = await api("/api/has_save?sid=" + encodeURIComponent(sid));
+      if (resp && resp.has_save) {
+        btnContinue.style.display = "inline-block";
+        btnContinue.onclick = () => doContinue(resp.saves);
+        const saveCount = resp.saves.length;
+        qs("#mainMenuStatus").textContent = `${saveCount} save(s) found`;
+      } else {
+        qs("#mainMenuStatus").textContent = "No saves found. Start a new career!";
+      }
+    } catch(e) {
+      console.log("Save check failed:", e);
+      qs("#mainMenuStatus").textContent = "No saves found";
+    }
+  } else {
+    qs("#mainMenuStatus").textContent = "Start a new career!";
   }
+}
+
+async function doContinue(saves) {
+  let latest = saves[0];
+  for (const s of saves) {
+    if (s.updated_at > latest.updated_at) latest = s;
+  }
+  ensureSid();
+  try {
+    const resp = await api("/api/load_game", { sid, slot: latest.slot_index });
+    if (resp.success) {
+      state = resp.state;
+      if (state && state.strategies) STRATS = state.strategies;
+      showGameScreen();
+      updateAllUI();
+      toast("Welcome back!", "success");
+    } else {
+      toast(resp.error || "Failed to continue", "error");
+    }
+  } catch(e) {
+    toast("Failed to continue: " + e.message, "error");
+  }
+}
+
+function showGameScreen() {
+  qs("#screen-main-menu").classList.add("hidden");
+  qs("#screen-create").classList.add("hidden");
+  qs("#screen-game").classList.remove("hidden");
+  qs("#bottomTabs").classList.remove("hidden");
+  qs("#btnSettings").classList.remove("hidden");
+  qs("#btnRefresh").classList.remove("hidden");
+  hasActiveGame = true;
+  switchTab("home");
+}
+
+async function showLoadModal() {
+  await showSaveLoadModal("load");
+}
+
+async function showSaveModal() {
+  if (state && state.fighter && state.has_fight) {
+    toast("Cannot save during an active fight", "error");
+    return;
+  }
+  await showSaveLoadModal("save");
+}
+
+async function showSaveLoadModal(mode) {
+  ensureSid();
+  let html = `<div class="card-title" style="font-size:16px">${mode === 'save' ? 'Save Game' : 'Load Game'}</div>`;
+  let saves = [];
+  try {
+    const resp = await api("/api/list_saves?sid=" + encodeURIComponent(sid));
+    if (resp && resp.saves) saves = resp.saves;
+  } catch(e) {}
+  for (let i = 0; i < 3; i++) {
+    const slot = saves.find(s => s.slot_index === i);
+    const slotName = i === 0 ? "Auto-Save" : `Slot ${i}`;
+    if (slot) {
+      const timeAgo = timeSince(slot.updated_at);
+      const isFight = slot.in_fight ? ' <span style="color:#ffd700;font-size:11px">(in fight)</span>' : '';
+      html += `<div style="margin-bottom:8px;padding:10px;background:#1a1a2a;border-radius:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong style="color:#e62400;font-size:13px">${slotName}</strong>
+            <span style="font-size:12px;color:#ffd700;margin-left:6px">${slot.display_name || slot.fighter_name}</span>
+            <div style="font-size:12px;color:#ccc">${slot.fighter_name} — ${slot.record}</div>
+            <div style="font-size:11px;color:#888">${slot.promotion_name} | ${slot.game_date}${isFight}</div>
+            <div style="font-size:10px;color:#555">Saved ${timeAgo}</div>
+          </div>
+          <div style="text-align:right">
+            <button class="btn btn-primary btn-small" onclick="${mode === 'save' ? `overwriteSave(${i})` : `loadGame(${i})`}" style="min-width:60px;margin-bottom:4px">${mode === 'save' ? 'OVERWRITE' : 'LOAD'}</button>
+            <br>
+            <button class="btn btn-ghost btn-small" onclick="exportSave(${i})" style="min-width:60px;margin-bottom:4px;font-size:10px">EXPORT</button>
+            <br>
+            <button class="btn btn-danger btn-small" onclick="deleteSave(${i})" style="min-width:60px;font-size:10px">DELETE</button>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      html += `<div style="margin-bottom:8px;padding:10px;background:#1a1a2a;border-radius:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong style="color:#888;font-size:13px">${slotName}</strong>
+            <div style="font-size:12px;color:#555">Empty</div>
+          </div>
+          <button class="btn btn-secondary btn-small" onclick="${mode === 'save' ? `overwriteSave(${i})` : ''}" style="min-width:80px">${mode === 'save' ? 'SAVE HERE' : 'EMPTY'}</button>
+        </div>
+      </div>`;
+    }
+  }
+  html += `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+    <button class="btn btn-ghost btn-small" onclick="showImportModal()">IMPORT</button>
+    <button class="btn btn-secondary btn-small" onclick="closeModal(null)">CLOSE</button>
+  </div>`;
+  showModal(html);
+}
+
+async function overwriteSave(slotIndex) {
+  if (state && state.fighter && state.has_fight) {
+    toast("Cannot save during an active fight", "error");
+    return;
+  }
+  const slotName = slotIndex === 0 ? "Auto-Save" : `Slot ${slotIndex}`;
+  if (!confirm(`Save current career to ${slotName}?`)) return;
+  const btn = document.querySelector("#modalContent .btn-primary, #modalContent .btn-secondary");
+  if (btn) { btn.textContent = "Saving..."; btn.disabled = true; }
+  try {
+    const resp = await api("/api/save_game", { sid, slot: slotIndex, name: state && state.fighter ? state.fighter.name : "Career" });
+    if (resp.success) {
+      toast("Game saved!", "success");
+      closeModal(null);
+    } else {
+      toast(resp.error || "Save failed", "error");
+      if (btn) { btn.textContent = "OVERWRITE"; btn.disabled = false; }
+    }
+  } catch(e) {
+    toast("Save failed: " + e.message, "error");
+    if (btn) { btn.textContent = "OVERWRITE"; btn.disabled = false; }
+  }
+}
+
+async function loadGame(slotIndex) {
+  ensureSid();
+  const btn = document.querySelector("#modalContent .btn-primary") || document.querySelector("#modalContent .btn-secondary");
+  if (btn) { btn.textContent = "Loading..."; btn.disabled = true; }
+  try {
+    const resp = await api("/api/load_game", { sid, slot: slotIndex });
+    if (resp.success) {
+      state = resp.state;
+      if (state && state.strategies) STRATS = state.strategies;
+      closeModal(null);
+      showGameScreen();
+      updateAllUI();
+      toast("Game loaded!", "success");
+    } else {
+      toast(resp.error || "Load failed", "error");
+      if (btn) { btn.textContent = "LOAD"; btn.disabled = false; }
+    }
+  } catch(e) {
+    toast("Load failed: " + e.message, "error");
+    if (btn) { btn.textContent = "LOAD"; btn.disabled = false; }
+  }
+}
+
+async function deleteSave(slotIndex) {
+  if (!confirm("Delete this save? This cannot be undone.")) return;
+  try {
+    await api("/api/delete_save", { sid, slot: slotIndex });
+    toast("Save deleted", "success");
+    showSaveLoadModal(document.querySelector("#modalContent .btn-primary") ? "load" : "save");
+  } catch(e) {
+    toast("Delete failed: " + e.message, "error");
+  }
+}
+
+async function exportSave(slotIndex) {
+  try {
+    const resp = await api("/api/export_save", { sid, slot: slotIndex });
+    if (resp.success && resp.export) {
+      const blob = new Blob([JSON.stringify(resp.export, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mma_save_slot${slotIndex}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("Exported!", "success");
+    } else {
+      toast("Export failed", "error");
+    }
+  } catch(e) {
+    toast("Export failed: " + e.message, "error");
+  }
+}
+
+function showImportModal() {
+  let html = '<div class="card-title" style="font-size:16px">Import Save</div>';
+  html += '<div style="font-size:12px;color:#888;margin-bottom:8px">Select a previously exported .json save file.</div>';
+  html += '<input type="file" id="importFileInput" accept=".json" style="margin-bottom:8px">';
+  html += '<div style="margin-top:8px;display:flex;gap:6px">';
+  html += '<button class="btn btn-primary btn-small" onclick="doImport()">IMPORT</button>';
+  html += '<button class="btn btn-secondary btn-small" onclick="closeModal(null)">CANCEL</button>';
+  html += '</div>';
+  showModal(html);
+}
+
+async function doImport() {
+  const input = qs("#importFileInput");
+  if (!input || !input.files || !input.files[0]) {
+    toast("Select a file first", "error");
+    return;
+  }
+  try {
+    const text = await input.files[0].text();
+    const data = JSON.parse(text);
+    ensureSid();
+    const resp = await api("/api/import_save", { sid, slot: 1, data });
+    if (resp.success) {
+      toast("Save imported to Slot 1!", "success");
+      closeModal(null);
+    } else {
+      toast(resp.error || "Import failed", "error");
+    }
+  } catch(e) {
+    toast("Import failed: " + e.message, "error");
+  }
+}
+
+function showOptionsModal() {
+  let html = '<div style="text-align:center">';
+  html += '<div style="font-size:24px;font-weight:900;color:#e62400;margin-bottom:20px">OPTIONS</div>';
+  html += '<div style="color:#888;font-size:12px;margin-bottom:20px">MMA Life Simulator v1.0</div>';
+  html += '<button class="btn btn-secondary" style="margin-bottom:8px;width:80%;max-width:250px" onclick="closeModal(null)">CLOSE</button>';
+  html += '</div>';
+  showModal(html);
+}
+
+function showSettingsModal() {
+  let html = '<div style="text-align:center">';
+  html += '<div style="font-size:24px;font-weight:900;color:#e62400;margin-bottom:20px">SETTINGS</div>';
+  if (state && state.fighter && !state.has_fight) {
+    html += `<button class="btn btn-gold" style="margin-bottom:8px;width:80%;max-width:250px" onclick="showSaveModal()">SAVE GAME</button><br>`;
+  }
+  html += `<button class="btn btn-secondary" style="margin-bottom:8px;width:80%;max-width:250px" onclick="showLoadModal()">LOAD GAME</button><br>`;
+  html += `<button class="btn btn-danger" style="width:80%;max-width:250px" onclick="returnToMenu()">MAIN MENU</button><br><br>`;
+  html += `<button class="btn btn-ghost btn-small" onclick="closeModal(null)">CLOSE</button>`;
+  html += '</div>';
+  showModal(html);
+}
+
+function returnToMenu() {
+  if (!confirm("Return to main menu? Unsaved progress will be lost.")) return;
+  closeModal(null);
+  state = null;
+  hasActiveGame = false;
+  qs("#screen-game").classList.add("hidden");
+  qs("#bottomTabs").classList.add("hidden");
+  qs("#btnSettings").classList.add("hidden");
+  qs("#btnRefresh").classList.add("hidden");
+  initMainMenu();
+}
+
+function timeSince(julianDay) {
+  if (!julianDay) return "recently";
+  // Julian day to JS date: JD - 2440587.5 = Unix days
+  const unixDays = julianDay - 2440587.5;
+  const unixMs = unixDays * 86400000;
+  const now = Date.now();
+  const diffMs = now - unixMs;
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 function initCreateForm() {
@@ -748,6 +1441,60 @@ function initCreateForm() {
   natSel.addEventListener('change', updateRegions);
   natSel.addEventListener('input', updateRegions);
 
+  // Weight class grid (Step 2)
+  const wcGrid = qs("#wcGrid");
+  const WC_DATA = [
+    {idx:0, name:"Flyweight", weight:"125 lbs"},
+    {idx:1, name:"Bantamweight", weight:"135 lbs"},
+    {idx:2, name:"Featherweight", weight:"145 lbs"},
+    {idx:3, name:"Lightweight", weight:"155 lbs"},
+    {idx:4, name:"Welterweight", weight:"170 lbs"},
+    {idx:5, name:"Middleweight", weight:"185 lbs"},
+    {idx:6, name:"Lt Heavyweight", weight:"205 lbs"},
+    {idx:7, name:"Heavyweight", weight:"265 lbs"},
+  ];
+  wcGrid.innerHTML = "";
+  WC_DATA.forEach(w => {
+    const card = document.createElement("div");
+    card.className = "wc-card" + (w.idx === 3 ? " selected" : "");
+    card.innerHTML = `<div class="wc-name">${w.name}</div><div class="wc-weight">${w.weight}</div>`;
+    card.onclick = () => {
+      wcGrid.querySelectorAll(".wc-card").forEach(c => c.classList.remove("selected"));
+      card.classList.add("selected");
+      qs("#fWeightClass").value = w.idx;
+    };
+    wcGrid.appendChild(card);
+  });
+
+  // Background grid (Step 3)
+  const bgGrid = qs("#bgGrid");
+  const BG_DATA = [
+    {id:"mma", short:"MMA", desc:"All-Rounder"},
+    {id:"wrestling", short:"Wrestling", desc:"Takedowns & Control"},
+    {id:"bjj", short:"BJJ", desc:"Submissions"},
+    {id:"muay_thai", short:"Muay Thai", desc:"Clinch & Strikes"},
+    {id:"boxing", short:"Boxing", desc:"Striking & Footwork"},
+    {id:"judo", short:"Judo", desc:"Throws & Clinch"},
+    {id:"taekwondo", short:"Taekwondo", desc:"Kicks & Range"},
+    {id:"karate", short:"Karate", desc:"Speed & Precision"},
+    {id:"sambo", short:"Sambo", desc:"Mixing it up"},
+    {id:"kickboxing", short:"Kickboxing", desc:"Stand-up Striker"},
+    {id:"capoeira", short:"Capoeira", desc:"Unorthodox"},
+  ];
+  bgGrid.innerHTML = "";
+  BG_DATA.forEach(b => {
+    const card = document.createElement("div");
+    card.className = "wc-card" + (b.id === "mma" ? " selected" : "");
+    card.innerHTML = `<div class="wc-name">${b.short}</div><div class="wc-weight">${b.desc}</div>`;
+    card.onclick = () => {
+      bgGrid.querySelectorAll(".wc-card").forEach(c => c.classList.remove("selected"));
+      card.classList.add("selected");
+      qs("#fBackground").value = b.id;
+    };
+    bgGrid.appendChild(card);
+  });
+
+  // Trait grid (Step 4)
   const tGrid = qs("#traitGrid");
   const TRAITS = [
     {id:"heavy_hands",name:"Heavy Hands",desc:"+5 striking power"},
@@ -773,6 +1520,7 @@ function initCreateForm() {
     tGrid.appendChild(btn);
   });
 
+  // Personality grid (Step 4)
   const pGrid = qs("#personalityGrid");
   const PERSONALITIES = [
     {id:"charismatic",name:"Charismatic",desc:"Natural charisma"},
@@ -800,6 +1548,9 @@ function initCreateForm() {
   const lasts = ["Smith","Jones","Miller","Garcia","Lee","Kim","Brown","Davis","Wilson","Taylor","Anderson","Thomas","Jackson","White","Harris","Martin","Thompson","Moore","Allen","King","Walker","Wright","Hill","Green","Adams"];
   const nicks = ["The Viper","Iron","Destroyer","Phoenix","Nightmare","Predator","Beast","Dragon","Renegade","Warrior","Samurai","Gladiator","Hurricane","Avalanche","Titan","Fury","Hammer","Blitz","Storm","Shadow"];
   qs("#fName").value = firsts[Math.floor(Math.random()*firsts.length)] + ' "' + nicks[Math.floor(Math.random()*nicks.length)] + '" ' + lasts[Math.floor(Math.random()*lasts.length)];
+
+  // Initialize wizard
+  initWizard();
 }
 
 function updateRegions() {
@@ -848,6 +1599,14 @@ document.getElementById('startCareerBtn').addEventListener('click', async functi
   createFighter();
 });
 
+document.getElementById('btnNewGame').addEventListener('click', function() {
+  qs("#screen-main-menu").classList.add("hidden");
+  qs("#screen-create").classList.remove("hidden");
+  initCreateForm();
+});
+
+document.getElementById('btnLoadGame').addEventListener('click', showLoadModal);
+
 init();
 
 async function createFighter() {
@@ -855,6 +1614,7 @@ async function createFighter() {
   btn.textContent = "Creating...";
   btn.disabled = true;
   try {
+    ensureSid();
     const name = qs("#fName").value.trim() || "";
     const age = parseInt(qs("#fAge").value);
     const bg = qs("#fBackground").value;
@@ -871,8 +1631,11 @@ async function createFighter() {
     if (resp.success) {
       state = resp.state;
       if (state.strategies) STRATS = state.strategies;
-      qs("#screen-create").classList.add("hidden");
-      qs("#screen-game").classList.remove("hidden");
+      if (resp.sid) {
+        sid = resp.sid;
+        localStorage.setItem("mma_sid", sid);
+      }
+      showGameScreen();
       updateAllUI();
       toast("Fighter created! Welcome to the pros.", "success");
     } else {
@@ -1681,6 +2444,65 @@ function updateFighterState(nameBar, stateBar, state) {
   }
 }
 
+let _currentWizardStep = 1;
+const WIZARD_LABELS = ["", "Identity", "Physical", "Background", "Traits & Personality", "Review"];
+
+function showWizardStep(step) {
+  _currentWizardStep = step;
+  document.querySelectorAll('.wizard-step').forEach(el => el.classList.add('hidden'));
+  const stepEl = document.querySelector(`.wizard-step[data-step="${step}"]`);
+  if (stepEl) stepEl.classList.remove('hidden');
+  document.querySelectorAll('.wizard-dot').forEach(d => {
+    const ds = parseInt(d.dataset.step);
+    d.className = 'wizard-dot' + (ds === step ? ' active' : ds < step ? ' done' : '');
+  });
+  qs("#wizardStepLabel").textContent = `Step ${step}: ${WIZARD_LABELS[step]}`;
+  qs("#wizardStepNum").textContent = `${step} / 5`;
+  qs("#wizardBack").style.display = step === 1 ? "none" : "";
+  qs("#wizardNext").textContent = step === 5 ? "" : "Next →";
+  qs("#startCareerBtn").parentElement.classList.toggle("hidden", step !== 5);
+  qs("#wizardNext").parentElement.classList.toggle("hidden", step === 5);
+  if (step === 5) updateReviewPreview();
+}
+
+function initWizard() {
+  showWizardStep(1);
+  qs("#wizardNext").onclick = () => {
+    if (_currentWizardStep < 5) {
+      if (validateWizardStep(_currentWizardStep)) showWizardStep(_currentWizardStep + 1);
+    }
+  };
+  qs("#wizardBack").onclick = () => {
+    if (_currentWizardStep > 1) showWizardStep(_currentWizardStep - 1);
+  };
+}
+
+function validateWizardStep(step) {
+  if (step === 1) {
+    if (!qs("#fName").value.trim()) { toast("Enter a fighter name", "error"); return false; }
+  }
+  if (step === 2) {
+    if (!qs("#fWeightClass").value && !document.querySelector('.wc-card.selected')) { toast("Select a weight class", "error"); return false; }
+  }
+  return true;
+}
+
+function updateReviewPreview() {
+  const name = qs("#fName").value.trim() || "Fighter";
+  qs("#reviewName").textContent = name;
+  const age = qs("#fAge").value;
+  const bg = qs("#fBackground").value;
+  const wcIdx = parseInt(qs("#fWeightClass").value) || 3;
+  const wcNames = ["Flyweight","Bantamweight","Featherweight","Lightweight","Welterweight","Middleweight","Lt Heavyweight","Heavyweight"];
+  const wcName = wcNames[wcIdx] || "Lightweight";
+  const nat = qs("#fNationality").value;
+  const traitBtn = qs("#traitGrid .selected");
+  const traitName = traitBtn ? traitBtn.dataset.trait : "None";
+  qs("#reviewDetails").textContent = `${age}yo | ${wcName} | ${nat} | ${bg} | Trait: ${traitName}`;
+  qs("#reviewPhysBar").style.width = Math.floor(30 + Math.random() * 30) + "%";
+  qs("#reviewMentBar").style.width = Math.floor(30 + Math.random() * 30) + "%";
+}
+
 let _roundScores = [];
 
 async function replayFightEvents(fightResult) {
@@ -1820,12 +2642,12 @@ async function showStrategyPrompt(data) {
     const f2n = data.f2Name || "Opponent";
     statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;background:#1a1a2a;border-radius:6px;padding:8px;font-size:11px">
       <div><strong style="color:#e62400">${escHtml(f1n)}</strong><br>
-        <span title="Significant Strikes Landed / Total Actions">Sig Strikes: ${s1.sig_strikes}</span><br>
+        <span title="Significant Strikes Landed / Total Thrown">Strikes: ${s1.sig_strikes}/${s1.strikes_thrown || s1.sig_strikes} (${Math.round(s1.sig_strikes / Math.max(1, s1.strikes_thrown || s1.sig_strikes) * 100)}%)</span><br>
         Takedowns: ${s1.takedowns}/${s1.takedowns_attempted || s1.takedowns}<br>
         Sub Att: ${s1.sub_attempts || 0}<br>
         Fatigue: ${s1.fatigue || 0}%</div>
       <div><strong style="color:#4a9eff">${escHtml(f2n)}</strong><br>
-        <span title="Significant Strikes Landed / Total Actions">Sig Strikes: ${s2.sig_strikes}</span><br>
+        <span title="Significant Strikes Landed / Total Thrown">Strikes: ${s2.sig_strikes}/${s2.strikes_thrown || s2.sig_strikes} (${Math.round(s2.sig_strikes / Math.max(1, s2.strikes_thrown || s2.sig_strikes) * 100)}%)</span><br>
         Takedowns: ${s2.takedowns}/${s2.takedowns_attempted || s2.takedowns}<br>
         Sub Att: ${s2.sub_attempts || 0}<br>
         Fatigue: ${s2.fatigue || 0}%</div>
@@ -1870,6 +2692,27 @@ async function completeFight() {
     resultDiv.classList.remove("hidden");
     const f = state.fighter;
     let extraHtml = "";
+
+    const fd = resp.fight_details;
+    if (fd && fd.f1_details) {
+      extraHtml += `<div style="margin-top:8px;padding:8px;background:#14141f;border-radius:6px;font-size:12px">
+        <span style="color:#fff;font-weight:600">Fight Statistics</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px">
+          <div style="color:#888">Strikes</div>
+          <div style="color:#e62400;text-align:center">${fd.f1_details.sig_strikes}/${fd.f1_details.strikes_thrown}</div>
+          <div style="color:#4a9eff;text-align:center">${fd.f2_details.sig_strikes}/${fd.f2_details.strikes_thrown}</div>
+          <div style="color:#888">Takedowns</div>
+          <div style="color:#e62400;text-align:center">${fd.f1_details.takedowns}/${fd.f1_details.takedowns_attempted}</div>
+          <div style="color:#4a9eff;text-align:center">${fd.f2_details.takedowns}/${fd.f2_details.takedowns_attempted}</div>
+          <div style="color:#888">Sub Attempts</div>
+          <div style="color:#e62400;text-align:center">${fd.f1_details.submissions}</div>
+          <div style="color:#4a9eff;text-align:center">${fd.f2_details.submissions}</div>
+          <div style="color:#888">Knockdowns</div>
+          <div style="color:#e62400;text-align:center">${fd.f1_details.knockdowns}</div>
+          <div style="color:#4a9eff;text-align:center">${fd.f2_details.knockdowns}</div>
+        </div>
+      </div>`;
+    }
 
     const milestones = resp.milestones || [];
     if (milestones.length) {
@@ -2001,7 +2844,7 @@ async function refreshFinanceTab() {
   if (!fin) return;
   qs("#fNet").textContent = `$${(fin.net_worth || 0).toLocaleString()}`;
   qs("#fAgent").textContent = fin.agent || "None";
-  const gymCost = fin.gym !== "None" ? 500 : 0;
+  const gymCost = fin.gym_fee || (fin.gym !== "None" ? 500 : 0);
   qs("#fGymCost").textContent = `$${gymCost}/mo`;
   qs("#fSponsor").textContent = `$${(fin.sponsorship || 0).toLocaleString()}/mo`;
 }

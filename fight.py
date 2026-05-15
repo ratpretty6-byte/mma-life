@@ -128,23 +128,23 @@ class Referee:
         # Eye injuries
         for eye in ["left_eye", "right_eye"]:
             eye_health = fighter.get_zone_health_pct(eye)
-            if eye_health < 8:
+            if eye_health < 3:
                 return f"Doctor stoppage: {fighter.name}'s {eye.replace('_', ' ')} is too damaged"
 
         # Jaw injuries
         jaw_health = fighter.get_zone_health_pct("jaw")
-        if jaw_health < 5:
+        if jaw_health < 2:
             return f"Doctor stoppage: {fighter.name}'s jaw is broken"
 
-        if state.get("swelling", 0) > 95:
+        if state.get("swelling", 0) > 97:
             return f"Doctor stoppage: Severe swelling on {fighter.name}"
 
         # Leg damage doctor check — can barely stand
         lead_dmg = state.get("lead_leg_damage", 0)
         rear_dmg = state.get("rear_leg_damage", 0)
-        if lead_dmg > 80 and rear_dmg > 80:
+        if lead_dmg > 90 and rear_dmg > 90:
             return f"Doctor stoppage: {fighter.name} can barely stand on damaged legs"
-        if (lead_dmg + rear_dmg) / 2 > 75 and random.random() < 0.3:
+        if (lead_dmg + rear_dmg) / 2 > 85 and random.random() < 0.15:
             return f"Doctor stoppage: {fighter.name}'s legs are too damaged to continue"
 
         return None
@@ -463,6 +463,8 @@ class Fight:
         self.f2_round_snap_sig = 0
         self.f1_round_snap_td = 0
         self.f2_round_snap_td = 0
+        self.f1_round_snap_td_att = 0
+        self.f2_round_snap_td_att = 0
         self.f1_round_snap_grapple = 0.0
         self.f2_round_snap_grapple = 0.0
         self.f1_round_snap_sub = 0
@@ -504,7 +506,9 @@ class Fight:
             "body_fatigue": 0,
             "vision_impairment": 0,
             "significant_strikes_landed": 0,
+            "strikes_thrown": 0,
             "takedowns_landed": 0,
+            "takedowns_attempted": 0,
             "guard_passes": 0,
             "submissions_attempted": 0,
             "unanswered_ground_strikes": 0,
@@ -620,12 +624,13 @@ class Fight:
     # ============================================================
 
     def _track_head_damage(self, fighter: Fighter, damage: float):
+        divisor = 2.0
         if fighter == self.fighter1:
-            self.f1_head_damage += damage / 1.5
+            self.f1_head_damage += damage / divisor
             self.f1_state["damage_taken_log"].append({"type": "head", "damage": damage, "round": self.current_round})
             self._update_ko_stage(self.fighter1, self.f1_state, self.f1_head_damage)
         else:
-            self.f2_head_damage += damage / 1.5
+            self.f2_head_damage += damage / divisor
             self.f2_state["damage_taken_log"].append({"type": "head", "damage": damage, "round": self.current_round})
             self._update_ko_stage(self.fighter2, self.f2_state, self.f2_head_damage)
 
@@ -661,7 +666,7 @@ class Fight:
 
     def _check_ko_or_tko(self, fighter: Fighter, damage: float, zone_mult: float) -> bool:
         """Check if current damage warrants a KO/TKO. Returns True if fight is over."""
-        if self.current_round < 2:
+        if self.current_round < 2 and random.random() < 0.90:
             return False
         is_f1 = fighter == self.fighter1
         head_damage = self.f1_head_damage if is_f1 else self.f2_head_damage
@@ -695,9 +700,8 @@ class Fight:
             self.win_round = self.current_round
             return True
 
-        # Stage 3 with big flush shot: potential TKO
         if pct >= 0.80 and self._last_severity in ("Flush", "Devastating"):
-            if random.random() < 0.3:  # 30% chance to call it off
+            if random.random() < 0.25:
                 self.winner = opponent
                 self.loser = fighter
                 self.win_method = "TKO (Strikes)"
@@ -707,8 +711,7 @@ class Fight:
         return False
 
     def _track_ko_accumulation(self, fighter: Fighter, damage: float, zone_mult: float):
-        # No KOs in round 1 to prevent instant finishes
-        if self.current_round < 2:
+        if self.current_round < 2 and random.random() < 0.90:
             return
         if self._check_ko_or_tko(fighter, damage, zone_mult):
             loser = self.loser
@@ -751,6 +754,8 @@ class Fight:
             self.f2_round_snap_sig = self.f2_state.get("significant_strikes_landed", 0)
             self.f1_round_snap_td = self.f1_state.get("takedowns_landed", 0)
             self.f2_round_snap_td = self.f2_state.get("takedowns_landed", 0)
+            self.f1_round_snap_td_att = self.f1_state.get("takedowns_attempted", 0)
+            self.f2_round_snap_td_att = self.f2_state.get("takedowns_attempted", 0)
             self.f1_round_snap_grapple = self.f1_state.get("effective_grappling_points", 0.0)
             self.f2_round_snap_grapple = self.f2_state.get("effective_grappling_points", 0.0)
             self.f1_round_snap_sub = self.f1_state.get("submissions_attempted", 0)
@@ -824,7 +829,7 @@ class Fight:
 
                 self._simulate_action(phase=phase)
 
-                if not self.winner and round_num >= 2 and action_idx > 0 and action_idx % 15 == 0 and random.random() < 0.3:
+                if not self.winner and round_num >= 3 and action_idx > 0 and action_idx % 20 == 0 and random.random() < 0.12:
                     for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
                         stop_reason = self.referee.check_doctor_stoppage(fighter, state, self)
                         if stop_reason:
@@ -840,6 +845,13 @@ class Fight:
                                    "text": f"Doctor stoppage! {self.winner.name} wins by {self.win_method}!",
                                    "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
                                    "time": self._get_time_str()}
+                            d = self._get_fight_details()
+                            yield {"type": "complete", "winner": self.winner.name,
+                                   "method": self.win_method, "round": self.win_round,
+                                   "f1_health": self._get_display_health(self.fighter1),
+                                   "f2_health": self._get_display_health(self.fighter2),
+                                   "total_scores": self._get_total_scores(),
+                                   "f1_details": d["f1"], "f2_details": d["f2"]}
                             return
 
                 # Yield action result with time stamp
@@ -932,6 +944,14 @@ class Fight:
                     loss_reaction = self.commentary.generate_post_fight_loss(self.loser, self.winner)
                     if loss_reaction:
                         yield {"type": "post_fight_reaction", "text": loss_reaction}
+                details = self._get_fight_details()
+                yield {"type": "complete", "winner": self.winner.name if self.winner else "Draw",
+                       "method": self.win_method, "round": self.win_round,
+                       "f1_health": self._get_display_health(self.fighter1),
+                       "f2_health": self._get_display_health(self.fighter2),
+                       "total_scores": self._get_total_scores(),
+                       "f1_details": details["f1"],
+                       "f2_details": details["f2"]}
                 return
 
             if round_num >= 2:
@@ -956,6 +976,13 @@ class Fight:
                                "f1_total_score": self._get_total_score_for(1),
                                "f2_total_score": self._get_total_score_for(2),
                                "total_scores": self._get_total_scores()}
+                        d = self._get_fight_details()
+                        yield {"type": "complete", "winner": self.winner.name,
+                               "method": self.win_method, "round": self.win_round,
+                               "f1_health": self._get_display_health(self.fighter1),
+                               "f2_health": self._get_display_health(self.fighter2),
+                               "total_scores": self._get_total_scores(),
+                               "f1_details": d["f1"], "f2_details": d["f2"]}
                         return
 
             # Round ending
@@ -993,11 +1020,13 @@ class Fight:
                 f2_sub = self.f2_state.get("submissions_attempted", 0) - self.f2_round_snap_sub
                 f1_att = self.f1_round_attempts - self.f1_start_attempts
                 f2_att = self.f2_round_attempts - self.f2_start_attempts
-                f1_td_att = self.f1_state.get("takedowns_landed", 0) - self.f1_round_snap_td
-                f2_td_att = self.f2_state.get("takedowns_landed", 0) - self.f2_round_snap_td
+                f1_td_att = self.f1_state.get("takedowns_attempted", 0) - self.f1_round_snap_td_att
+                f2_td_att = self.f2_state.get("takedowns_attempted", 0) - self.f2_round_snap_td_att
+                f1_strikes_thrown = self.f1_state.get("strikes_thrown", 0) - self.f1_round_snap_sig
+                f2_strikes_thrown = self.f2_state.get("strikes_thrown", 0) - self.f2_round_snap_sig
                 yield {"type": "strategy_prompt", "round": round_num,
-                       "f1_stats": {"sig_strikes": f1_sig, "strikes_attempted": f1_att, "takedowns": f1_td, "takedowns_attempted": max(f1_td, f1_att // 6), "fatigue": round(f1_fat), "sub_attempts": f1_sub, "grapple_points": round(f1_gp, 1)},
-                       "f2_stats": {"sig_strikes": f2_sig, "strikes_attempted": f2_att, "takedowns": f2_td, "takedowns_attempted": max(f2_td, f2_att // 6), "fatigue": round(f2_fat), "sub_attempts": f2_sub, "grapple_points": round(f2_gp, 1)},
+                       "f1_stats": {"sig_strikes": f1_sig, "strikes_thrown": max(f1_sig, f1_strikes_thrown), "strikes_attempted": f1_att, "takedowns": f1_td, "takedowns_attempted": max(f1_td, f1_td_att), "fatigue": round(f1_fat), "sub_attempts": f1_sub, "grapple_points": round(f1_gp, 1)},
+                       "f2_stats": {"sig_strikes": f2_sig, "strikes_thrown": max(f2_sig, f2_strikes_thrown), "strikes_attempted": f2_att, "takedowns": f2_td, "takedowns_attempted": max(f2_td, f2_td_att), "fatigue": round(f2_fat), "sub_attempts": f2_sub, "grapple_points": round(f2_gp, 1)},
                        "f1_total_score": self._get_total_score_for(1),
                        "f2_total_score": self._get_total_score_for(2),
                        "f1_health": self._get_display_health(self.fighter1),
@@ -1006,10 +1035,10 @@ class Fight:
                        "f2Name": self.fighter2.name,
                        "score_detail": f"{int(f1_avg)}-{int(f2_avg)}"}
 
-            if round_num >= 2 and round_num < self.rounds and not self.winner:
+            if round_num >= 3 and round_num < self.rounds and not self.winner:
                 for fighter, state in [(self.fighter1, self.f1_state), (self.fighter2, self.f2_state)]:
                     stop_reason = self.referee.check_doctor_stoppage(fighter, state, self)
-                    if stop_reason and random.random() < 0.5:
+                    if stop_reason and random.random() < (0.10 if self.is_title_fight else 0.12):
                         self.winner = self.fighter2 if fighter == self.fighter1 else self.fighter1
                         self.loser = fighter
                         self.win_method = "TKO (Doctor Stoppage)"
@@ -1022,6 +1051,13 @@ class Fight:
                                "text": f"Doctor stoppage! {self.winner.name} wins by {self.win_method}!",
                                "winner": self.winner.name, "method": self.win_method, "round": self.current_round,
                                "time": self._get_time_str()}
+                        d = self._get_fight_details()
+                        yield {"type": "complete", "winner": self.winner.name,
+                               "method": self.win_method, "round": self.win_round,
+                               "f1_health": self._get_display_health(self.fighter1),
+                               "f2_health": self._get_display_health(self.fighter2),
+                               "total_scores": self._get_total_scores(),
+                               "f1_details": d["f1"], "f2_details": d["f2"]}
                         return
 
             if round_num < self.rounds and not self.winner:
@@ -1038,11 +1074,14 @@ class Fight:
                    "f1_health": self._get_display_health(self.fighter1),
                    "f2_health": self._get_display_health(self.fighter2)}
 
+        details = self._get_fight_details()
         yield {"type": "complete", "winner": self.winner.name if self.winner else "Draw",
                "method": self.win_method, "round": self.win_round,
                "f1_health": self._get_display_health(self.fighter1),
                "f2_health": self._get_display_health(self.fighter2),
-               "total_scores": self._get_total_scores()}
+               "total_scores": self._get_total_scores(),
+               "f1_details": details["f1"],
+               "f2_details": details["f2"]}
 
     # ============================================================
     # TIMING
@@ -1547,13 +1586,13 @@ class Fight:
             weights = {k: v * 0.7 for k, v in weights.items()}
             weights["strike"] = weights.get("strike", 0.7) * 1.3  # Jab-heavy early
         elif phase in ("urgency", "finish_hunt"):
-            weights["takedown"] *= 0.5  # Less takedowns when desperate
+            weights["takedown"] *= 0.85
             weights["clinch"] *= 0.6
 
         # Position adjustments
         if pos == Position.DISTANCE:
             weights["strike"] *= 1.5
-            weights["takedown"] *= 0.6
+            weights["takedown"] *= 1.0
         elif pos == Position.POCKET:
             weights["strike"] *= 1.2
         elif pos == Position.CLINCH:
@@ -1732,6 +1771,10 @@ class Fight:
                         strike_type, target, strategy, phase, state_mods,
                         combo_bonus=0.0, stamina_mult=1.0):
         """Execute a strike with full damage calculation."""
+        if attacker == self.fighter1:
+            self.f1_state["strikes_thrown"] = self.f1_state.get("strikes_thrown", 0) + 1
+        else:
+            self.f2_state["strikes_thrown"] = self.f2_state.get("strikes_thrown", 0) + 1
         profile = STRIKE_PROFILES.get(strike_type, STRIKE_PROFILES["jab"])
 
         is_kick = "kick" in strike_type
@@ -2082,9 +2125,13 @@ class Fight:
             self._transition_fighter_state(defender, def_state, "STUNNED")
 
         # Check for knockdown (KO threshold) — minimum round 2 before KOs
-        if self.current_round >= 2 and tier["name"] == "Devastating" and target in ("head", "jaw", "temple"):
-            self._check_knockdown(attacker, defender, atk_state, def_state, target, actual_damage,
-                                   atk_state["fatigue_level"], strike_type)
+        if self.current_round >= 2 and target in ("head", "jaw", "temple"):
+            severity = tier["name"]
+            head_pct = defender.get_group_health("head")
+            if (severity == "Devastating" or
+                (severity in ("Flush", "Solid") and head_pct <= 25)):
+                self._check_knockdown(attacker, defender, atk_state, def_state, target, actual_damage,
+                                       atk_state["fatigue_level"], strike_type)
 
         # If knockdown happened, update the strike log entry with a DROPS marker
         if def_state.get("knockdown", False):
@@ -2283,7 +2330,6 @@ class Fight:
             machine.state = new_state
             state["state"] = new_state
 
-            # Commentary on state transitions
             if new_state == "HURT":
                 self.fight_log.append(f"{fighter.name} is hurt!")
             elif new_state == "ROCKED":
@@ -2316,8 +2362,9 @@ class Fight:
         else:
             success = self.position_system.attempt_takedown(attacker, defender, fatigue, td_mod=td_mod, tda_mod=tda_mod, wd_mod=wd_mod, weight_advantage=weight_advantage, att_leg_mod=att_leg_mod, def_leg_mod=def_leg_mod)
 
+        att_state["takedowns_attempted"] = att_state.get("takedowns_attempted", 0) + 1
         self._apply_stamina_cost(
-            self._get_attacker_state(attacker),
+            att_state,
             "takedown_attempt", fatigue,
             attacker.get_effective_attribute("cardio", fatigue)
         )
@@ -2416,7 +2463,7 @@ class Fight:
         top_cardio = top.get_effective_attribute("cardio", fatigue)
 
         # Guard pass attempt
-        if pos == Position.GROUND_GUARD and pt > 4 and random.random() < 0.35:
+        if pos == Position.GROUND_GUARD and pt > 4 and random.random() < 0.45:
             if self.position_system.pass_guard(top, bottom, fatigue):
                 self.fight_log.append(self.commentary.generate_ground_transition_commentary(
                     "pass_guard", fighter=top.name, opponent=bottom.name))
@@ -2429,7 +2476,7 @@ class Fight:
         # Side control → mount
         elif pos == Position.GROUND_SIDE:
             if pt > 3:
-                if random.random() < 0.3 and self.position_system.advance_to_mount(top, bottom, fatigue):
+                if random.random() < 0.4 and self.position_system.advance_to_mount(top, bottom, fatigue):
                     self.fight_log.append(self.commentary.generate_ground_transition_commentary(
                         "mount", fighter=top.name, opponent=bottom.name))
                     top_state["effective_grappling_points"] += 5.0
@@ -2455,7 +2502,7 @@ class Fight:
                 return
 
         # Submission attempt from top
-        sub_chance = action_weights.get("submission", 0.3) * (1.3 if pos in (Position.GROUND_SIDE, Position.GROUND_MOUNT) else 1.0)
+        sub_chance = 0.15 * (1.4 if pos in (Position.GROUND_SIDE, Position.GROUND_MOUNT) else 1.0)
         if random.random() < sub_chance:
             self._simulate_submission_attempt(top, bottom, fatigue, strategy, pos)
         else:
@@ -2464,15 +2511,21 @@ class Fight:
     def _process_ground_bottom_action(self, top, bottom, top_state, bottom_state, fatigue, strategy, pos, pt):
         bottom_cardio = bottom.get_effective_attribute("cardio", fatigue)
 
-        # Guard submissions from bottom
-        if pos == Position.GROUND_GUARD and pt > 3 and random.random() < 0.25:
-            if random.random() < 0.4:
+        just_kd = bottom_state.get("knockdown", False)
+        kd_penalty = 0.5 if just_kd else 1.0
+        head_pct = bottom.get_group_health("head")
+        health_penalty = 1.0 - max(0, (55 - head_pct) / 100) * 0.5 if head_pct < 55 else 1.0
+        escape_mod = kd_penalty * health_penalty
+
+        # Guard submissions from bottom — less likely when hurt
+        if pos == Position.GROUND_GUARD and pt > 3 and random.random() < 0.14 * escape_mod:
+            if random.random() < 0.28:
                 self._simulate_submission_attempt(bottom, top, fatigue, strategy, pos)
                 return
 
-        # Sweep attempts
         pos_bonus = 1.0 if pos == Position.GROUND_GUARD else (0.7 if pos == Position.GROUND_SIDE else (0.4 if pos == Position.GROUND_MOUNT else 0.2))
-        if random.random() < 0.4 * pos_bonus:
+        sweep_chance = 0.28 * pos_bonus * escape_mod
+        if random.random() < sweep_chance:
             if self.position_system.sweep_from_bottom(bottom, top, fatigue):
                 self.fight_log.append(self.commentary.generate_ground_transition_commentary(
                     "sweep", bottom=bottom.name, top=top.name))
@@ -2482,14 +2535,18 @@ class Fight:
             else:
                 self.fight_log.append(f"{bottom.name} tries to sweep but {top.name} defends.")
         else:
-            if self.position_system.stand_up_from_bottom(bottom, top, fatigue):
-                self.fight_log.append(self.commentary.generate_ground_transition_commentary(
-                    "stand_up", fighter=bottom.name))
-                bottom_state["effective_grappling_points"] += 2.0
-                bottom_state["unanswered_ground_strikes"] = 0
-                self._apply_stamina_cost(bottom_state, "stand_up", fatigue, bottom_cardio)
+            stand_chance = 0.28 * escape_mod
+            if random.random() < stand_chance:
+                if self.position_system.stand_up_from_bottom(bottom, top, fatigue):
+                    self.fight_log.append(self.commentary.generate_ground_transition_commentary(
+                        "stand_up", fighter=bottom.name))
+                    bottom_state["effective_grappling_points"] += 2.0
+                    bottom_state["unanswered_ground_strikes"] = 0
+                    self._apply_stamina_cost(bottom_state, "stand_up", fatigue, bottom_cardio)
+                else:
+                    self.fight_log.append(f"{bottom.name} tries to stand but {top.name} keeps them down.")
             else:
-                self.fight_log.append(f"{bottom.name} tries to stand but {top.name} keeps them down.")
+                self.fight_log.append(f"{bottom.name} covers up on the ground, trying to survive.")
 
     def _simulate_ground_strike(self, attacker, defender, atk_state, def_state, fatigue, strategy, pos=Position.GROUND_GUARD):
         strike_type = random.choice(["hammerfist", "elbow", "punch"])
@@ -2534,13 +2591,11 @@ class Fight:
         just_kd = def_state.get("knockdown", False)
 
         if just_kd:
-            # Post-knockdown: fighter is already hurt/dazed, faster stoppage
-            side_tko = 5
-            mount_tko = 4
-            warning_map = {3: "close_mount"}
+            side_tko = 14
+            mount_tko = 10
+            warning_map = {5: "close_mount", 8: "mount"}
         else:
-            # Takedown: must dominate a fresh fighter — much higher threshold
-            side_tko = 18
+            side_tko = 22
             mount_tko = 14
             warning_map = {8: "watching", 12: "mount", 15: "survival"}
 
@@ -2584,11 +2639,11 @@ class Fight:
     # ============================================================
 
     def _get_available_subs(self, pos, attacker_is_top=True) -> list:
-        guard_subs_top = ["kimura", "d'arce choke", "americana"]
-        guard_subs_bottom = ["triangle choke", "armbar", "guillotine"]
-        side_subs = ["kimura", "d'arce choke", "armbar"]
-        mount_subs = ["armbar", "mounted triangle"]
-        back_subs = ["rear naked choke"]
+        guard_subs_top = ["kimura", "d'arce choke", "americana", "arm triangle", "gogoplata"]
+        guard_subs_bottom = ["triangle choke", "armbar", "guillotine", "omoplata", "kimura"]
+        side_subs = ["kimura", "d'arce choke", "armbar", "arm triangle", "americana"]
+        mount_subs = ["armbar", "mounted triangle", "americana", "arm triangle"]
+        back_subs = ["rear naked choke", "armbar"]
 
         if pos == Position.GROUND_GUARD:
             return guard_subs_top if attacker_is_top else guard_subs_bottom
@@ -2598,9 +2653,11 @@ class Fight:
             return mount_subs
         elif pos == Position.GROUND_BACK:
             return back_subs
-        return ["armbar"]
+        return ["armbar", "kimura"]
 
     def _simulate_submission_attempt(self, attacker, defender, fatigue, strategy, pos=Position.GROUND_GUARD):
+        if self.current_round < 2 and random.random() < 0.90:
+            return
         top = self.position_system.top_fighter
         attacker_is_top = (attacker == top)
         available = self._get_available_subs(pos, attacker_is_top)
@@ -2622,6 +2679,16 @@ class Fight:
                      Position.GROUND_MOUNT: 1.4, Position.GROUND_BACK: 1.7}
         pb = pos_bonus.get(pos, 1.0)
 
+        # Weight class modifier for submissions: heavier = less flexible = harder to sub
+        weight_class = attacker.weight_class
+        sub_weight_mod = 1.0
+        if weight_class in ("Heavyweight",):
+            sub_weight_mod = 0.85
+        elif weight_class in ("Light Heavyweight",):
+            sub_weight_mod = 0.92
+        elif weight_class in ("Flyweight", "Bantamweight"):
+            sub_weight_mod = 1.15
+
         # Get correct defensive state
         if attacker == self.fighter1:
             def_state = self.f2_state
@@ -2631,11 +2698,10 @@ class Fight:
         threat_key = submission
         current_threat = def_state.get("submission_threat", {}).get(threat_key, 0)
 
-        # Submission threat builds with more realistic formula
-        base_threat = (sub_off * 0.1 - sub_def * 0.05) * pb
+        base_threat = (sub_off * 0.135 - sub_def * 0.025) * pb
         mental_resistance = mental / 250.0
         cardio_resistance = cardio / 200.0
-        threat_increment = base_threat * (1.0 - mental_resistance * 0.3) * (1.0 - cardio_resistance * 0.2)
+        threat_increment = base_threat * (1.0 - mental_resistance * 0.3) * (1.0 - cardio_resistance * 0.2) * sub_weight_mod
         threat_increment += random.uniform(-2, 5)
 
         # Previous threats decay slower (0.6x instead of 0.7x)
@@ -2662,7 +2728,7 @@ class Fight:
         defender_health = (defender.get_group_health("head") + defender.get_group_health("body")) / 200.0
         health_urgency = max(0.5, 1.0 + (1.0 - defender_health) * 0.5)
 
-        success_chance = max(2, min(60, (new_threat * 1.1 - sub_def * defense_factor * 0.12) * pb * health_urgency))
+        success_chance = max(5, min(65, (new_threat * 1.9 - sub_def * defense_factor * 0.065) * pb * health_urgency))
 
         if random.random() * 100 <= success_chance:
             self.fight_log.append(self.commentary.generate_ground_commentary(
@@ -2731,6 +2797,16 @@ class Fight:
             for cut in state.get("cuts", []):
                 if random.random() < 0.2:
                     cut["severity"] = min(1.0, cut["severity"] * 1.3)
+
+            # Head damage recovery between rounds (corner work)
+            head_damage = self.f1_head_damage if idx == 0 else self.f2_head_damage
+            head_recovery = head_damage * 0.20
+            if is_title_round and round_num >= 4:
+                head_recovery *= 0.5
+            if idx == 0:
+                self.f1_head_damage = max(0, self.f1_head_damage - head_recovery)
+            else:
+                self.f2_head_damage = max(0, self.f2_head_damage - head_recovery)
 
             # Reset combo tracking
             state["combo_count"] = 0
@@ -2822,7 +2898,7 @@ class Fight:
         # Decide whether to chase to the ground or let them back up
         atk_agg = attacker.get_effective_attribute("aggression", atk_state["fatigue_level"])
         atk_fiq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
-        finish_chance = min(0.9, 0.50 + (atk_agg / 200.0) + (atk_fiq / 300.0))
+        finish_chance = min(0.65, 0.40 + (atk_agg / 300.0) + (atk_fiq / 400.0))
 
         if random.random() < finish_chance:
             self.fight_log.append(f"{defender.name} goes down! {attacker.name} swarms, looking for the finish!")
@@ -2852,8 +2928,7 @@ class Fight:
         f2_avg = sum(j.scores[-1][1] for j in self.judges) / 3.0
         score_text = f"{int(f1_avg)}-{int(f2_avg)}"
 
-        # Enhanced scoring commentary (Phase 4A)
-        rd = self._gather_round_data()
+        # Enhanced scoring commentary
         f1_damage = self._calc_effective_striking(self.fighter1, self.f1_state)
         f2_damage = self._calc_effective_striking(self.fighter2, self.f2_state)
         f1_grapple = self._calc_effective_grappling(self.fighter1, self.f1_state)
@@ -3121,6 +3196,22 @@ class Fight:
         f1_total = self._get_total_score_for(1)
         f2_total = self._get_total_score_for(2)
         return {self.fighter1.name: f1_total, self.fighter2.name: f2_total}
+
+    def _get_fight_details(self) -> dict:
+        def stats_for(state, fighter):
+            return {
+                "sig_strikes": state.get("significant_strikes_landed", 0),
+                "strikes_thrown": state.get("strikes_thrown", 0),
+                "takedowns": state.get("takedowns_landed", 0),
+                "takedowns_attempted": state.get("takedowns_attempted", 0),
+                "submissions": state.get("submissions_attempted", 0),
+                "knockdowns": state.get("knockdown_count", 0),
+                "guard_passes": state.get("guard_passes", 0),
+            }
+        return {
+            "f1": stats_for(self.f1_state, self.fighter1),
+            "f2": stats_for(self.f2_state, self.fighter2),
+        }
 
     def _get_display_health(self, fighter: Fighter) -> dict:
         """Format health display for the frontend."""

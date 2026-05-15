@@ -7,12 +7,23 @@ from events import EventSystem
 from generator import generate_single_fighter
 import random
 import copy
+import math
 import utils
 
 class WorldSimulator:
     def __init__(self, promotions: List[Promotion]):
         self.promotions = promotions
         self.month_counter = 0
+        self._init_champions()
+
+    def _init_champions(self):
+        for promo in self.promotions:
+            promo.update_rankings()
+            for wc in promo.weight_classes:
+                if wc not in promo.champions or promo.champions.get(wc) is None:
+                    ranked = promo.rankings.get(wc, [])
+                    if ranked:
+                        promo.set_champion(ranked[0])
 
     def simulate_month(self, game_date: datetime, event_sys: EventSystem) -> List[Dict]:
         results = []
@@ -32,6 +43,9 @@ class WorldSimulator:
         # Replenish thin divisions: if any weight class has < 15 fighters, generate more
         replenish_news = self._replenish_thin_divisions(game_date)
         results.extend(replenish_news)
+
+        # Age all fighters by ~1 month
+        self._simulate_aging()
 
         # Retirement simulation
         retirement_news = self._simulate_retirements(game_date)
@@ -93,39 +107,45 @@ class WorldSimulator:
                     })
         return news
 
+    def _simulate_aging(self):
+        for promo in self.promotions:
+            for fighter in promo.fighters:
+                if not fighter.retired:
+                    fighter.age += 1 / 12.0
+
     def _simulate_retirements(self, game_date: datetime) -> List[Dict]:
         news = []
         for promo in self.promotions:
             for fighter in promo.fighters[:]:
                 if fighter.retired:
                     continue
-                if fighter.age >= 40:
+                if fighter.age >= 38:
                     fighter.retired = True
                     fighter.retirement_date = game_date
                     news.append({
                         "type": "retirement",
                         "fighter": fighter.name,
-                        "age": fighter.age,
+                        "age": int(fighter.age),
                         "record": fighter.get_record_string(),
                         "legacy_score": 0,
                     })
-                elif fighter.age >= 37 and fighter.loss_streak >= 3 and random.random() < 0.15:
+                elif fighter.age >= 35 and fighter.loss_streak >= 3 and random.random() < 0.25:
                     fighter.retired = True
                     fighter.retirement_date = game_date
                     news.append({
                         "type": "retirement",
                         "fighter": fighter.name,
-                        "age": fighter.age,
+                        "age": int(fighter.age),
                         "record": fighter.get_record_string(),
                         "legacy_score": 0,
                     })
-                elif fighter.career_ko_losses >= 3 and random.random() < 0.05:
+                elif fighter.career_ko_losses >= 3 and random.random() < 0.10:
                     fighter.retired = True
                     fighter.retirement_date = game_date
                     news.append({
                         "type": "retirement",
                         "fighter": fighter.name,
-                        "age": fighter.age,
+                        "age": int(fighter.age),
                         "record": fighter.get_record_string(),
                         "legacy_score": 0,
                     })
@@ -179,6 +199,13 @@ class WorldSimulator:
         winner = fight.winner
         method = fight.win_method or "Draw"
         win_round = fight.win_round or 0
+
+        # Track career damage
+        for orig, f_copy in [(f1, f1_copy), (f2, f2_copy)]:
+            head_pct = f_copy.get_group_health("head")
+            body_pct = f_copy.get_group_health("body")
+            damage_taken = (100 - head_pct) * 0.5 + (100 - body_pct) * 0.3
+            orig.career_damage_taken = getattr(orig, "career_damage_taken", 0.0) + damage_taken
 
         news_item = {
             "type": "fight_result",

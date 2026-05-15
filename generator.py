@@ -100,7 +100,7 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
     # Generate group-level talent modifiers (correlated attributes within groups)
     group_mods = {}
     for group_name, attrs in ATTRIBUTE_GROUPS.items():
-        group_mods[group_name] = utils.gaussian_random(0, 8, -15, 15)
+        group_mods[group_name] = utils.gaussian_random(0, 5, -10, 10)
 
     for attr in fighter.PHYSICAL_ATTRS + fighter.MENTAL_ATTRS:
         if attr not in fighter.attributes:
@@ -115,9 +115,17 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
 
         group_mod = group_mods.get(attr_group, 0)
         # Per-attribute variance ±5 around the group baseline
-        per_attr_var = utils.gaussian_random(0, 5, -10, 10)
+        per_attr_var = utils.gaussian_random(0, 3, -6, 6)
         new_val = utils.clamp(base_val + group_mod + per_attr_var, utils.ATTR_MIN, utils.ATTR_MAX)
         fighter.attributes[attr] = new_val
+
+    # Ensure minimum durability for all fighters to prevent glass jaws
+    fighter.attributes["durability"] = max(fighter.attributes.get("durability", 0), 40)
+    fighter.attributes["mental_toughness"] = max(fighter.attributes.get("mental_toughness", 0), 35)
+    fighter.attributes["heart"] = max(fighter.attributes.get("heart", 0), 35)
+    fighter.attributes["composure"] = max(fighter.attributes.get("composure", 0), 30)
+    fighter.attributes["aggression"] = max(fighter.attributes.get("aggression", 0), 25)
+    fighter.attributes["fight_iq"] = max(fighter.attributes.get("fight_iq", 0), 20)
 
     # Apply archetype stat profile
     profile = ARCHETYPE_PROFILES.get(archetype, {})
@@ -139,8 +147,6 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
             fighter.attributes[attr_spec] = utils.clamp(
                 fighter.attributes[attr_spec] + val, utils.ATTR_MIN, utils.ATTR_MAX)
 
-    fighter.archetype = pick_archetype(fighter.attributes)
-
     rating = fighter.get_overall_rating()
     if rating >= 70:
         w, l = utils.gaussian_random(15, 5, 5, 30), utils.gaussian_random(3, 2, 0, 10)
@@ -156,12 +162,27 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
     fighter.draws = random.choices([0, 1, 2], weights=[80, 15, 5])[0]
     fighter.knockouts = int(fighter.wins * random.uniform(0.3, 0.7))
     fighter.submissions = int(fighter.wins * random.uniform(0.1, 0.4))
-    fighter.win_streak = min(fighter.wins, random.randint(0, fighter.wins))
-    fighter.loss_streak = min(fighter.losses, random.randint(0, fighter.losses))
+    max_streak = random.randint(0, max(fighter.wins, fighter.losses))
+    if random.random() < 0.6:
+        fighter.win_streak = min(fighter.wins, max_streak)
+        fighter.loss_streak = 0
+    else:
+        fighter.loss_streak = min(fighter.losses, max_streak)
+        fighter.win_streak = 0
     fighter.confidence = 50 + fighter.win_streak * 5 - fighter.loss_streak * 8
     fighter.confidence = utils.clamp(fighter.confidence, 10, 100)
     fighter.net_worth = fighter.wins * random.randint(1000, 10000) + random.randint(0, 50000)
     fighter.months_inactive = random.randint(1, 8)
+
+    # Cap starting fights based on age for realism
+    max_starting_fights = max(3, fighter.age - 15)
+    if fighter.wins + fighter.losses > max_starting_fights:
+        total_fights = fighter.wins + fighter.losses
+        ratio = fighter.wins / max(1, total_fights)
+        fighter.wins = int(max_starting_fights * ratio)
+        fighter.losses = max_starting_fights - fighter.wins
+        fighter.knockouts = min(fighter.knockouts, fighter.wins)
+        fighter.submissions = min(fighter.submissions, fighter.wins)
 
     return fighter
 
@@ -189,15 +210,15 @@ def assign_to_promotions(fighters: List[Fighter], promotions: List[Promotion]):
             f.attributes[attr] = max(f.attributes[attr], 25)
 
 def generate_fighters(total: int = 8000) -> List[Fighter]:
-    weight_probs = [0.10, 0.12, 0.14, 0.18, 0.16, 0.14, 0.10, 0.06]
+    weight_probs = [0.10, 0.12, 0.14, 0.18, 0.16, 0.14, 0.10, 0.10]
     fighters = []
     weight_classes = utils.WEIGHT_CLASSES
     for i in range(total):
         wc_idx = random.choices(range(len(weight_classes)), weights=weight_probs)[0]
         wc = weight_classes[wc_idx]
         weight_lbs = random.randint(wc["min"], wc["max"])
-        skill_mean = utils.gaussian_random(50, 10, 25, 75)
-        skill_std = utils.gaussian_random(15, 3, 8, 22)
+        skill_mean = utils.gaussian_random(55, 8, 35, 75)
+        skill_std = utils.gaussian_random(10, 3, 5, 16)
         # Reject extreme stat variance — max-min difference must be <= 50
         for attempt in range(3):
             fighter = generate_single_fighter(weight_lbs, skill_mean, skill_std)

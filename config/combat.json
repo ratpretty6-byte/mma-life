@@ -1,0 +1,111 @@
+{
+  "_comment": "MMA Life Simulator — Combat Balance Config (tuned against real UFC 2010+ stats)",
+  "round": {
+    "duration": 300,
+    "championship_rounds": 5,
+    "regular_rounds": 3
+  },
+  "stamina_costs": {
+    "jab": 1, "cross": 2, "hook": 3, "uppercut": 3,
+    "kick": 5, "knee": 4, "elbow": 3,
+    "hammerfist": 2, "punch": 2, "superman_punch": 4,
+    "takedown_attempt": 6, "clinch_attempt": 3,
+    "ground_strike": 2, "submission_attempt": 4,
+    "stand_up": 5, "sweep": 4, "pass_guard": 3,
+    "advance_mount": 3, "take_back": 4
+  },
+  "strike_profiles": {
+    "jab":       {"base_damage": 5,  "speed": 1.4, "stamina_cost": 1,  "range": "pocket",  "targets": ["head", "body", "jaw"]},
+    "cross":     {"base_damage": 8,  "speed": 1.0, "stamina_cost": 2,  "range": "pocket",  "targets": ["head", "body", "jaw"]},
+    "hook":      {"base_damage": 11, "speed": 0.7, "stamina_cost": 3,  "range": "pocket",  "targets": ["head", "body", "jaw"]},
+    "uppercut":  {"base_damage": 9,  "speed": 0.8, "stamina_cost": 3,  "range": "pocket",  "targets": ["head", "body", "jaw"]},
+    "kick":      {"base_damage": 13, "speed": 0.5, "stamina_cost": 5,  "range": "distance", "targets": ["head", "body", "legs"]},
+    "knee":      {"base_damage": 10, "speed": 0.7, "stamina_cost": 4,  "range": "clinch",   "targets": ["head", "body"]},
+    "elbow":     {"base_damage": 11, "speed": 0.9, "stamina_cost": 3,  "range": "clinch",   "targets": ["head", "body", "jaw"]},
+    "hammerfist":{"base_damage": 7,  "speed": 0.9, "stamina_cost": 2,  "range": "ground",   "targets": ["head", "body"]},
+    "punch":     {"base_damage": 6,  "speed": 1.0, "stamina_cost": 2,  "range": "ground",   "targets": ["head", "body"]},
+    "superman_punch": {"base_damage": 10, "speed": 0.6, "stamina_cost": 4, "range": "pocket", "targets": ["head", "body"]}
+  },
+  "target_damage_modifiers": {
+    "body": 0.8, "ribs": 0.8,
+    "solar_plexus": 0.9,
+    "liver": 1.1,
+    "legs": 0.55,
+    "jaw": 1.2, "temple": 1.2,
+    "nose": 0.85
+  },
+  "severity_tiers": [
+    {"name": "Blocked", "min_accuracy": 0, "max_accuracy": 15, "defense_reduction": 0.9, "knockdown_chance": 0},
+    {"name": "Glancing", "min_accuracy": 15, "max_accuracy": 30, "defense_reduction": 0.6, "knockdown_chance": 0},
+    {"name": "Clean", "min_accuracy": 30, "max_accuracy": 55, "defense_reduction": 0.3, "knockdown_chance": 0.0008},
+    {"name": "Solid", "min_accuracy": 55, "max_accuracy": 75, "defense_reduction": 0.15, "knockdown_chance": 0.004},
+    {"name": "Flush", "min_accuracy": 75, "max_accuracy": 90, "defense_reduction": 0.05, "knockdown_chance": 0.016},
+    {"name": "Devastating", "min_accuracy": 90, "max_accuracy": 101, "defense_reduction": 0, "knockdown_chance": 0.065}
+  ],
+  "critical_hit": {
+    "base_chance": 0.03,
+    "fight_iq_multiplier": 0.001,
+    "combo_counter_bonus": 0.05,
+    "damage_multiplier": 1.8
+  },
+  "combo": {
+    "power_bonus_base": 0.1,
+    "stamina_multiplier": 1.2,
+    "feint_bonus_rate": 0.03,
+    "max_combo_strikes": 2,
+    "accuracy_penalty_per_strike": 0.07
+  },
+  "ko_system": {
+    "no_ko_round_1": true,
+    "chin_resistance_durability_weight": 0.30,
+    "chin_resistance_mental_toughness_weight": 0.25,
+    "chin_resistance_composure_weight": 0.20,
+    "chin_resistance_heart_weight": 0.15,
+    "chin_resistance_aggression_weight": 0.10,
+    "age_decline_start": 30,
+    "age_decline_rate": 0.005,
+    "chin_resistance_multiplier": 2.0,
+    "_head_damage_divisor": 2.0,
+    "_stage3_tko_chance": 0.25,
+    "_chase_down_cap": 0.65,
+    "_ko_threshold_pct": 1.0
+  },
+  "head_damage_accumulation": {
+    "_note": "Head damage = raw_damage / divisor. Recovery = accumulated * 0.30 between rounds.",
+    "divisor": 2.0,
+    "between_round_recovery_pct": 20,
+    "title_round_penalty": 0.5
+  },
+  "ground_tko": {
+    "_note": "Unanswered ground strikes needed for ref stoppage",
+    "after_kd_side_control": 14,
+    "after_kd_mount": 10,
+    "normal_side_control": 22,
+    "normal_mount": 14
+  },
+  "recovery": {
+    "stamina_between_rounds_base": 15,
+    "stamina_between_rounds_percent": 0.12,
+    "title_fight_recovery_penalty": 0.33,
+    "breathing_recovery_between_rounds": 10,
+    "breathing_recovery_title_deep": 5
+  },
+  "submission": {
+    "base_defense_factor": 0.30,
+    "mental_factor_weight": 0.8,
+    "cardio_factor_weight": 0.3,
+    "sub_def_factor_weight": 0.20,
+    "_threat_multiplier_clean": 2.5,
+    "_defense_reduction": 0.055,
+    "min_success_chance": 5,
+    "max_success_chance": 70,
+    "retained_threat_multiplier": 0.6,
+    "retain_threat_chance": 0.4,
+    "attempt_cooldown": 25
+  },
+  "balance_targets_3r_even": {
+    "ko_tko_pct": 31.3,
+    "submission_pct": 18.0,
+    "decision_pct": 49.4
+  }
+}

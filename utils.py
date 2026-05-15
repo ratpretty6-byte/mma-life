@@ -1,6 +1,22 @@
 from typing import Dict, List, Optional, Tuple
 import random
 import math
+import json
+import os
+
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
+_config_cache: Dict[str, dict] = {}
+
+def load_config(name: str) -> dict:
+    if name in _config_cache:
+        return _config_cache[name]
+    path = os.path.join(CONFIG_DIR, f"{name}.json")
+    if os.path.exists(path):
+        with open(path) as f:
+            cfg = json.load(f)
+        _config_cache[name] = cfg
+        return cfg
+    return {}
 
 WEIGHT_CLASSES = [
     {"name": "Flyweight", "min": 125, "max": 125},
@@ -242,7 +258,7 @@ def get_age_modifier(age: int) -> float:
     return 1.0
 
 
-def calculate_strength_of_schedule(wins: int, losses: int, opponent_ratings: List[float]) -> float:
+def calculate_strength_of_schedule(opponent_ratings: List[float]) -> float:
     if not opponent_ratings:
         return 0.0
     avg_opp = sum(opponent_ratings) / len(opponent_ratings)

@@ -98,9 +98,11 @@ class Promotion:
         for wc in self.weight_classes:
             fighters = self.rankings[wc]
             scored = []
+            div_ratings = [f2.get_overall_rating() for f2 in fighters]
             for f in fighters:
-                opp_ratings = [50.0]
-                sos = utils.calculate_strength_of_schedule(f.wins, f.losses, opp_ratings)
+                others = [r for r in div_ratings if r != f.get_overall_rating()]
+                opp_ratings = others if others else [f.get_overall_rating()]
+                sos = utils.calculate_strength_of_schedule(opp_ratings)
 
                 # Momentum bonus for win streaks
                 momentum_bonus = 0

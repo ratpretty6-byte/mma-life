@@ -7,12 +7,14 @@ import urllib.parse
 import traceback
 import random
 import copy
+import secrets
 from datetime import datetime, timedelta
 from threading import Lock, Thread
 import time
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
+from persistence import init_db, save_world_state, load_world_state, save_session, load_session, delete_session, cleanup_stale_sessions, save_to_slot, load_from_slot, list_saves, delete_save, export_save, import_save, SaveIncompatibleError
 from fighter import Fighter
 from training import TrainingSystem, TrainingCamp, DAYS_OF_WEEK
 from promotion import Promotion, create_promotions
@@ -30,36 +32,63 @@ import utils
 
 init_lock = Lock()
 gs = {"initialized": False}
+_gs_lock = Lock()
+
+def _gs_set(key, value):
+    with _gs_lock:
+        gs[key] = value
+
+def _gs_get(key, default=None):
+    with _gs_lock:
+        return gs.get(key, default)
 
 def ensure_initialized():
-    if gs.get("initialized"):
+    if _gs_get("initialized"):
         return
     with init_lock:
-        if gs.get("initialized"):
+        if _gs_get("initialized"):
             return
-        print("Initializing game world with 500 fighters...")
-        weight_classes = [wc["name"] for wc in utils.WEIGHT_CLASSES]
-        promotions = create_promotions(weight_classes)
-        world, national, regional = promotions
-        all_fighters = generate_fighter_pool(promotions, 3000)
-        gs["sessions"] = {}
-        gs["sessions_lock"] = Lock()
-        gs["promotions"] = promotions
-        gs["world"] = world
-        gs["national"] = national
-        gs["regional"] = regional
-        gs["all_fighters"] = all_fighters
-        gs["world_sim"] = WorldSimulator(promotions)
-        gs["world_news"] = []
-        MAX_NEWS = 200
-        gs["initialized"] = True
-        print("Game world ready!")
+        try:
+            init_db()
+            existing = load_world_state()
+            if existing:
+                promotions, all_fighters, world_sim, world_news = existing
+                world, national, regional = promotions
+                print(f"Loaded existing world: {len(all_fighters)} fighters, {len(promotions)} promotions")
+            else:
+                print("Generating new game world...")
+                weight_classes = [wc["name"] for wc in utils.WEIGHT_CLASSES]
+                promotions = create_promotions(weight_classes)
+                world, national, regional = promotions
+                all_fighters = generate_fighter_pool(promotions, 3000)
+                world_news = []
+                save_world_state(promotions, all_fighters)
+                world_sim = WorldSimulator(promotions)
+            with _gs_lock:
+                gs["sessions"] = {}
+                gs["sessions_lock"] = Lock()
+                gs["promotions"] = promotions
+                gs["world"] = world
+                gs["national"] = national
+                gs["regional"] = regional
+                gs["all_fighters"] = all_fighters
+                gs["world_sim"] = world_sim or WorldSimulator(promotions)
+                gs["world_news"] = world_news or []
+                gs["initialized"] = True
+            print("Game world ready!")
+        except Exception as e:
+            print(f"INIT FAILED: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
 def get_or_create_session(session_id):
-    sl = gs.get("sessions_lock")
+    sl = _gs_get("sessions_lock")
+    if sl is None:
+        raise RuntimeError("Server not initialized yet")
     with sl:
         if session_id not in gs["sessions"]:
-            gs["sessions"][session_id] = {"_created": time.time()}
+            gs["sessions"][session_id] = load_session(session_id) or {"_created": time.time()}
         return gs["sessions"][session_id]
 
 _world_sim_running = False
@@ -67,25 +96,93 @@ _world_sim_lock = Lock()
 
 def run_world_sim(game_date, es):
     global _world_sim_running
+    if not _gs_get("initialized"):
+        return
     with _world_sim_lock:
         if _world_sim_running:
             return
         _world_sim_running = True
     try:
-        ws = gs.get("world_sim")
+        ws = _gs_get("world_sim")
         if ws and game_date:
             results = ws.simulate_month(game_date, es)
             if results:
-                news_list = gs.setdefault("world_news", [])
+                news_list = _gs_get("world_news") or []
                 news_list.extend(results)
                 if len(news_list) > 200:
                     news_list[:] = news_list[-200:]
+                with _gs_lock:
+                    gs["world_news"] = news_list
+    except Exception as e:
+        print(f"World sim error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
+        _persist_world()
         with _world_sim_lock:
             _world_sim_running = False
 
 def run_world_sim_async(game_date, es):
     Thread(target=run_world_sim, args=(game_date, es), daemon=True).start()
+
+def _session_cleanup_loop():
+    while True:
+        time.sleep(3600)
+        try:
+            cleanup_stale_sessions(48)
+        except Exception as e:
+            print(f"Session cleanup error: {e}")
+
+Thread(target=_session_cleanup_loop, daemon=True).start()
+
+def _persist_session(sid, session):
+    try:
+        save_session(sid, session)
+    except Exception as e:
+        print(f"Failed to save session {sid}: {e}")
+
+def _persist_world():
+    try:
+        promotions = _gs_get("promotions")
+        fighters = _gs_get("all_fighters")
+        if promotions is None or fighters is None:
+            return
+        save_world_state(promotions, fighters, _gs_get("world_sim"), _gs_get("world_news"))
+    except Exception as e:
+        print(f"Failed to save world state: {e}")
+
+def _auto_save(sid, session):
+    """Auto-save to slot 0 on key game events."""
+    try:
+        if not session or not session.get("fighter"):
+            return
+        if session.get("current_fight") or session.get("fight_started"):
+            return
+        promotions_tuple = (gs.get("world"), gs.get("national"), gs.get("regional"))
+        world_data = (
+            promotions_tuple,
+            gs.get("all_fighters", []),
+            gs.get("world_sim"),
+            gs.get("world_news", []),
+        )
+        f = session.get("fighter")
+        name = f"{f.name} (Auto)"
+
+        # Only auto-save to slot 0 if it doesn't exist or game_date moved forward
+        existing = list_saves(sid)
+        slot_0 = [s for s in existing if s["slot_index"] == 0]
+        if slot_0:
+            old_date = slot_0[0].get("game_date", "")
+            new_date = session.get("game_date")
+            if new_date:
+                new_date_str = new_date.strftime("%Y-%m-%d")
+                if new_date_str == old_date:
+                    # Try to avoid duplicate saves on same day
+                    # Still save on fight completion and promotion change always
+                    return
+        save_to_slot(sid, 0, name, session, world_data)
+    except Exception as e:
+        print(f"Auto-save failed: {e}")
 
 def ensure_regional_opponents(session):
     f = session.get("fighter")
@@ -394,11 +491,19 @@ def _get_finance_state(session):
     f = session.get("finance")
     if not f:
         return None
+    gym_name = f.fighter.gym
+    gym_fee = 0
+    if gym_name:
+        for g in utils.GYMS:
+            if g["name"] == gym_name:
+                gym_fee = g["monthly_fee"]
+                break
     return {
         "net_worth": f.net_worth,
         "agent": f.fighter.agent or "None",
         "agent_name": f.fighter.agent_name or "None",
-        "gym": f.fighter.gym or "None",
+        "gym": gym_name or "None",
+        "gym_fee": gym_fee,
         "sponsorship": f.sponsorship_deal["monthly_income"] if f.sponsorship_deal else 0,
         "broke_months": f.consecutive_broke_months,
     }
@@ -521,19 +626,44 @@ class Handler(BaseHTTPRequestHandler):
                     "world": len(gs["world"].fighters),
                 }})
 
+            elif path == "/api/has_save":
+                ensure_initialized()
+                sid = params.get("sid", [""])[0]
+                if not sid:
+                    self.json_resp({"has_save": False, "saves": []})
+                    return
+                saves = list_saves(sid)
+                self.json_resp({
+                    "has_save": len(saves) > 0,
+                    "saves": saves,
+                    "latest_slot": max(s["slot_index"] for s in saves) if saves else None,
+                })
+
+            elif path == "/api/list_saves":
+                ensure_initialized()
+                sid = params.get("sid", [""])[0]
+                if not sid:
+                    self.json_resp({"saves": []})
+                    return
+                saves = list_saves(sid)
+                self.json_resp({"saves": saves})
+
             elif path == "/create":
                 ensure_initialized()
-                name = params.get("name", [""])[0]
-                if not name or name.strip() == "":
+                import html
+                raw_name = params.get("name", [""])[0]
+                if not raw_name or raw_name.strip() == "":
                     first, last = utils.generate_name()
                     name = f"{first} {last}"
+                else:
+                    name = html.escape(raw_name.strip()[:64])
                 try:
                     age = int(params.get("age", ["25"])[0])
-                except:
+                except (ValueError, TypeError, IndexError):
                     age = 25
                 try:
                     wc = int(params.get("weight_class", ["3"])[0])
-                except:
+                except (ValueError, TypeError, IndexError):
                     wc = 3
                 bg = params.get("background", ["mma"])[0]
                 nationality = params.get("nationality", ["American"])[0]
@@ -656,13 +786,15 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/create_fighter":
                 ensure_initialized()
-                name = body.get("name", "")
-                if not name or name.strip() == "":
+                import html
+                raw_name = body.get("name", "")
+                name = html.escape(raw_name.strip()[:64]) if raw_name.strip() else ""
+                if not name or not all(c.isalnum() or c in " -.'" for c in name):
                     first, last = utils.generate_name()
                     name = f"{first} {last}"
                 try:
                     age = int(body.get("age", 25))
-                except:
+                except (ValueError, TypeError):
                     age = 25
                 bg = body.get("background", "mma")
                 wc_param = body.get("weight_class", 3)
@@ -679,7 +811,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     wc = utils.WEIGHT_CLASSES[wc_param]
                 weight = random.randint(wc["min"], wc["max"])
-                sid = body.get("sid", "")
+                sid = body.get("sid", "") or secrets.token_urlsafe(16)
                 nationality = body.get("nationality", "American")
                 region = body.get("region", "California")
                 trait_id = body.get("trait_id")
@@ -729,35 +861,14 @@ class Handler(BaseHTTPRequestHandler):
 
                 seed_regional_division(nationality, region, f.weight_class, 10)
                 
+                _persist_session(sid, session)
+
+                _auto_save(sid, session)
+
                 # Check if this is a form submission (not AJAX)
                 if "application/x-www-form-urlencoded" in content_type:
-                    # Return HTML page that loads the game
                     state_json = json.dumps(get_state_dict(session))
-                    html = f'''<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>MMA Life - Game</title>
-<meta http-equiv="refresh" content="0;url=/?sid={sid}">
-<style>
-body{{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a0f;color:#e0e0e0;padding:20px;text-align:center}}
-.btn{{display:inline-block;padding:10px 20px;background:#e62400;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:16px}}
-</style>
-<script>
-var sid = "{sid}";
-var state = {state_json};
-try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setItem("mma_sid", sid);}}catch(e){{}}
-</script>
-</head>
-<body>
-<h1>Fighter Created!</h1>
-<p>Welcome to the pros, {f.name}!</p>
-<p><a href="/?sid={sid}" class="btn">ENTER GAME</a></p>
-</body>
-</html>'''
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html")
-                    self.end_headers()
-                    self.wfile.write(html.encode())
+                    self.json_resp({"success": True, "state": state_json, "sid": sid})
                 else:
                     self.json_resp({"success": True, "state": get_state_dict(session), "sid": sid})
 
@@ -798,6 +909,11 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 if fb and fb.date and game_date and game_date >= fb.date:
                     if not session.get("fight_completed"):
                         fight_today = True
+
+                _persist_session(sid, session)
+                if game_date and game_date.day == 1:
+                    _persist_world()
+                    _auto_save(sid, session)
 
                 self.json_resp({
                     "success": True,
@@ -1119,14 +1235,37 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 session["current_fight_booking"] = None
                 session["current_fight"] = None
                 session["fight_started"] = False
+                fight_details = None
+                if fight:
+                    def ds(state):
+                        return {
+                            "sig_strikes": state.get("significant_strikes_landed", 0),
+                            "strikes_thrown": state.get("strikes_thrown", 0),
+                            "takedowns": state.get("takedowns_landed", 0),
+                            "takedowns_attempted": state.get("takedowns_attempted", 0),
+                            "submissions": state.get("submissions_attempted", 0),
+                            "knockdowns": state.get("knockdown_count", 0),
+                            "guard_passes": state.get("guard_passes", 0),
+                        }
+                    fight_details = {
+                        "f1_details": ds(fight.f1_state),
+                        "f2_details": ds(fight.f2_state),
+                        "method": fight.win_method,
+                        "round": fight.win_round,
+                    }
+
                 session["fight_completed"] = True
                 ensure_regional_opponents(session)
+                _persist_session(sid, session)
+                _persist_world()
+                _auto_save(sid, session)
                 self.json_resp({
                     "success": True, "won": won,
                     "state": get_state_dict(session),
                     "milestones": milestones,
                     "bonuses": bonuses,
                     "season_award": season_award,
+                    "fight_details": fight_details,
                 })
 
             elif path == "/api/sign_free_agent":
@@ -1147,6 +1286,9 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 career.sign_with_promotion(promo, 4, game_date)
                 session["current_promotion"] = promo
                 ensure_regional_opponents(session)
+                _persist_session(sid, session)
+                _persist_world()
+                _auto_save(sid, session)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/accept_promotion":
@@ -1165,6 +1307,9 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 career.sign_with_promotion(offer, 4, game_date)
                 session["current_promotion"] = offer
                 ensure_regional_opponents(session)
+                _persist_session(sid, session)
+                _persist_world()
+                _auto_save(sid, session)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/advance_time":
@@ -1208,6 +1353,11 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                             fight_today = True
 
                 session["game_date"] = game_date
+
+                _persist_session(sid, session)
+                if game_date and game_date.day == 1:
+                    _persist_world()
+                    _auto_save(sid, session)
 
                 self.json_resp({
                     "success": True,
@@ -1266,12 +1416,20 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 fight_history = []
                 for fh in [f, target]:
                     recent = []
-                    for fb_h in (session.get("current_event").fights if session.get("current_event") else []):
-                        pass
                     total = fh.wins + fh.losses
                     last_5 = min(total, 5)
+                    w_streak = fh.win_streak
+                    l_streak = fh.loss_streak
                     for i in range(last_5):
-                        recent.append("W" if i < fh.wins else "L")
+                        if w_streak > 0:
+                            recent.append("W")
+                            w_streak -= 1
+                        elif l_streak > 0:
+                            recent.append("L")
+                            l_streak -= 1
+                        else:
+                            prob = fh.wins / max(1, total)
+                            recent.append("W" if random.random() < prob else "L")
                     fight_history.append({
                         "name": fh.name,
                         "recent": recent,
@@ -1395,6 +1553,7 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
 
             elif path == "/api/balance_test":
                 """Run multiple simulated fights and return aggregate stats."""
+                from copy import deepcopy
                 from generator import generate_single_fighter
                 sid = body.get("sid", "")
                 iterations = body.get("iterations", 100)
@@ -1418,17 +1577,19 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                            "submissions": 0, "decisions": 0, "total_rounds": [], "avg_duration": 0}
                 strats = [s["id"] for s in STRATEGIES]
                 for _ in range(iterations):
+                    f_copy = deepcopy(f)
+                    opp_copy = deepcopy(opponent)
                     a_strat = random.choice(strats)
                     d_strat = random.choice(strats)
-                    fight = Fight(f, opponent, rounds=3, is_title_fight=False)
+                    fight = Fight(f_copy, opp_copy, rounds=3, is_title_fight=False)
                     fight.strategy1.set_pre_fight_strategy(a_strat)
                     fight.strategy2.set_pre_fight_strategy(d_strat)
                     for event in fight.simulate_fight_gen():
                         if event["type"] == "complete":
                             break
-                    if fight.winner == f:
+                    if fight.winner and fight.winner.name == f.name:
                         results["f1_wins"] += 1
-                    elif fight.winner == opponent:
+                    elif fight.winner and fight.winner.name == opponent.name:
                         results["f2_wins"] += 1
                     else:
                         results["draws"] += 1
@@ -1452,9 +1613,9 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 from generator import generate_single_fighter
                 iterations = body.get("iterations", 100)
                 f1_mean = body.get("f1_mean", 50)
-                f1_std = body.get("f1_std", 10)
+                f1_std = body.get("f1_std", 8)
                 f2_mean = body.get("f2_mean", 50)
-                f2_std = body.get("f2_std", 10)
+                f2_std = body.get("f2_std", 8)
                 wc_idx = body.get("weight_class", 3)
                 wc_data = utils.WEIGHT_CLASSES[wc_idx]
 
@@ -1467,13 +1628,13 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                 for i in range(iterations):
                     f1 = generate_single_fighter(
                         random.randint(wc_data["min"], wc_data["max"]),
-                        skill_mean=utils.gaussian_random(f1_mean, f1_std, 20, 80),
-                        skill_std=utils.gaussian_random(12, 3, 5, 20)
+                        skill_mean=utils.gaussian_random(f1_mean, f1_std, 35, 80),
+                        skill_std=utils.gaussian_random(10, 3, 5, 18)
                     )
                     f2 = generate_single_fighter(
                         random.randint(wc_data["min"], wc_data["max"]),
-                        skill_mean=utils.gaussian_random(f2_mean, f2_std, 20, 80),
-                        skill_std=utils.gaussian_random(12, 3, 5, 20)
+                        skill_mean=utils.gaussian_random(f2_mean, f2_std, 35, 80),
+                        skill_std=utils.gaussian_random(10, 3, 5, 18)
                     )
                     f1.weight_class = wc_data["name"]
                     f2.weight_class = wc_data["name"]
@@ -1519,6 +1680,125 @@ try{{localStorage.setItem("mma_state", JSON.stringify(state));localStorage.setIt
                     results["avg_rounds"] = round(results["avg_rounds"], 1)
 
                 self.json_resp({"success": True, "results": results})
+
+            elif path == "/api/save_game":
+                sid = body.get("sid", "")
+                slot_index = int(body.get("slot", 0))
+                display_name = body.get("name", "Save")
+                if not sid:
+                    self.json_resp({"error": "No session id"})
+                    return
+                session = get_or_create_session(sid)
+                if session.get("current_fight") or session.get("fight_started"):
+                    self.json_resp({"error": "Cannot save during an active fight"})
+                    return
+                if not session.get("fighter"):
+                    self.json_resp({"error": "No fighter to save"})
+                    return
+                promotions_tuple = (gs.get("world"), gs.get("national"), gs.get("regional"))
+                world_data = (
+                    promotions_tuple,
+                    gs.get("all_fighters", []),
+                    gs.get("world_sim"),
+                    gs.get("world_news", []),
+                )
+                try:
+                    save_id = save_to_slot(sid, slot_index, display_name, session, world_data)
+                    self.json_resp({"success": True, "save_id": save_id})
+                except Exception as e:
+                    self.json_resp({"error": f"Save failed: {e}"})
+
+            elif path == "/api/load_game":
+                sid = body.get("sid", "")
+                slot_index = int(body.get("slot", 0))
+                if not sid:
+                    self.json_resp({"error": "No session id"})
+                    return
+                try:
+                    result = load_from_slot(sid, slot_index)
+                    if not result:
+                        self.json_resp({"error": "Save not found"})
+                        return
+                    loaded_session, world_data = result
+                    promotions, all_fighters, world_sim, world_news = world_data
+                    world, national, regional = promotions
+
+                    # Match session fighter with loaded world fighters
+                    loaded_f = loaded_session.get("fighter")
+                    if loaded_f:
+                        db_id = getattr(loaded_f, '_db_id', None)
+                        found = None
+                        for af in all_fighters:
+                            af_id = getattr(af, '_db_id', None)
+                            if db_id and af_id and af_id == db_id:
+                                found = af
+                                break
+                        if not found:
+                            for af in all_fighters:
+                                if af.name == loaded_f.name and af.age == loaded_f.age:
+                                    found = af
+                                    break
+                        if found:
+                            loaded_session["fighter"] = found
+
+                    # Replace global world state with snapshot
+                    with _gs_lock:
+                        gs["promotions"] = promotions
+                        gs["world"] = world
+                        gs["national"] = national
+                        gs["regional"] = regional
+                        gs["all_fighters"] = all_fighters
+                        gs["world_sim"] = world_sim
+                        gs["world_news"] = world_news or []
+
+                    # Replace session data
+                    with gs["sessions_lock"]:
+                        gs["sessions"][sid] = loaded_session
+
+                    self.json_resp({
+                        "success": True,
+                        "state": get_state_dict(loaded_session),
+                    })
+                except SaveIncompatibleError as e:
+                    self.json_resp({"error": str(e)})
+                except Exception as e:
+                    self.json_resp({"error": f"Load failed: {e}", "traceback": traceback.format_exc()})
+
+            elif path == "/api/delete_save":
+                sid = body.get("sid", "")
+                slot_index = int(body.get("slot", 0))
+                if not sid:
+                    self.json_resp({"error": "No session id"})
+                    return
+                delete_save(sid, slot_index)
+                self.json_resp({"success": True})
+
+            elif path == "/api/export_save":
+                sid = body.get("sid", "")
+                slot_index = int(body.get("slot", 0))
+                if not sid:
+                    self.json_resp({"error": "No session id"})
+                    return
+                data = export_save(sid, slot_index)
+                if not data:
+                    self.json_resp({"error": "Save not found"})
+                    return
+                self.json_resp({"success": True, "export": data})
+
+            elif path == "/api/import_save":
+                sid = body.get("sid", "")
+                slot_index = int(body.get("slot", 0))
+                import_data = body.get("data")
+                if not sid or not import_data:
+                    self.json_resp({"error": "Missing sid or import data"})
+                    return
+                try:
+                    import_save(sid, slot_index, import_data)
+                    self.json_resp({"success": True})
+                except SaveIncompatibleError as e:
+                    self.json_resp({"error": str(e)})
+                except Exception as e:
+                    self.json_resp({"error": f"Import failed: {e}"})
 
             else:
                 self.json_resp({"error": "Unknown endpoint"})

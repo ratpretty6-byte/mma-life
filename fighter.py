@@ -161,8 +161,14 @@ class Fighter:
                         if attr in self.attributes:
                             self.attributes[attr] = utils.clamp(self.attributes[attr] + bonus, utils.ATTR_MIN, utils.ATTR_MAX)
 
+    def reset_fight_data(self):
+        self._zone_health = {}
+        self._zone_max_health = {}
+        self._blood_level = 0.0
+
     def init_fight_health(self):
         """Initialize 9-zone health model for a fight. Based on durability + age."""
+        self.reset_fight_data()
         durability = self.attributes.get("durability", 50)
         age_mod = utils.get_age_modifier(self.age)
         base_health = durability * age_mod

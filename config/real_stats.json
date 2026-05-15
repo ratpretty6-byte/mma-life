@@ -1,0 +1,407 @@
+{
+  "source": "ufcstats.com (via stats_fetcher.py)",
+  "fetched_at": "2026-05-14T23:51:40.929384",
+  "total_fights_analyzed": 7423,
+  "real_world_rates": {
+    "ko_tko_pct": 31.3,
+    "submission_pct": 18.0,
+    "decision_pct": 49.4,
+    "finish_pct": 49.3
+  },
+  "striking_grappling": {
+    "avg_total_strikes_per_min": 9.67,
+    "avg_takedowns_per_fight": 2.12,
+    "avg_kd_per_fight": 0.43,
+    "avg_sub_attempts_per_fight": 0.67,
+    "strikes_per_takedown": 37.6
+  },
+  "per_weight_class": {
+    "Bantamweight": {
+      "ko_tko_pct": 25.5,
+      "submission_pct": 19.5,
+      "decision_pct": 53.1,
+      "finish_pct": 45.1,
+      "avg_total_strikes_per_min": 9.84,
+      "avg_takedowns_per_fight": 2.34,
+      "avg_sub_attempts_per_fight": 0.73,
+      "total_fights": 779,
+      "round_distribution": {
+        "1": 21.6,
+        "2": 15.4,
+        "3": 58.5,
+        "4": 0.8,
+        "5": 3.7
+      },
+      "avg_fight_duration_seconds": 512.5
+    },
+    "Catch Weight": {
+      "ko_tko_pct": 26.0,
+      "submission_pct": 23.3,
+      "decision_pct": 49.3,
+      "finish_pct": 49.3,
+      "avg_total_strikes_per_min": 11.77,
+      "avg_takedowns_per_fight": 2.44,
+      "avg_sub_attempts_per_fight": 0.63,
+      "total_fights": 73,
+      "round_distribution": {
+        "1": 23.3,
+        "2": 19.2,
+        "3": 52.1,
+        "5": 5.5
+      },
+      "avg_fight_duration_seconds": 493.4
+    },
+    "Featherweight": {
+      "ko_tko_pct": 29.0,
+      "submission_pct": 16.6,
+      "decision_pct": 53.6,
+      "finish_pct": 45.6,
+      "avg_total_strikes_per_min": 9.96,
+      "avg_takedowns_per_fight": 2.34,
+      "avg_sub_attempts_per_fight": 0.8,
+      "total_fights": 859,
+      "round_distribution": {
+        "1": 23.7,
+        "2": 13.6,
+        "3": 58.3,
+        "4": 0.5,
+        "5": 3.8
+      },
+      "avg_fight_duration_seconds": 506.5
+    },
+    "Flyweight": {
+      "ko_tko_pct": 23.9,
+      "submission_pct": 21.3,
+      "decision_pct": 53.9,
+      "finish_pct": 45.2,
+      "avg_total_strikes_per_min": 9.18,
+      "avg_takedowns_per_fight": 2.81,
+      "avg_sub_attempts_per_fight": 0.96,
+      "total_fights": 414,
+      "round_distribution": {
+        "1": 21.3,
+        "2": 16.2,
+        "3": 57.2,
+        "5": 5.3
+      },
+      "avg_fight_duration_seconds": 514.0
+    },
+    "Heavyweight": {
+      "ko_tko_pct": 50.1,
+      "submission_pct": 12.6,
+      "decision_pct": 35.3,
+      "finish_pct": 62.7,
+      "avg_total_strikes_per_min": 9.11,
+      "avg_takedowns_per_fight": 1.4,
+      "avg_sub_attempts_per_fight": 0.33,
+      "total_fights": 563,
+      "round_distribution": {
+        "1": 35.7,
+        "2": 19.5,
+        "3": 40.5,
+        "4": 0.9,
+        "5": 3.4
+      },
+      "avg_fight_duration_seconds": 443.2
+    },
+    "Light Heavyweight": {
+      "ko_tko_pct": 43.7,
+      "submission_pct": 17.0,
+      "decision_pct": 37.3,
+      "finish_pct": 60.7,
+      "avg_total_strikes_per_min": 9.24,
+      "avg_takedowns_per_fight": 1.69,
+      "avg_sub_attempts_per_fight": 0.45,
+      "total_fights": 577,
+      "round_distribution": {
+        "1": 36.6,
+        "2": 15.4,
+        "3": 42.6,
+        "4": 1.0,
+        "5": 4.3
+      },
+      "avg_fight_duration_seconds": 452.7
+    },
+    "Lightweight": {
+      "ko_tko_pct": 30.1,
+      "submission_pct": 20.2,
+      "decision_pct": 48.8,
+      "finish_pct": 50.3,
+      "avg_total_strikes_per_min": 9.65,
+      "avg_takedowns_per_fight": 2.2,
+      "avg_sub_attempts_per_fight": 0.74,
+      "total_fights": 1207,
+      "round_distribution": {
+        "1": 25.2,
+        "2": 17.4,
+        "3": 54.6,
+        "4": 0.4,
+        "5": 2.4
+      },
+      "avg_fight_duration_seconds": 482.5
+    },
+    "Middleweight": {
+      "ko_tko_pct": 37.1,
+      "submission_pct": 18.3,
+      "decision_pct": 42.7,
+      "finish_pct": 55.4,
+      "avg_total_strikes_per_min": 8.9,
+      "avg_takedowns_per_fight": 1.98,
+      "avg_sub_attempts_per_fight": 0.64,
+      "total_fights": 908,
+      "round_distribution": {
+        "1": 27.0,
+        "2": 19.5,
+        "3": 47.8,
+        "4": 0.9,
+        "5": 4.8
+      },
+      "avg_fight_duration_seconds": 490.6
+    },
+    "Welterweight": {
+      "ko_tko_pct": 32.6,
+      "submission_pct": 16.7,
+      "decision_pct": 49.5,
+      "finish_pct": 49.2,
+      "avg_total_strikes_per_min": 9.37,
+      "avg_takedowns_per_fight": 2.11,
+      "avg_sub_attempts_per_fight": 0.62,
+      "total_fights": 1129,
+      "round_distribution": {
+        "1": 26.5,
+        "2": 14.2,
+        "3": 53.9,
+        "4": 0.6,
+        "5": 4.8
+      },
+      "avg_fight_duration_seconds": 497.0
+    },
+    "Women's Bantamweight": {
+      "ko_tko_pct": 22.0,
+      "submission_pct": 17.1,
+      "decision_pct": 60.4,
+      "finish_pct": 39.2,
+      "avg_total_strikes_per_min": 10.24,
+      "avg_takedowns_per_fight": 2.05,
+      "avg_sub_attempts_per_fight": 0.67,
+      "total_fights": 245,
+      "round_distribution": {
+        "1": 16.7,
+        "2": 12.2,
+        "3": 66.1,
+        "5": 4.9
+      },
+      "avg_fight_duration_seconds": 543.3
+    },
+    "Women's Featherweight": {
+      "ko_tko_pct": 23.3,
+      "submission_pct": 20.0,
+      "decision_pct": 56.7,
+      "finish_pct": 43.3,
+      "avg_total_strikes_per_min": 9.77,
+      "avg_takedowns_per_fight": 1.53,
+      "avg_sub_attempts_per_fight": 0.4,
+      "total_fights": 30,
+      "round_distribution": {
+        "1": 26.7,
+        "2": 10.0,
+        "3": 50.0,
+        "5": 13.3
+      },
+      "avg_fight_duration_seconds": 543.3
+    },
+    "Women's Flyweight": {
+      "ko_tko_pct": 16.8,
+      "submission_pct": 19.4,
+      "decision_pct": 63.7,
+      "finish_pct": 36.3,
+      "avg_total_strikes_per_min": 11.21,
+      "avg_takedowns_per_fight": 2.21,
+      "avg_sub_attempts_per_fight": 0.7,
+      "total_fights": 273,
+      "round_distribution": {
+        "1": 15.4,
+        "2": 13.6,
+        "3": 64.5,
+        "4": 0.7,
+        "5": 5.9
+      },
+      "avg_fight_duration_seconds": 544.9
+    },
+    "Women's Strawweight": {
+      "ko_tko_pct": 13.4,
+      "submission_pct": 19.4,
+      "decision_pct": 66.7,
+      "finish_pct": 32.8,
+      "avg_total_strikes_per_min": 11.13,
+      "avg_takedowns_per_fight": 2.3,
+      "avg_sub_attempts_per_fight": 0.73,
+      "total_fights": 366,
+      "round_distribution": {
+        "1": 13.9,
+        "2": 13.1,
+        "3": 68.0,
+        "5": 4.9
+      },
+      "avg_fight_duration_seconds": 550.2
+    }
+  },
+  "balance_targets": {
+    "Bantamweight": {
+      "even_3_round": {
+        "KO_TKO_target": 25.5,
+        "Submission_target": 19.5,
+        "Decision_target": 53.1
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 21.7,
+        "Submission_target": 19.5,
+        "Decision_target": 71.7
+      }
+    },
+    "Catch Weight": {
+      "even_3_round": {
+        "KO_TKO_target": 26.0,
+        "Submission_target": 23.3,
+        "Decision_target": 49.3
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 22.1,
+        "Submission_target": 23.3,
+        "Decision_target": 66.6
+      }
+    },
+    "Featherweight": {
+      "even_3_round": {
+        "KO_TKO_target": 29.0,
+        "Submission_target": 16.6,
+        "Decision_target": 53.6
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 24.6,
+        "Submission_target": 16.6,
+        "Decision_target": 72.4
+      }
+    },
+    "Flyweight": {
+      "even_3_round": {
+        "KO_TKO_target": 23.9,
+        "Submission_target": 21.3,
+        "Decision_target": 53.9
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 20.3,
+        "Submission_target": 21.3,
+        "Decision_target": 72.8
+      }
+    },
+    "Heavyweight": {
+      "even_3_round": {
+        "KO_TKO_target": 50.1,
+        "Submission_target": 12.6,
+        "Decision_target": 35.3
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 42.6,
+        "Submission_target": 12.6,
+        "Decision_target": 47.7
+      }
+    },
+    "Light Heavyweight": {
+      "even_3_round": {
+        "KO_TKO_target": 43.7,
+        "Submission_target": 17.0,
+        "Decision_target": 37.3
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 37.1,
+        "Submission_target": 17.0,
+        "Decision_target": 50.4
+      }
+    },
+    "Lightweight": {
+      "even_3_round": {
+        "KO_TKO_target": 30.1,
+        "Submission_target": 20.2,
+        "Decision_target": 48.8
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 25.6,
+        "Submission_target": 20.2,
+        "Decision_target": 65.9
+      }
+    },
+    "Middleweight": {
+      "even_3_round": {
+        "KO_TKO_target": 37.1,
+        "Submission_target": 18.3,
+        "Decision_target": 42.7
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 31.5,
+        "Submission_target": 18.3,
+        "Decision_target": 57.6
+      }
+    },
+    "Welterweight": {
+      "even_3_round": {
+        "KO_TKO_target": 32.6,
+        "Submission_target": 16.7,
+        "Decision_target": 49.5
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 27.7,
+        "Submission_target": 16.7,
+        "Decision_target": 66.8
+      }
+    },
+    "Women's Bantamweight": {
+      "even_3_round": {
+        "KO_TKO_target": 22.0,
+        "Submission_target": 17.1,
+        "Decision_target": 60.4
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 18.7,
+        "Submission_target": 17.1,
+        "Decision_target": 81.5
+      }
+    },
+    "Women's Featherweight": {
+      "even_3_round": {
+        "KO_TKO_target": 23.3,
+        "Submission_target": 20.0,
+        "Decision_target": 56.7
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 19.8,
+        "Submission_target": 20.0,
+        "Decision_target": 76.5
+      }
+    },
+    "Women's Flyweight": {
+      "even_3_round": {
+        "KO_TKO_target": 16.8,
+        "Submission_target": 19.4,
+        "Decision_target": 63.7
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 14.3,
+        "Submission_target": 19.4,
+        "Decision_target": 86.0
+      }
+    },
+    "Women's Strawweight": {
+      "even_3_round": {
+        "KO_TKO_target": 13.4,
+        "Submission_target": 19.4,
+        "Decision_target": 66.7
+      },
+      "even_5_round_title": {
+        "KO_TKO_target": 11.4,
+        "Submission_target": 19.4,
+        "Decision_target": 90.0
+      }
+    }
+  }
+}

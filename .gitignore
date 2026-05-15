@@ -6,3 +6,6 @@ __pycache__/
 .DS_Store
 *.sock
 nohup.out
+*.db
+*.db.bak
+temp_*

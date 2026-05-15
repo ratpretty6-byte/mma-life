@@ -1,0 +1,45 @@
+{
+  "_comment": "MMA Life Simulator — World Generation Config",
+  "generation": {
+    "initial_fighter_count": 3000,
+    "prospect_generation_months": 4,
+    "prospect_count_per_cycle": 30,
+    "division_min_fighters": 15,
+    "max_fighters_per_division": 60
+  },
+  "skills": {
+    "mean_range": [30, 70],
+    "std_range": [8, 18],
+    "group_variance": 5,
+    "per_attr_variance": 3,
+    "archetype_profile_strength": 10
+  },
+  "aging": {
+    "prime_modifier_start": 24,
+    "prime_modifier_end": 33,
+    "decline_rate": 0.02,
+    "steep_decline_rate": 0.04,
+    "retirement_annual_chance_base": 0.05,
+    "retirement_annual_chance_per_loss": 0.03,
+    "retirement_loss_streak_threshold": 3,
+    "retirement_ko_threshold": 5
+  },
+  "world_simulation": {
+    "fights_per_division_per_month": 3,
+    "monthly_aging_day": 1,
+    "news_max_items": 200,
+    "session_timeout_hours": 2,
+    "session_cleanup_interval_seconds": 300
+  },
+  "weight_classes": [
+    {"name": "Strawweight", "min": 100, "max": 115, "generation_weight": 5},
+    {"name": "Flyweight", "min": 115, "max": 125, "generation_weight": 8},
+    {"name": "Bantamweight", "min": 125, "max": 135, "generation_weight": 12},
+    {"name": "Featherweight", "min": 135, "max": 145, "generation_weight": 14},
+    {"name": "Lightweight", "min": 145, "max": 155, "generation_weight": 18},
+    {"name": "Welterweight", "min": 155, "max": 170, "generation_weight": 16},
+    {"name": "Middleweight", "min": 170, "max": 185, "generation_weight": 12},
+    {"name": "Light Heavyweight", "min": 185, "max": 205, "generation_weight": 8},
+    {"name": "Heavyweight", "min": 205, "max": 265, "generation_weight": 10}
+  ]
+}

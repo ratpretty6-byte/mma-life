@@ -1,3 +1,4 @@
+import random
 from typing import Dict, List, Optional
 from fighter import Fighter
 import utils
@@ -13,7 +14,7 @@ STRATEGIES = [
                       "wrestling_defense": 0.9, "cardio_drain": 1.05},
         "counters": ["defensive_striking", "clinch_dominance"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.85, "takedown": 0.05, "clinch": 0.10},
+        "action_weights": {"strike": 0.75, "takedown": 0.12, "clinch": 0.13},
     },
     {
         "id": "defensive_striking",
@@ -23,7 +24,7 @@ STRATEGIES = [
                       "striking_power": 0.9, "cardio_drain": 0.9, "parry_chance": 1.2, "feint_chance": 0.03},
         "counters": ["aggressive_striking", "volume_striking"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.75, "takedown": 0.10, "clinch": 0.15},
+        "action_weights": {"strike": 0.65, "takedown": 0.18, "clinch": 0.17},
     },
     {
         "id": "wrestling_focus",
@@ -43,7 +44,7 @@ STRATEGIES = [
                       "top_control": 1.05, "striking_power": 0.8, "escape_ability": 1.1},
         "counters": ["ground_and_pound", "wrestling_focus"],
         "preferred_position": "ground",
-        "action_weights": {"strike": 0.20, "takedown": 0.30, "clinch": 0.10},
+        "action_weights": {"strike": 0.20, "takedown": 0.50, "clinch": 0.10},
     },
     {
         "id": "clinch_dominance",
@@ -53,7 +54,7 @@ STRATEGIES = [
                       "striking_accuracy": 0.9, "takedown_accuracy": 0.9},
         "counters": ["wrestling_focus", "aggressive_striking"],
         "preferred_position": "clinch",
-        "action_weights": {"strike": 0.25, "takedown": 0.15, "clinch": 0.60},
+        "action_weights": {"strike": 0.25, "takedown": 0.25, "clinch": 0.50},
     },
     {
         "id": "pressure_fighting",
@@ -63,7 +64,7 @@ STRATEGIES = [
                       "composure": 0.95, "fight_iq": 0.95},
         "counters": ["defensive_striking", "leg_kick_focus"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.80, "takedown": 0.10, "clinch": 0.10},
+        "action_weights": {"strike": 0.70, "takedown": 0.17, "clinch": 0.13},
     },
     {
         "id": "volume_striking",
@@ -73,7 +74,7 @@ STRATEGIES = [
                       "cardio_drain": 1.1, "combo_frequency": 1.25},
         "counters": ["power_hunting", "defensive_striking"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.90, "takedown": 0.05, "clinch": 0.05},
+        "action_weights": {"strike": 0.80, "takedown": 0.12, "clinch": 0.08},
     },
     {
         "id": "power_hunting",
@@ -83,7 +84,7 @@ STRATEGIES = [
                       "cardio_drain": 0.95, "counter_power": 1.25},
         "counters": ["volume_striking", "pressure_fighting"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.85, "takedown": 0.08, "clinch": 0.07},
+        "action_weights": {"strike": 0.75, "takedown": 0.15, "clinch": 0.10},
     },
     {
         "id": "leg_kick_focus",
@@ -93,7 +94,7 @@ STRATEGIES = [
                       "cardio_drain": 1.1, "striking_power": 0.9},
         "counters": ["kickboxing_focus", "clinch_dominance"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.85, "takedown": 0.10, "clinch": 0.05},
+        "action_weights": {"strike": 0.75, "takedown": 0.18, "clinch": 0.07},
     },
     {
         "id": "body_shot_focus",
@@ -103,7 +104,7 @@ STRATEGIES = [
                       "kick_power": 0.9, "body_damage_bonus": 1.25},
         "counters": ["leg_kick_focus", "pressure_fighting"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.90, "takedown": 0.05, "clinch": 0.05},
+        "action_weights": {"strike": 0.80, "takedown": 0.12, "clinch": 0.08},
     },
     {
         "id": "ground_and_pound",
@@ -123,7 +124,7 @@ STRATEGIES = [
                       "striking_power": 0.75, "submission_defense": 1.05},
         "counters": ["ground_and_pound", "wrestling_focus"],
         "preferred_position": "ground",
-        "action_weights": {"strike": 0.15, "takedown": 0.35, "clinch": 0.10},
+        "action_weights": {"strike": 0.15, "takedown": 0.55, "clinch": 0.10},
     },
     {
         "id": "boxing_focus",
@@ -134,7 +135,7 @@ STRATEGIES = [
                       "counter_power": 1.1},
         "counters": ["kickboxing_focus", "leg_kick_focus"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.90, "takedown": 0.05, "clinch": 0.05},
+        "action_weights": {"strike": 0.80, "takedown": 0.12, "clinch": 0.08},
     },
     {
         "id": "kickboxing_focus",
@@ -144,7 +145,7 @@ STRATEGIES = [
                       "clinch_control": 0.85, "takedown_accuracy": 0.85},
         "counters": ["boxing_focus", "clinch_dominance"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.85, "takedown": 0.10, "clinch": 0.05},
+        "action_weights": {"strike": 0.75, "takedown": 0.18, "clinch": 0.07},
     },
     {
         "id": "muay_thai_focus",
@@ -154,7 +155,7 @@ STRATEGIES = [
                       "wrestling_defense": 0.85, "takedown_accuracy": 0.85},
         "counters": ["kickboxing_focus", "wrestling_focus"],
         "preferred_position": "clinch",
-        "action_weights": {"strike": 0.40, "takedown": 0.10, "clinch": 0.50},
+        "action_weights": {"strike": 0.30, "takedown": 0.18, "clinch": 0.52},
     },
     {
         "id": "counter_striker",
@@ -164,7 +165,7 @@ STRATEGIES = [
                       "striking_power": 0.95, "counter_power": 1.3, "defensive_striking": 1.15, "feint_chance": 0.02},
         "counters": ["aggressive_striking", "power_hunting", "brawler"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.70, "takedown": 0.10, "clinch": 0.20},
+        "action_weights": {"strike": 0.60, "takedown": 0.18, "clinch": 0.22},
     },
     {
         "id": "brawler",
@@ -174,7 +175,7 @@ STRATEGIES = [
                       "striking_accuracy": 0.88, "cardio_drain": 1.1, "heart": 1.1, "feint_chance": -0.02},
         "counters": ["counter_striker", "leg_kick_focus"],
         "preferred_position": "standing",
-        "action_weights": {"strike": 0.85, "takedown": 0.10, "clinch": 0.05},
+        "action_weights": {"strike": 0.75, "takedown": 0.18, "clinch": 0.07},
     },
 ]
 
@@ -302,8 +303,9 @@ class StrategySystem:
         return mods.get(attr, 1.0)
 
     def get_action_weights(self) -> Dict[str, float]:
-        if not self.current_strategy:
-            return {"strike": 0.7, "takedown": 0.15, "clinch": 0.15}
+        if self.current_strategy:
+            return self.current_strategy.get("action_weights", {"strike": 0.30, "takedown": 0.55, "clinch": 0.15})
+        return {"strike": 0.30, "takedown": 0.55, "clinch": 0.15}
         weights = self.current_strategy.get("action_weights", {}).copy()
 
         # Drift blending: mix current and target weights
@@ -524,8 +526,3 @@ class StrategySystem:
             opp_stam = opponent_fighter.get_effective_attribute("cardio", 0) / 100
             if opp_stam < 0.4 and random.random() < 0.3:
                 return random.choice(["clinch_dominance", "body_shot_focus"])
-
-        return default_strategy_id
-
-
-import random
