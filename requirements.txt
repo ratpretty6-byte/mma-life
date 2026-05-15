@@ -1,2 +1,2 @@
-# No external dependencies needed - uses Python standard library only
-# Python 3.8+ required
+numpy>=2.0
+scipy>=1.10
