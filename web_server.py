@@ -830,6 +830,7 @@ class Handler(BaseHTTPRequestHandler):
                             break
                     wc = utils.WEIGHT_CLASSES[wc_idx]
                 else:
+                    wc_idx = wc_param
                     wc = utils.WEIGHT_CLASSES[wc_param]
                 weight = random.randint(wc["min"], wc["max"])
                 sid = body.get("sid", "") or secrets.token_urlsafe(16)
