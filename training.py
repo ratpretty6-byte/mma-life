@@ -44,6 +44,16 @@ DRILLS = [
 
 DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
+DRILL_CATEGORIES = {
+    "Striking": ["Hand Speed Drills", "Footwork & Movement", "Combination Work", "Kick Conditioning"],
+    "Grappling": ["Takedown Chains", "Wrestling & Sprawl", "Ground and Pound", "Submission Defense", "Sprawl & Scramble", "Chain Wrestling", "Guard Retention", "Ground Defense"],
+    "Defense": ["Head Movement Drills", "Defensive Fundamentals"],
+    "Clinch": ["Clinch Control", "Clinch Throws"],
+    "Sparring": ["Sparring (Striking)", "Sparring (Grappling)", "Reactive Counters"],
+    "Conditioning": ["Fight Conditioning", "Kick Conditioning"],
+    "Mental": ["Mental Training", "Pace & Distance"],
+}
+
 
 class TrainingSystem:
     def __init__(self, fighter: Fighter):

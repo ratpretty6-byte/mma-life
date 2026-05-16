@@ -519,7 +519,6 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
     <div id="tab-gym" class="tab-content hidden fade-in">
       <div class="card">
         <div class="card-title">Gym: <span id="gymName">None</span></div>
-        <div id="gymInfo" style="color:var(--text-muted);font-size:var(--text-sm);margin-bottom:6px"></div>
         <div class="flex-row">
           <button class="btn btn-secondary btn-sm" onclick="showGymList()">Change Gym</button>
           <span id="gymStatus" style="font-size:var(--text-sm);color:var(--text-muted)"></span>
@@ -527,36 +526,49 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       </div>
 
       <div class="card">
-        <div class="card-title">Training</div>
-        <div id="trainingStatus"></div>
-        <div id="fatigueBar" class="hidden" style="margin:6px 0;height:8px;background:var(--bg-elevated);border-radius:var(--radius-sm);overflow:hidden">
+        <div class="card-title">Training <span id="trainingStatus" style="font-size:var(--text-xs);color:var(--text-muted);font-weight:400"></span></div>
+        <div id="fatigueBar" style="margin:6px 0;height:8px;background:var(--bg-elevated);border-radius:var(--radius-sm);overflow:hidden">
           <div id="fatigueFill" style="height:100%;width:0%;border-radius:var(--radius-sm);transition:width .3s"></div>
         </div>
-        <div class="flex-row" style="margin-top:6px;gap:4px" id="trainingActions">
-          <button class="btn btn-danger btn-sm hidden" id="btnStopTraining" onclick="stopTraining()">Stop Training</button>
-        </div>
+        <div id="selectedDrillInfo" style="font-size:var(--text-xs);color:var(--text-muted)"></div>
+      </div>
+
+      <div class="card" id="scheduleCard">
+        <div class="card-title">Weekly Schedule <button class="btn btn-ghost btn-small" onclick="clearAllDrills()" style="float:right;font-size:10px">Clear All</button></div>
+        <div id="scheduleGrid" class="schedule-grid"></div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px">Select a drill below, then click a day to assign it.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Drill Categories</div>
+        <div class="flex-row" id="drillCatButtons" style="gap:3px;flex-wrap:wrap"></div>
+        <div id="drillList" style="margin-top:6px;max-height:220px;overflow-y:auto"></div>
       </div>
 
       <div class="card">
         <div class="card-title">Recovery <span id="filmStudyStatus" style="font-size:var(--text-xs);color:var(--text-muted);font-weight:400"></span></div>
         <div class="flex-row" style="gap:4px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="doRecovery('ice_bath')">&#x2744; Ice Bath</button>
+          <button class="btn btn-ghost btn-sm" onclick="doRecovery('ice_bath')">&#x2744; Ice</button>
           <button class="btn btn-ghost btn-sm" onclick="doRecovery('sports_massage')">&#x1F4AA; Massage</button>
           <button class="btn btn-ghost btn-sm" onclick="doRecovery('nutrition_plan')">&#x1F966; Nutrition</button>
-          <button class="btn btn-ghost btn-sm" onclick="doRecovery('meditation')">&#x1F9D8; Meditation</button>
+          <button class="btn btn-ghost btn-sm" onclick="doRecovery('meditation')">&#x1F9D8; Meditate</button>
           <button class="btn btn-ghost btn-sm" onclick="doFilmStudy()">&#x1F3AC; Film Study</button>
+        </div>
+      </div>
+
+      <div class="card" id="weightManagement">
+        <div class="card-title">&#x2696; Weight Management</div>
+        <div id="weightInfo" style="font-size:var(--text-sm);color:var(--text-muted)"></div>
+        <div class="flex-row" id="weightCutButtons" style="gap:4px;margin-top:4px">
+          <button class="btn btn-ghost btn-small" onclick="doWeightCut('safe')">Safe Cut</button>
+          <button class="btn btn-ghost btn-small" onclick="doWeightCut('standard')">Standard</button>
+          <button class="btn btn-ghost btn-small" onclick="doWeightCut('aggressive')">Aggressive</button>
         </div>
       </div>
 
       <div class="card" id="gymFightersCard" style="display:none">
         <div class="card-title">Training Partners <span id="gymFighterCount" style="font-size:var(--text-xs);color:var(--text-muted);font-weight:400"></span></div>
-        <div id="gymFighterList" style="max-height:180px;overflow-y:auto;font-size:var(--text-sm)"></div>
-      </div>
-
-      <div class="card" id="scheduleCard">
-        <div class="card-title">Weekly Schedule</div>
-        <div id="scheduleGrid" class="schedule-grid"></div>
-        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px">Click a day to change the drill. Rest days auto-recover fatigue.</div>
+        <div id="gymFighterList" style="max-height:160px;overflow-y:auto;font-size:var(--text-sm)"></div>
       </div>
 
       <div id="trainResult" class="hidden card card-highlight" style="border-color:var(--success)"></div>
@@ -1716,7 +1728,6 @@ function updateGymTab() {
   const t = state.training;
   const fin = state.finance;
   qs("#gymName").textContent = fin ? fin.gym : "None";
-  qs("#gymInfo").textContent = "Train by setting drills in the weekly schedule below.";
 
   const ga = state.gym_atmosphere;
   const gc = qs("#gymFightersCard");
@@ -1736,9 +1747,6 @@ function updateGymTab() {
     gc.style.display = "none";
   }
 
-  qs("#btnStopTraining").classList.add("hidden");
-  qs("#fatigueBar").classList.remove("hidden");
-
   if (t) {
     const fatigue = t.fatigue || 0;
     const fill = qs("#fatigueFill");
@@ -1747,59 +1755,156 @@ function updateGymTab() {
     else if (fatigue > 40) fill.style.background = "#ffd700";
     else fill.style.background = "#4aff6a";
 
+    const schedDay = t.schedule?.current_day || '';
     if (t.drill_name) {
-      qs("#trainingStatus").innerHTML = `<span style="color:#4a9eff">Training: ${escHtml(t.drill_name)}</span> | Fatigue: ${fatigue}% | Day: ${escHtml(t.schedule?.current_day || '')}`;
+      qs("#trainingStatus").innerHTML = `${escHtml(t.drill_name)} | ${schedDay}`;
     } else {
-      qs("#trainingStatus").innerHTML = `<span style="color:#888">Click a day below to set a drill</span>`;
+      qs("#trainingStatus").innerHTML = `<span style="color:#888">Set a drill below</span>`;
     }
   } else {
-    qs("#trainingStatus").innerHTML = `<span style="color:#888">Training system initializing...</span>`;
+    qs("#trainingStatus").innerHTML = `<span style="color:#888">Initializing...</span>`;
   }
+
   updateScheduleGrid();
+  updateDrillCategories();
+  updateDrillList();
+  updateWeightSection();
 
   const fss = qs("#filmStudyStatus");
   if (t && t.film_study_available) {
-    fss.textContent = "Film study: available (2x/week)";
+    fss.textContent = "Film: available";
     fss.style.color = "#4aff6a";
   } else if (t) {
-    fss.textContent = "Film study: used for this week";
+    fss.textContent = "Film: used";
     fss.style.color = "#ffd700";
   }
   if (t && t.recovery_active) {
-    fss.textContent = "Recovery active: " + (t.recovery_type || "processing");
+    fss.textContent = "Recovery active";
     fss.style.color = "#4a9eff";
   }
 }
+
+let selectedDrillName = null;
+let selectedCategory = "All";
 
 function updateScheduleGrid() {
   const grid = qs("#scheduleGrid");
   if (!grid) return;
   const t = state && state.training;
   const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-
-  if (!t || !t.schedule || !t.schedule.schedule) {
-    let html = "";
-    days.forEach((d, i) => {
-      html += `<div class="sched-day${i === 0 ? ' today' : ''}" onclick="showDrillPicker(${i}, null)">
-        <div class="day-name">${d.slice(0,3)}</div><div class="day-drill rest">Rest</div>
-      </div>`;
-    });
-    grid.innerHTML = html;
-    return;
-  }
-
-  const current = t.schedule.current_day;
+  const current = t && t.schedule ? t.schedule.current_day : '';
   grid.innerHTML = "";
   days.forEach((d, i) => {
-    const drill = t.schedule.schedule[d] || "Rest";
+    const drill = (t && t.schedule && t.schedule.schedule) ? (t.schedule.schedule[d] || "Rest") : "Rest";
     const isToday = d === current;
+    const isSel = false;
     const div = document.createElement("div");
     div.className = "sched-day" + (isToday ? " today" : "");
-    div.title = "Click to change drill";
     div.innerHTML = `<div class="day-name">${d.slice(0,3)}</div><div class="day-drill${drill==='Rest'?' rest':''}">${drill==='Rest'?'Rest':drill.replace(/Drills/,'').trim()}</div>`;
-    div.onclick = () => showDrillPicker(i, drill);
+    div.onclick = () => {
+      if (selectedDrillName) {
+        doSetDrill(i, selectedDrillName);
+      } else {
+        doSetDrill(i, null);
+      }
+    };
     grid.appendChild(div);
   });
+}
+
+function updateDrillCategories() {
+  const container = qs("#drillCatButtons");
+  if (!container) return;
+  const t = state && state.training;
+  const cats = t && t.drill_categories ? Object.keys(t.drill_categories) : [];
+  let html = `<button class="btn btn-ghost btn-small" onclick="selectCategory('All')" style="${selectedCategory==='All'?'border-color:var(--accent);color:var(--accent)':''}">All</button>`;
+  cats.forEach(c => {
+    const active = selectedCategory === c;
+    html += `<button class="btn btn-ghost btn-small" onclick="selectCategory('${escHtml(c)}')" style="${active?'border-color:var(--accent);color:var(--accent)':''}">${escHtml(c)}</button>`;
+  });
+  container.innerHTML = html;
+}
+
+function selectCategory(cat) {
+  selectedCategory = cat;
+  updateDrillCategories();
+  updateDrillList();
+}
+
+function updateDrillList() {
+  const container = qs("#drillList");
+  if (!container) return;
+  const t = state && state.training;
+  const drills = t && t.available_drills ? t.available_drills : [];
+  const cats = t && t.drill_categories || {};
+
+  let filtered = drills;
+  if (selectedCategory !== "All" && cats[selectedCategory]) {
+    filtered = drills.filter(d => cats[selectedCategory].includes(d.name));
+  }
+
+  let html = '';
+  if (!filtered.length) {
+    html = '<div style="color:#888;font-size:12px;padding:6px">No drills in this category.</div>';
+  }
+  filtered.forEach(d => {
+    const isSelected = selectedDrillName === d.name;
+    const attrStr = d.attrs.slice(0, 3).join(', ');
+    html += `<div class="list-item" onclick="selectDrill('${escHtml(d.name)}')" style="${isSelected?'border-color:var(--accent);background:var(--accent-glow)':''}">
+      <strong>${isSelected ? '▶ ' : ''}${escHtml(d.name)}</strong>
+      <small style="color:#888;font-size:10px"> ${escHtml(attrStr)}</small>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function selectDrill(name) {
+  if (selectedDrillName === name) {
+    selectedDrillName = null;
+  } else {
+    selectedDrillName = name;
+  }
+  updateDrillList();
+  qs("#selectedDrillInfo").textContent = selectedDrillName ? `Selected: ${selectedDrillName} — click a day to assign` : '';
+}
+
+function clearAllDrills() {
+  for (let i = 0; i < 7; i++) {
+    doSetDrill(i, null);
+  }
+}
+
+async function doSetDrill(dayIdx, drillName) {
+  const resp = await api("/api/set_schedule", { sid, day_idx: dayIdx, drill_name: drillName });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateScheduleGrid();
+    updateGymTab();
+  } else {
+    toast(resp.error || "Failed", "error");
+  }
+}
+
+async function refreshGymTab() {
+  if (state && state.strategies) STRATS = state.strategies;
+  updateGymTab();
+}
+
+function updateWeightSection() {
+  const f = state && state.fighter;
+  const t = state && state.training;
+  const wi = qs("#weightInfo");
+  if (!wi || !f) return;
+  const maxWeight = {"Flyweight":125,"Bantamweight":135,"Featherweight":145,"Lightweight":155,"Welterweight":170,"Middleweight":185,"Light Heavyweight":205,"Heavyweight":265}[f.weight_class] || 170;
+  const needToCut = Math.max(0, f.weight - maxWeight);
+  let info = `Current: ${f.weight} lbs | Limit: ${maxWeight} lbs | Cut: ${needToCut > 0 ? needToCut + ' lbs needed' : 'None needed'}`;
+  if (t) {
+    info += ` | Hydration: ${Math.round(t.hydration_level || 80)}%`;
+    if (t.weigh_in_pass === false) info += ' | <span style="color:#ff4a4a">WEIGH-IN FAILED</span>';
+    else if (t.weigh_in_pass === true && needToCut > 0) info += ' | <span style="color:#4aff6a">Weigh-in passed</span>';
+  }
+  wi.innerHTML = info;
 }
 
 function updateNewsFeed() {
@@ -1824,57 +1929,6 @@ function updateNewsFeed() {
 function escHtml(s) {
   if (!s) return "";
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
-}
-
-async function showDrillPicker(dayIdx, currentDrill) {
-  const t = state.training;
-  if (!t || !t.available_drills) return;
-  let html = `<div class="card-title">Select Drill for ${["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][dayIdx]}</div>`;
-  html += `<div style="font-size:12px;color:#888;margin-bottom:8px">Current: ${currentDrill === 'Rest' ? 'Rest' : escHtml(currentDrill)}</div>`;
-  html += `<div class="list-item" onclick="doSetDrill(${dayIdx}, null)" style="${currentDrill==='Rest'||!currentDrill?'border-color:#4a9eff':''}"><strong>Rest</strong> <small style="color:#4a9eff">Fatigue recovery</small></div>`;
-  t.available_drills.forEach(d => {
-    const isActive = d.name === currentDrill;
-    const safeName = escHtml(d.name);
-    const bonusHtml = d.gym_bonus > 0 ? ` <span style="color:#4aff6a">+${d.gym_bonus}% gym bonus</span>` : "";
-    html += `<div class="list-item" onclick="doSetDrill(${dayIdx}, '${safeName}')" style="${isActive?'border-color:#e62400':''}">
-      <strong>${isActive ? '▶ ' : ''}${safeName}</strong> <small>${d.duration}d, ${d.type}${bonusHtml}<br>Affects: ${escHtml(d.attrs.join(", "))}</small></div>`;
-  });
-  html += `<div style="margin-top:8px;text-align:center"><button class="btn btn-secondary btn-small" onclick="closeModal(null)">Close</button></div>`;
-  showModal(html);
-}
-
-async function doSetDrill(dayIdx, drillName) {
-  const resp = await api("/api/set_schedule", { sid, day_idx: dayIdx, drill_name: drillName });
-  if (resp.success) {
-    state = resp.state;
-    if (state && state.strategies) STRATS = state.strategies;
-    updateScheduleGrid();
-    closeModal(null);
-  } else {
-    toast(resp.error || "Failed", "error");
-  }
-}
-
-async function doWeightCut(intensity) {
-  const resp = await api("/api/cut_weight", { sid, intensity });
-  if (resp.success) {
-    state = resp.state;
-    const wcEl = qs("#weightCutInfo");
-    if (resp.weigh_in_pass) {
-      wcEl.innerHTML = `✅ Weigh-in passed! Cut ${resp.cut_lbs.toFixed(1)} lbs. Hydration: ${resp.hydration.toFixed(0)}%`;
-    } else {
-      wcEl.innerHTML = `❌ Weigh-in failed! Cut ${resp.cut_lbs.toFixed(1)} lbs. Hydration: ${resp.hydration.toFixed(0)}%`;
-    }
-    toast(resp.weigh_in_pass ? "Weigh-in passed!" : "Weigh-in failed!", resp.weigh_in_pass ? "success" : "error");
-    updateAllUI();
-  } else {
-    toast(resp.error || "Weight cut failed", "error");
-  }
-}
-
-async function refreshGymTab() {
-  if (state && state.strategies) STRATS = state.strategies;
-  updateGymTab();
 }
 
 async function doRecovery(type) {

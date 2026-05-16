@@ -510,7 +510,7 @@ def _get_training_state(session):
     t = session.get("training")
     if not t:
         return None
-    from training import DRILLS as ALL_DRILLS
+    from training import DRILL_CATEGORIES, DRILLS as ALL_DRILLS
     available_drills = []
     for d in ALL_DRILLS:
         gym_bonus = t.get_gym_bonus_for_drill(d.name)
@@ -526,9 +526,13 @@ def _get_training_state(session):
         "fatigue": round(t.fatigue * 100),
         "schedule": t.get_schedule_state(),
         "available_drills": available_drills,
+        "drill_categories": {k: v for k, v in DRILL_CATEGORIES.items()},
         "film_study_available": t.film_study_sessions < 2,
         "recovery_active": t.recovery_active,
         "recovery_type": t.recovery_type,
+        "weigh_in_pass": t.fighter.weigh_in_pass if hasattr(t.fighter, 'weigh_in_pass') else True,
+        "weight_cut_lbs": getattr(t.fighter, 'weight_cut_lbs', 0),
+        "hydration_level": getattr(t.fighter, 'hydration_level', 80),
     }
 
 def _get_gym_atmosphere(session):
@@ -1465,7 +1469,7 @@ class Handler(BaseHTTPRequestHandler):
                     pop_gain = pop_by_pos.get(pos, 0) if won else pop_by_pos.get(pos, 0)
                     if "KO" in method or "TKO" in method:
                         pop_gain += 5
-                    if is_title:
+                    if fb_state.is_title_fight:
                         pop_gain += 10 if won else -3
                 f.popularity = utils.clamp(getattr(f, "popularity", 10) + pop_gain, 0, 100)
 
@@ -1629,26 +1633,13 @@ class Handler(BaseHTTPRequestHandler):
                     "fight_today": fight_today,
                 })
 
-            elif path == "/api/set_schedule":
-                sid = body.get("sid", "")
-                day_idx = body.get("day_idx", 0)
-                drill_name = body.get("drill_name", None)
-                session = get_or_create_session(sid)
-                training = session.get("training")
-                if not training:
-                    self.json_resp({"error": "Not initialized"})
-                    return
-                if not training.week_started:
-                    training.week_started = True
-                training.set_day_drill(day_idx, drill_name)
-                self.json_resp({"success": True, "state": get_state_dict(session)})
-
             elif path == "/api/stop_training":
                 sid = body.get("sid", "")
                 session = get_or_create_session(sid)
                 training = session.get("training")
                 if training:
                     training.stop_training()
+                _persist_session(sid, session)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/accept_offer":
@@ -1776,6 +1767,7 @@ class Handler(BaseHTTPRequestHandler):
                             self.json_resp({"error": "Cannot afford membership"})
                             return
                         f.gym = gym_name
+                        _persist_session(sid, session)
                         self.json_resp({"success": True, "state": get_state_dict(session)})
                         return
                 self.json_resp({"error": "Gym not found"})
@@ -1788,6 +1780,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": "Not initialized"})
                     return
                 success = training.start_film_study()
+                _persist_session(sid, session)
                 self.json_resp({"success": success, "state": get_state_dict(session)})
 
             elif path == "/api/migrate_weight":
@@ -1820,6 +1813,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": "Not initialized"})
                     return
                 success = training.start_recovery(recovery_type)
+                _persist_session(sid, session)
                 self.json_resp({"success": success, "state": get_state_dict(session)})
 
             elif path == "/api/leave_gym":
@@ -1828,6 +1822,7 @@ class Handler(BaseHTTPRequestHandler):
                 f = session.get("fighter")
                 if f:
                     f.gym = None
+                _persist_session(sid, session)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/balance_test":

@@ -203,7 +203,7 @@ class WorldSimulator:
         news = []
         for promo in self.promotions:
             for fighter in promo.fighters[:]:
-                if fighter.retired:
+                if fighter.retired or getattr(fighter, 'is_player', False):
                     continue
                 if fighter.age >= 38:
                     fighter.retired = True
@@ -247,7 +247,7 @@ class WorldSimulator:
                     booked.add(fb.fighter1.name)
                     booked.add(fb.fighter2.name)
 
-        available = [f for f in fighters if f.is_available(game_date) and f.name not in booked]
+        available = [f for f in fighters if f.is_available(game_date) and f.name not in booked and not getattr(f, 'is_player', False)]
         if len(available) < 2:
             return []
 
