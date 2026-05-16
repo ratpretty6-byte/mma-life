@@ -50,12 +50,12 @@ ATTR_MAX = 100
 
 # --- Severity Tiers (6-tier strike grading) ---
 SEVERITY_TIERS = [
-    {"name": "Blocked",     "mult": 0.05, "score": 0.1,  "knockdown_chance": 0.0,  "vision_damage": 0.0},
-    {"name": "Glancing",    "mult": 0.30, "score": 0.3,  "knockdown_chance": 0.0,  "vision_damage": 0.01},
-    {"name": "Clean",       "mult": 0.70, "score": 0.7,  "knockdown_chance": 0.01, "vision_damage": 0.02},
-    {"name": "Solid",       "mult": 1.00, "score": 1.0,  "knockdown_chance": 0.03, "vision_damage": 0.04},
-    {"name": "Flush",       "mult": 1.50, "score": 1.3,  "knockdown_chance": 0.07, "vision_damage": 0.08},
-    {"name": "Devastating", "mult": 2.20, "score": 1.8,  "knockdown_chance": 0.13, "vision_damage": 0.12},
+    {"name": "Blocked",     "mult": 0.06, "score": 0.1,  "knockdown_chance": 0.0,   "vision_damage": 0.0},
+    {"name": "Glancing",    "mult": 0.32, "score": 0.3,  "knockdown_chance": 0.0,   "vision_damage": 0.01},
+    {"name": "Clean",       "mult": 0.75, "score": 0.7,  "knockdown_chance": 0.015, "vision_damage": 0.025},
+    {"name": "Solid",       "mult": 1.08, "score": 1.0,  "knockdown_chance": 0.035, "vision_damage": 0.045},
+    {"name": "Flush",       "mult": 1.60, "score": 1.3,  "knockdown_chance": 0.08,  "vision_damage": 0.09},
+    {"name": "Devastating", "mult": 2.35, "score": 1.8,  "knockdown_chance": 0.14,  "vision_damage": 0.13},
 ]
 SEVERITY_NAMES = {t["name"]: t for t in SEVERITY_TIERS}
 

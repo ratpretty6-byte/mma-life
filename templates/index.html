@@ -1978,54 +1978,84 @@ async function loadOpponents() {
 
 function showComparison(o) {
   const f = state.fighter;
-  const physLabels = ["striking_power","striking_accuracy","hand_speed","kick_power","kick_accuracy","kick_speed","takedown_power","takedown_accuracy","wrestling_defense","clinch_control","clinch_escapes","clinch_strikes","clinch_throws","top_control","bottom_control","submission_offense","submission_defense","cardio","durability","athleticism"];
-  const mentLabels = ["mental_toughness","fight_iq","heart","discipline","charisma","aggression","composure","adaptability"];
+  const groups = f.stat_groups || {};
+  const keyAttrs = f.stat_key || ["striking_power","striking_accuracy","hand_speed","cardio","durability","wrestling_defense","submission_defense","head_movement","fight_iq","mental_toughness","heart","composure"];
+  const allAttrs = (f.physical_attrs || []).concat(f.mental_attrs || []);
 
-  let html = `<div class="card-title" style="font-size:16px">Matchmaking: ${escHtml(f.name)} vs ${escHtml(o.name)}</div>`;
+  function arrow(my, op) {
+    if (my > op) return '<span style="color:#4aff6a">▲</span>';
+    if (my < op) return '<span style="color:#e62400">▼</span>';
+    return '<span style="color:#666">=</span>';
+  }
 
-  html += `<div class="compare-grid">
-    <div class="compare-col"><h4>${escHtml(f.name)}</h4>
-      <div class="stat-row"><span class="stat-label">Record</span><span class="stat-value">${escHtml(f.record)}</span></div>
-      <div class="stat-row"><span class="stat-label">Rank</span><span class="stat-value" style="color:${f.rank < o.rank ? '#4aff6a' : '#e62400'}">#${f.rank}</span></div>
-      <div class="stat-row"><span class="stat-label">Rating</span><span class="stat-value">${f.rating}</span></div>
-      <div class="stat-row"><span class="stat-label">Height</span><span class="stat-value">${f.height}"</span></div>
-      <div class="stat-row"><span class="stat-label">Reach</span><span class="stat-value">${f.reach}"</span></div>
-      <div class="stat-row"><span class="stat-label">Age</span><span class="stat-value">${f.age}</span></div>
-      <div class="stat-row"><span class="stat-label">KOs</span><span class="stat-value">${f.knockouts||0}</span></div>
-      <div class="stat-row"><span class="stat-label">Subs</span><span class="stat-value">${f.submissions||0}</span></div>
-      <div class="stat-row"><span class="stat-label">Win Streak</span><span class="stat-value">${f.win_streak||0}</span></div>
-    </div>
-    <div class="compare-col"><h4>${escHtml(o.name)}</h4>
-      <div class="stat-row"><span class="stat-label">Record</span><span class="stat-value">${escHtml(o.record)}</span></div>
-      <div class="stat-row"><span class="stat-label">Rank</span><span class="stat-value" style="color:${o.rank < f.rank ? '#4aff6a' : '#e62400'}">#${o.rank}</span></div>
-      <div class="stat-row"><span class="stat-label">Rating</span><span class="stat-value">${o.rating}</span></div>
-      <div class="stat-row"><span class="stat-label">Height</span><span class="stat-value">${o.height}"</span></div>
-      <div class="stat-row"><span class="stat-label">Reach</span><span class="stat-value">${o.reach}"</span></div>
-      <div class="stat-row"><span class="stat-label">Age</span><span class="stat-value">${o.age}</span></div>
-      <div class="stat-row"><span class="stat-label">KOs</span><span class="stat-value">${o.knockouts}</span></div>
-      <div class="stat-row"><span class="stat-label">Subs</span><span class="stat-value">${o.submissions}</span></div>
-      <div class="stat-row"><span class="stat-label">Win Streak</span><span class="stat-value">${o.win_streak||0}</span></div>
-    </div>
+  let html = `<div class="card-title" style="font-size:16px;text-align:center">${escHtml(f.name)} vs ${escHtml(o.name)}</div>`;
+
+  // Tale of the Tape
+  html += `<div class="compare-grid" style="margin-bottom:8px">
+    <div class="compare-col"><h4 style="color:var(--accent);font-size:13px">${escHtml(f.name)}</h4></div>
+    <div class="compare-col" style="text-align:center;font-size:10px;color:var(--text-muted)">TALE OF THE TAPE</div>
+    <div class="compare-col"><h4 style="color:#4a9eff;font-size:13px;text-align:right">${escHtml(o.name)}</h4></div>
   </div>`;
 
-  html += `<div style="margin-top:8px"><div class="card-title" style="font-size:13px">All Attributes</div>`;
-  html += `<div style="max-height:300px;overflow-y:auto">`;
-  [...physLabels, ...mentLabels].forEach(attr => {
+  const tapeStats = [
+    ["Record", f.record, o.record],
+    ["Rank", `#${f.rank}`, `#${o.rank}`],
+    ["Rating", f.rating, o.rating],
+    ["Height", `${f.height}"`, `${o.height}"`],
+    ["Reach", `${f.reach}"`, `${o.reach}"`],
+    ["Age", f.age, o.age],
+    ["KOs", f.knockouts||0, o.knockouts],
+    ["Subs", f.submissions||0, o.submissions],
+  ];
+  tapeStats.forEach(([label, myVal, opVal]) => {
+    const adv = typeof myVal === 'number' && typeof opVal === 'number' ? arrow(myVal, opVal) : '';
+    html += `<div class="compare-grid" style="margin:2px 0;font-size:12px">
+      <div style="text-align:right;padding-right:4px">${myVal} ${adv}</div>
+      <div style="text-align:center;font-size:10px;color:var(--text-muted)">${label}</div>
+      <div style="text-align:left;padding-left:4px">${opVal}</div>
+    </div>`;
+  });
+
+  // Key Stats side-by-side bars
+  html += `<div style="margin-top:8px"><div class="card-title" style="font-size:12px">Key Stats</div>`;
+  keyAttrs.forEach(attr => {
     const myVal = f.attributes ? f.attributes[attr] || 50 : 50;
     const opVal = o.attributes ? o.attributes[attr] || 50 : 50;
-    const color = myVal > opVal ? "#4aff6a" : (myVal < opVal ? "#e62400" : "#888");
-    const barPctMy = Math.min(100, myVal);
-    const barPctOp = Math.min(100, opVal);
+    const adv = arrow(myVal, opVal);
+    const barMy = Math.min(100, myVal);
+    const barOp = Math.min(100, opVal);
+    const isPhys = f.physical_attrs && f.physical_attrs.includes(attr);
     html += `<div style="display:flex;align-items:center;gap:4px;margin:3px 0">
-      <span style="width:130px;font-size:11px;color:#aaa;text-align:right;flex-shrink:0">${escHtml(attr.replace(/_/g,' '))}</span>
-      <div style="flex:1;height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden">
-        <div style="float:left;height:100%;width:${barPctMy}%;background:linear-gradient(90deg,#4a9eff,#e62400);border-radius:4px"></div>
+      <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+        <div style="float:right;height:100%;width:${barMy}%;background:${isPhys ? 'linear-gradient(90deg,#4a9eff,var(--accent))' : 'linear-gradient(90deg,#8a4aff,#ff6a4a)'};border-radius:3px"></div>
       </div>
-      <span style="width:70px;font-size:10px;color:${color};text-align:center">${myVal.toFixed(0)} vs ${opVal.toFixed(0)}</span>
-      <div style="flex:1;height:8px;background:#1a1a2a;border-radius:4px;overflow:hidden">
-        <div style="float:right;height:100%;width:${barPctOp}%;background:linear-gradient(90deg,#e62400,#4a9eff);border-radius:4px"></div>
+      <span style="width:110px;font-size:10px;color:#aaa;text-align:center">${escHtml(attr.replace(/_/g,' '))} ${adv}</span>
+      <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
+        <div style="float:left;height:100%;width:${barOp}%;background:${isPhys ? 'linear-gradient(90deg,var(--accent),#4a9eff)' : 'linear-gradient(90deg,#ff6a4a,#8a4aff)'};border-radius:3px"></div>
       </div>
     </div>`;
+  });
+  html += `</div>`;
+
+  // All Attributes (collapsible grouped)
+  html += `<div style="margin-top:8px">
+    <div class="card-title" style="font-size:12px;cursor:pointer" onclick="const e=this.nextElementSibling;e.style.display=e.style.display==='none'?'block':'none'">All Attributes <span style="font-size:10px;color:var(--text-muted)">▼</span></div>
+    <div style="display:none">`;
+  Object.entries(groups).forEach(([groupName, attrs]) => {
+    if (!attrs || !attrs.length) return;
+    html += `<div style="margin:4px 0"><span style="font-size:10px;color:var(--text-muted);text-transform:uppercase">${escHtml(groupName)}</span>`;
+    attrs.forEach(attr => {
+      const myVal = f.attributes ? f.attributes[attr] || 50 : 50;
+      const opVal = o.attributes ? o.attributes[attr] || 50 : 50;
+      const color = myVal > opVal ? "#4aff6a" : (myVal < opVal ? "#e62400" : "#888");
+      html += `<div style="display:flex;font-size:10px;padding:1px 0">
+        <span style="flex:1;color:#aaa">${escHtml(attr.replace(/_/g,' '))}</span>
+        <span style="width:30px;text-align:right;color:${myVal > opVal ? '#4aff6a' : '#ccc'}">${myVal.toFixed(0)}</span>
+        <span style="width:20px;text-align:center;color:#666">vs</span>
+        <span style="width:30px;color:${opVal > myVal ? '#e62400' : '#ccc'}">${opVal.toFixed(0)}</span>
+      </div>`;
+    });
+    html += `</div>`;
   });
   html += `</div></div>`;
 
@@ -2095,9 +2125,20 @@ async function scoutOpponent() {
     let bodyHtml = `<span style="color:${levelColor}">Scouting: ${s.sessions} session(s)</span><br>`;
     bodyHtml += `Archetype: ${escHtml(s.opponent_archetype)} | Background: ${escHtml(s.opponent_background)}<br>`;
     if (s.opponent_attrs_visible && s.opponent_preferred_strategies && s.opponent_preferred_strategies.length) {
-      bodyHtml += `Preferred strategies: ${s.opponent_preferred_strategies.join(", ")}`;
+      bodyHtml += `Preferred strategies: ${s.opponent_preferred_strategies.join(", ")}<br>`;
     } else if (s.opponent_attrs_visible) {
-      bodyHtml += `Attributes partially scouted (rounded values)`;
+      bodyHtml += `Attributes partially scouted (rounded values)<br>`;
+    }
+    // Composite defense notes
+    if (s.composite_notes && s.composite_notes.length) {
+      bodyHtml += `<div style="margin-top:6px;padding:6px;background:#0d0d1a;border-radius:4px;font-size:12px">`;
+      s.composite_notes.forEach(n => {
+        let c = "#aaa";
+        if (n.includes("excellent") || n.includes("strong") || n.includes("advantage")) c = "#4aff6a";
+        else if (n.includes("vulnerable") || n.includes("weakness") || n.includes("porous")) c = "#e62400";
+        bodyHtml += `<div style="color:${c}">• ${escHtml(n)}</div>`;
+      });
+      bodyHtml += `</div>`;
     }
     qs("#scoutBody").innerHTML = bodyHtml;
     toast("Scouting report updated", "success");
@@ -2371,27 +2412,31 @@ async function replayFightEvents(fightResult) {
     if (ev.type === "action") {
       const t = ev.text || "";
       const sev = ev.severity || "";
+      const subtype = ev.subtype || "";
+      const landed = ev.landed;
       let actCls = "ev-strike";
 
+      // Use structured subtype first, fall back to text patterns for legacy
       if (t.startsWith("!!!")) actCls = "ev-knockdown";
-      else if (t.startsWith("Both fighters trade")) actCls = "ev-exchange";
-      else if (/throws a .+! Landed \d+\/\d+:/.test(t)) actCls = "ev-combo";
-      else if (/slips.*and fires back|parries.*and creates|blocks.*and answers/.test(t)) actCls = "ev-counter";
-      else if (/shells up|circles away|swings wildly|is frozen|ties up to recover/.test(t)) actCls = "ev-reaction";
-      else if (/circles|steps into the pocket|switches stance|finding range/.test(t)) actCls = "ev-movement";
-      else if (/feints.*draws|sells the jab.*flinches|fakes the takedown.*eats/.test(t)) actCls = "ev-feint";
+      else if (subtype === "knockdown") actCls = "ev-knockdown";
+      else if (subtype === "exchange" || t.startsWith("Both fighters trade")) actCls = "ev-exchange";
+      else if (subtype === "combo" || /throws a .+! Landed \d+\/\d+:/.test(t)) actCls = "ev-combo";
+      else if (subtype === "counter" || /slips.*and fires back|parries.*and creates|blocks.*and answers/.test(t)) actCls = "ev-counter";
+      else if (subtype === "reaction" || /shells up|circles away|swings wildly|is frozen|ties up to recover/.test(t)) actCls = "ev-reaction";
+      else if (subtype === "movement" || /circles|steps into the pocket|switches stance|finding range/.test(t)) actCls = "ev-movement";
+      else if (subtype === "feint" || /feints.*draws|sells the jab.*flinches|fakes the takedown.*eats/.test(t)) actCls = "ev-feint";
+      else if (subtype === "miss" || subtype === "block" || subtype === "slip" || subtype === "parry") actCls = "ev-defensive";
+      else if (subtype === "takedown" || /takedown|slam|takes .+ down|puts .+ on the canvas|sprawl/i.test(t)) actCls = "ev-takedown";
+      else if (subtype === "clinch" || /clinch|knee|elbow|tie up|dirty box/i.test(t)) actCls = "ev-clinch";
+      else if (subtype === "ground" || /hammerfist|ground|mount|side control|guard|pass/i.test(t)) actCls = "ev-ground";
+      else if (subtype === "submission" || /submission|kimura|choke|armbar|triangle|tap/i.test(t)) actCls = "ev-sub-attempt";
+      else if (subtype === "strike" && landed === false) actCls = "ev-defensive";
       else if (/CRITICAL/.test(sev)) actCls = "ev-critical";
       else if (sev === "Devastating") actCls = "ev-critical";
       else if (sev === "Flush") actCls = "ev-heavy";
-      else if (sev === "Solid") actCls = "ev-strike";
-      else if (sev === "Clean") actCls = "ev-strike";
-      else if (sev === "Glancing") actCls = "ev-defensive";
-      else if (sev === "Blocked") actCls = "ev-defensive";
-      else if (/takedown|slam|takes .+ down|puts .+ on the canvas|sprawl/i.test(t)) actCls = "ev-takedown";
-      else if (/clinch|knee|elbow|tie up|dirty box/i.test(t)) actCls = "ev-clinch";
-      else if (/hammerfist|ground|mount|side control|guard|pass/i.test(t)) actCls = "ev-ground";
-      else if (/submission|kimura|choke|armbar|triangle|tap/i.test(t)) actCls = "ev-sub-attempt";
-      else if (/blocks|slips|parries|defends|misses|too gassed|can't/i.test(t)) actCls = "ev-defensive";
+      else if (sev === "Solid" || sev === "Clean") actCls = "ev-strike";
+      else if (sev === "Glancing" || sev === "Blocked") actCls = "ev-defensive";
+      else if (/too gassed|can't/i.test(t)) actCls = "ev-defensive";
       else if (/HURT|ROCKED|is hurt|is rocked/i.test(t)) actCls = "ev-hurt";
       else if (/STUNNED|stunned/i.test(t)) actCls = "ev-stunned";
       el.className += " " + actCls;
@@ -2626,28 +2671,52 @@ async function refreshCareerTab() {
     }
   }
 
-  const physLabels = ["striking_power","striking_accuracy","hand_speed","kick_power","kick_accuracy","kick_speed","takedown_power","takedown_accuracy","wrestling_defense","clinch_control","clinch_escapes","clinch_strikes","clinch_throws","top_control","bottom_control","submission_offense","submission_defense","cardio","durability","athleticism"];
-  const mentLabels = ["mental_toughness","fight_iq","heart","discipline","charisma","aggression","composure","adaptability"];
+  const statsMode = window._stats_mode || "key";
 
-  let physHtml = "";
-  physLabels.forEach(attr => {
-    const val = f.attributes ? f.attributes[attr] || 50 : 50;
+  function renderAttrBar(attr, val) {
     const pct = Math.min(100, Math.max(0, val));
-    physHtml += `<div class="attr-bar"><span class="label">${escHtml(attr.replace(/_/g,' '))}</span>
-      <div class="track"><div class="fill phys" style="width:${pct}%"></div></div>
+    return `<div class="attr-bar"><span class="label">${escHtml(attr.replace(/_/g,' '))}</span>
+      <div class="track"><div class="fill ${f.physical_attrs && f.physical_attrs.includes(attr) ? 'phys' : 'ment'}" style="width:${pct}%"></div></div>
       <span class="val">${val.toFixed(0)}</span></div>`;
-  });
-  qs("#physAttrs").innerHTML = physHtml;
+  }
 
-  let mentHtml = "";
-  mentLabels.forEach(attr => {
-    const val = f.attributes ? f.attributes[attr] || 50 : 50;
-    const pct = Math.min(100, Math.max(0, val));
-    mentHtml += `<div class="attr-bar"><span class="label">${escHtml(attr.replace(/_/g,' '))}</span>
-      <div class="track"><div class="fill ment" style="width:${pct}%"></div></div>
-      <span class="val">${val.toFixed(0)}</span></div>`;
-  });
-  qs("#mentAttrs").innerHTML = mentHtml;
+  function renderStatsSection(title, attrs, containerId) {
+    if (!attrs || !attrs.length) return;
+    let html = `<div class="stat-section" style="margin-bottom:8px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${escHtml(title)}</div>`;
+    attrs.forEach(attr => {
+      const val = f.attributes ? f.attributes[attr] || 50 : 50;
+      html += renderAttrBar(attr, val);
+    });
+    html += `</div>`;
+    qs(containerId).innerHTML += html;
+  }
+
+  const toggleHtml = `<div style="display:flex;gap:4px;margin-bottom:8px">
+    <button class="btn btn-ghost btn-small" onclick="window._stats_mode='key';refreshCareerTab()" style="${statsMode === 'key' ? 'color:var(--accent);border-color:var(--accent)' : ''}">Key Stats</button>
+    <button class="btn btn-ghost btn-small" onclick="window._stats_mode='all';refreshCareerTab()" style="${statsMode === 'all' ? 'color:var(--accent);border-color:var(--accent)' : ''}">All Stats</button>
+  </div>`;
+
+  if (statsMode === "key") {
+    const keyAttrs = f.stat_key || f.physical_attrs.slice(0, 6).concat(f.mental_attrs.slice(0, 4));
+    qs("#physAttrs").innerHTML = toggleHtml + `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Core attributes for your fighter</div>`;
+    let keyHtml = "";
+    keyAttrs.forEach(attr => {
+      const val = f.attributes ? f.attributes[attr] || 50 : 50;
+      keyHtml += renderAttrBar(attr, val);
+    });
+    qs("#physAttrs").innerHTML += keyHtml;
+    qs("#mentAttrs").innerHTML = "";
+  } else {
+    const groups = f.stat_groups || {};
+    qs("#physAttrs").innerHTML = toggleHtml;
+    renderStatsSection("Offense", groups.offense, "#physAttrs");
+    renderStatsSection("Defense", groups.defense, "#physAttrs");
+    renderStatsSection("Physical", groups.physical, "#physAttrs");
+
+    qs("#mentAttrs").innerHTML = "";
+    renderStatsSection("Mental", groups.mental, "#mentAttrs");
+  }
 }
 
 // --- FINANCE ---

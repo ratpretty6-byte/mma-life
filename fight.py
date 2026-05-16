@@ -589,6 +589,8 @@ class Fight:
         self.f1_start_attempts = 0
         self.f2_start_attempts = 0
         self._last_severity = "Clean"
+        self._last_landed = True
+        self._last_subtype = "strike"
 
     def _init_fighter_state(self) -> Dict:
         return {
@@ -997,6 +999,8 @@ class Fight:
                              "f2_total_score": self._get_total_score_for(2),
                              "time": self._get_time_str(),
                              "severity": self._last_severity,
+                             "landed": self._last_landed,
+                             "subtype": self._last_subtype,
                              "f1_momentum": self.f1_momentum,
                              "f2_momentum": self.f2_momentum,
                              "crowd_excitement": self.crowd_excitement,
@@ -1747,10 +1751,13 @@ class Fight:
             # Capture what _perform_strike logged and remove it for grouping
             if len(self.fight_log) > before_len:
                 last_entry = self.fight_log.pop()
-                if not last_entry.endswith("— CRITICAL HIT!"):
-                    last_entry = last_entry.rsplit(" — ", 1)[0] if " — " in last_entry else last_entry
-                results.append(f"{last_entry.split(' to ')[-1] if ' to ' in last_entry else last_entry}")
-                landed += 1
+                if "misses with" in last_entry:
+                    results.append(f"missed {actual_strike}")
+                else:
+                    if not last_entry.endswith("— CRITICAL HIT!"):
+                        last_entry = last_entry.rsplit(" — ", 1)[0] if " — " in last_entry else last_entry
+                    results.append(f"{last_entry.split(' to ')[-1] if ' to ' in last_entry else last_entry}")
+                    landed += 1
             else:
                 results.append(f"missed {actual_strike}")
 
@@ -1768,17 +1775,7 @@ class Fight:
             detail = ", ".join([r for r in results[:4]])
             self.fight_log.append(f"{attacker.name} throws a {combo_name}! Landed {landed}/{len(strikes)}: {detail}")
 
-    def _execute_defense(self, attacker, defender, atk_state, def_state, atk_strategy, df_strategy, phase):
-        """Simulate defender's active defense — sometimes they block/slip/parry."""
-        defense_action = self._select_defense(defender, atk_strategy)
-        if defense_action == "block":
-            pass  # Damage already reduced by block factor
-        elif defense_action == "slip":
-            if random.random() < 0.3:
-                self.fight_log.append(f"{defender.name} slips the strike!")
-        elif defense_action == "parry":
-            if random.random() < 0.25:
-                self.fight_log.append(f"{defender.name} parries and creates an opening!")
+
 
     def _select_defense(self, defender, strategy) -> str:
         """Weighted defense selection based on fighter attributes and strategy."""
@@ -2120,6 +2117,42 @@ class Fight:
 
         # Determine if strike lands and at what severity (target-zone-aware)
         defense_score = self._get_composite_defense(defender, def_state, atk_state, target)
+
+        # === MISS GATE ===
+        cardio = attacker.get_effective_attribute("cardio", atk_state["fatigue_level"])
+        # Miss only when defense significantly exceeds accuracy
+        def_ratio = defense_score / max(1, accuracy)
+        miss_chance = 0.05 + max(0, (def_ratio - 1.0) * 0.12)
+        miss_chance = utils.clamp(miss_chance, 0.05, 0.45)
+
+        if random.random() < miss_chance:
+            # Full stamina cost for missing — wasted energy
+            self._apply_stamina_cost(atk_state, strike_type, atk_state["fatigue_level"], cardio, stamina_mult)
+            self._last_landed = False
+            # Log what the defender did to cause the miss
+            def_action = self._select_defense(defender, strategy)
+            if def_action == "block":
+                self._last_subtype = "block"
+                self.fight_log.append(f"{defender.name} blocks the {strike_type}!")
+            elif def_action == "slip":
+                self._last_subtype = "slip"
+                self.fight_log.append(f"{defender.name} slips the {strike_type}!")
+            elif def_action == "parry":
+                self._last_subtype = "parry"
+                self.fight_log.append(f"{defender.name} parries the {strike_type}!")
+            elif def_action == "roll":
+                self._last_subtype = "slip"
+                self.fight_log.append(f"{defender.name} rolls with the {strike_type}!")
+            else:
+                self._last_subtype = "miss"
+                self.fight_log.append(f"{attacker.name} misses with a {strike_type}!")
+            return
+
+        # Landed — full stamina cost (missing also costs same stamina as punishment)
+        self._apply_stamina_cost(atk_state, strike_type, atk_state["fatigue_level"], cardio, stamina_mult)
+        self._last_landed = True
+        self._last_subtype = "strike"
+
         tier = utils.determine_severity(
             accuracy, defense_score, power, composure,
             self.get_adrenaline(1 if attacker == self.fighter1 else 2),
@@ -2132,8 +2165,6 @@ class Fight:
 
         # Calculate damage
         weight_mod = self._strike_weight_modifier(attacker.weight_class)
-        cardio = attacker.get_effective_attribute("cardio", atk_state["fatigue_level"])
-        self._apply_stamina_cost(atk_state, strike_type, atk_state["fatigue_level"], cardio, stamina_mult)
 
         # Build damage formula
         base_damage = profile["base_damage"]

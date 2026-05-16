@@ -30,6 +30,15 @@ DRILLS = [
     TrainingDrill("Kick Conditioning", "kick", ["kick_power", "kick_accuracy", "kick_speed", "athleticism"], 7, 0.6, 0.06, 0.02),
     TrainingDrill("Fight Conditioning", "conditioning", ["cardio", "durability", "mental_toughness", "heart"], 7, 0.5, 0.04, 0.01),
     TrainingDrill("Mental Training", "mental", ["fight_iq", "discipline", "charisma", "composure", "adaptability", "aggression"], 7, 0.5, 0.03, 0.005),
+    # New defensive & physical differentiation drills
+    TrainingDrill("Head Movement Drills", "defense", ["head_movement", "footwork_defense", "counter_timing"], 7, 0.5, 0.05, 0.01),
+    TrainingDrill("Defensive Fundamentals", "defense", ["blocking", "parrying", "danger_recognition"], 7, 0.5, 0.04, 0.01),
+    TrainingDrill("Reactive Counters", "sparring", ["counter_timing", "head_movement", "fight_iq"], 5, 1.0, 0.15, 0.05),
+    TrainingDrill("Sprawl & Scramble", "grappling", ["sprawl_technique", "scrambling", "explosiveness"], 7, 0.6, 0.07, 0.02),
+    TrainingDrill("Chain Wrestling", "grappling", ["chain_wrestling", "takedown_power", "takedown_accuracy"], 10, 0.7, 0.08, 0.03),
+    TrainingDrill("Guard Retention", "grappling", ["guard_retention", "flexibility", "bottom_control"], 7, 0.5, 0.06, 0.02),
+    TrainingDrill("Ground Defense", "grappling", ["ground_striking_defense", "submission_awareness", "durability"], 10, 0.6, 0.07, 0.02),
+    TrainingDrill("Pace & Distance", "mental", ["pace_management", "cardio", "danger_recognition"], 7, 0.4, 0.03, 0.005),
 ]
 
 CAMP_TEMPLATES = [
@@ -53,13 +62,13 @@ class TrainingCamp:
         self.coach_bonus = coach_bonus
         always = ["conditioning", "mental"]
         if camp_type == "muay_thai":
-            self.available_drills = [d for d in DRILLS if d.drill_type in ["striking", "clinch", "kick"] + always]
+            self.available_drills = [d for d in DRILLS if d.drill_type in ["striking", "clinch", "kick", "defense"] + always]
         elif camp_type == "bjj":
             self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling"] + always]
         elif camp_type == "wrestling":
             self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling", "clinch"] + always]
         elif camp_type == "striking":
-            self.available_drills = [d for d in DRILLS if d.drill_type in ["striking", "sparring", "kick"] + always]
+            self.available_drills = [d for d in DRILLS if d.drill_type in ["striking", "sparring", "kick", "defense"] + always]
         elif camp_type == "grappling":
             self.available_drills = [d for d in DRILLS if d.drill_type in ["grappling"] + always]
         else:  # MMA camp
@@ -96,7 +105,7 @@ class TrainingSystem:
         if self.film_study_sessions >= 2:
             return False
         self.film_study_sessions += 1
-        for attr in ["fight_iq", "adaptability"]:
+        for attr in ["fight_iq", "adaptability", "danger_recognition", "pace_management"]:
             old_val = self.fighter.attributes.get(attr, 50)
             new_val = utils.clamp(old_val + 0.08, utils.ATTR_MIN, utils.ATTR_MAX)
             self.fighter.attributes[attr] = new_val

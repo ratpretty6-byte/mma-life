@@ -327,6 +327,25 @@ def get_state_dict(session):
             "attributes": {k: round(v, 1) for k, v in f.attributes.items()},
             "physical_attrs": Fighter.PHYSICAL_ATTRS,
             "mental_attrs": Fighter.MENTAL_ATTRS,
+            "stat_groups": {
+                "offense": ["striking_power", "striking_accuracy", "hand_speed",
+                            "kick_power", "kick_accuracy", "kick_speed",
+                            "takedown_power", "takedown_accuracy", "submission_offense",
+                            "clinch_strikes", "clinch_throws"],
+                "defense": ["wrestling_defense", "head_movement", "footwork_defense",
+                            "blocking", "parrying", "counter_timing",
+                            "sprawl_technique", "guard_retention", "scrambling",
+                            "ground_striking_defense", "submission_awareness",
+                            "submission_defense", "clinch_escapes"],
+                "physical": ["cardio", "durability", "athleticism",
+                             "explosiveness", "flexibility",
+                             "top_control", "bottom_control", "clinch_control"],
+                "mental": Fighter.MENTAL_ATTRS,
+            },
+            "stat_key": ["striking_power", "striking_accuracy", "hand_speed",
+                         "cardio", "durability", "wrestling_defense",
+                         "submission_defense", "head_movement",
+                         "fight_iq", "mental_toughness", "heart", "composure"],
             "injuries": [{"type": i["type"], "severity": round(i["severity"], 2)} for i in f.injuries],
             "suspension": max(0, (f.medical_suspension_end - game_date).days) if f.medical_suspension_end else 0,
             "retired": f.retired,
@@ -1170,6 +1189,34 @@ class Handler(BaseHTTPRequestHandler):
                 opponent_attrs = opponent.attributes if scouted >= 3 else (
                     {k: round(v, -1) for k, v in opponent.attributes.items()} if scouted >= 1 else {})
                 preferred_strats = opponent.preferred_strategies if hasattr(opponent, 'preferred_strategies') else []
+                attrs = opponent.attributes
+                comp_strike_def = (attrs.get("head_movement", 50) + attrs.get("blocking", 50) +
+                                   attrs.get("parrying", 50) + attrs.get("footwork_defense", 50) +
+                                   attrs.get("counter_timing", 50)) / 5
+                comp_td_def = (attrs.get("sprawl_technique", 50) + attrs.get("wrestling_defense", 50) * 2) / 3
+                comp_ground_def = (attrs.get("guard_retention", 50) + attrs.get("scrambling", 50) +
+                                   attrs.get("ground_striking_defense", 50) + attrs.get("submission_awareness", 50)) / 4
+                height_diff = (f.height or 0) - (opponent.height or 0)
+                reach_diff = (f.reach or 0) - (opponent.reach or 0)
+
+                def describe_comp(val, high, mid, low):
+                    if val >= 70: return high
+                    if val >= 50: return mid
+                    return low
+
+                comp_notes = []
+                comp_notes.append(f"Striking D: {describe_comp(comp_strike_def, 'excellent footwork & defense', 'solid fundamentals', 'porous striking defense')}")
+                comp_notes.append(f"Takedown D: {describe_comp(comp_td_def, 'strong anti-wrestling', 'decent sprawl', 'vulnerable to takedowns')}")
+                comp_notes.append(f"Ground D: {describe_comp(comp_ground_def, 'dangerous off the back', 'competent on the mat', 'weakness on the ground')}")
+                if height_diff > 2:
+                    comp_notes.append(f"You have a height advantage (+{height_diff}\")")
+                elif height_diff < -2:
+                    comp_notes.append(f"They have a height advantage ({height_diff}\")")
+                if reach_diff > 2:
+                    comp_notes.append(f"You have a reach advantage (+{reach_diff}\")")
+                elif reach_diff < -2:
+                    comp_notes.append(f"They have a reach advantage ({reach_diff}\")")
+
                 scouting_report = {
                     "level": "full" if scouted >= 3 else ("partial" if scouted >= 1 else "none"),
                     "sessions": scouted,
@@ -1177,6 +1224,14 @@ class Handler(BaseHTTPRequestHandler):
                     "opponent_background": opponent.background,
                     "opponent_attrs_visible": scouted >= 1,
                     "opponent_preferred_strategies": preferred_strats if scouted >= 3 else [],
+                    "composites": {
+                        "striking_defense": round(comp_strike_def),
+                        "takedown_defense": round(comp_td_def),
+                        "ground_defense": round(comp_ground_def),
+                        "height_diff": height_diff,
+                        "reach_diff": reach_diff,
+                    },
+                    "composite_notes": comp_notes,
                 }
                 self.json_resp({"success": True, "scouting": scouting_report})
 
