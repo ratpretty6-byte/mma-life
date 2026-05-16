@@ -2201,20 +2201,142 @@ async function startFight() {
   qs("#f2NameBar").textContent = f2Name;
   qs("#f1StateBar").textContent = "";
   qs("#f2StateBar").textContent = "";
-
-  if (resp.fight_result && resp.fight_result.f1_health) {
-    updateHealthBars(resp.fight_result.f1_health, resp.fight_result.f2_health);
-  } else {
-    updateHealthBars({head:100,body:100,legs:100,overall:100,stamina:100,blood:0}, {head:100,body:100,legs:100,overall:100,stamina:100,blood:0});
-  }
-
+  updateHealthBars({head:100,body:100,legs:100,overall:100,stamina:100,blood:0}, {head:100,body:100,legs:100,overall:100,stamina:100,blood:0});
   qs("#fightScoreBars").style.display = "block";
   qs("#momentumDisplay").style.display = "block";
   updateScoreBars(0, 0);
   updateMomentumBars(0, 0, 50);
 
   fightReplaying = true;
-  await replayFightEvents(resp.fight_result);
+  await pollFightEvents();
+}
+
+async function pollFightEvents() {
+  let fromIdx = 0;
+  while (fightReplaying) {
+    const resp = await api(`/api/fight_events?sid=${encodeURIComponent(sid)}&from=${fromIdx}`);
+    if (!resp.success) { toast("Fight polling error", "error"); break; }
+    if (resp.events && resp.events.length) {
+      fromIdx += resp.events.length;
+      if (!await replayStreamedEvents(resp.events)) {
+        break;
+      }
+    }
+    if (resp.waiting) {
+      fightPaused = true;
+      const lastEv = resp.events ? resp.events[resp.events.length - 1] : null;
+      if (lastEv && lastEv.type === "strategy_prompt") {
+        showStrategyPrompt(lastEv);
+      }
+      while (fightPaused && fightReplaying) {
+        await sleep(100);
+      }
+    }
+    if (resp.done) {
+      await completeFight();
+      break;
+    }
+    await sleep(200);
+  }
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+async function replayStreamedEvents(events) {
+  for (const ev of events) {
+    if (!fightReplaying) return false;
+    if (ev.type === "strategy_prompt") continue; // handled by pollFightEvents
+    const el = document.createElement("div");
+    el.className = "ev fade-in";
+    let cls = "ev-action";
+    if (ev.type === "knockout" || ev.type === "submission" || ev.type === "decision" || ev.type === "post_fight") cls = "ev-big";
+    else if (ev.type === "pre_fight" || ev.type === "walkout" || ev.type === "score_update" || ev.type === "between_round") cls = "ev-info";
+    else if (ev.type === "round_start" || ev.type === "round_end") cls = "ev-round";
+    else if (ev.type === "round_summary") cls = "ev-summary";
+    el.className += " " + cls;
+
+    if (ev.type === "round_start") {
+      el.innerHTML = '--- ' + escHtml(ev.text) + ' ---';
+    } else if (ev.type === "round_end" || ev.type === "round_summary") {
+      if (ev.scores) {
+        _roundScores = ev.scores;
+        const f1r = _roundScores.reduce((s, r) => s + r[0], 0);
+        const f2r = _roundScores.reduce((s, r) => s + r[1], 0);
+        updateScoreBars(f1r, f2r);
+      }
+      el.innerHTML = escHtml(ev.text || "");
+    } else if (ev.type === "score_update") {
+      el.innerHTML = "Score: " + escHtml(ev.score);
+    } else if (ev.type === "between_round") {
+      el.innerHTML = escHtml(ev.text || "").replace(/\n/g, "<br>");
+    } else if (ev.type === "carryover") {
+      el.innerHTML = escHtml(ev.text || "");
+      el.className += " ev-carryover";
+    } else {
+      el.innerHTML = escHtml(ev.text || "");
+    }
+
+    if (ev.type === "action") {
+      const t = ev.text || "";
+      const sev = ev.severity || "";
+      const subtype = ev.subtype || "";
+      const landed = ev.landed;
+      let actCls = "ev-strike";
+
+      if (t.startsWith("!!!")) actCls = "ev-knockdown";
+      else if (subtype === "knockdown") actCls = "ev-knockdown";
+      else if (subtype === "exchange" || t.startsWith("Both fighters trade")) actCls = "ev-exchange";
+      else if (subtype === "combo" || /throws a .+! Landed \d+\/\d+:/.test(t)) actCls = "ev-combo";
+      else if (subtype === "counter" || /slips.*and fires back|parries.*and creates|blocks.*and answers/.test(t)) actCls = "ev-counter";
+      else if (subtype === "reaction" || /shells up|circles away|swings wildly|is frozen|ties up to recover/.test(t)) actCls = "ev-reaction";
+      else if (subtype === "movement" || /circles|steps into the pocket|switches stance|finding range/.test(t)) actCls = "ev-movement";
+      else if (subtype === "feint" || /feints.*draws|sells the jab.*flinches|fakes the takedown.*eats/.test(t)) actCls = "ev-feint";
+      else if (subtype === "miss" || subtype === "block" || subtype === "slip" || subtype === "parry") actCls = "ev-defensive";
+      else if (subtype === "takedown" || /takedown|slam|takes .+ down|puts .+ on the canvas|sprawl/i.test(t)) actCls = "ev-takedown";
+      else if (subtype === "clinch" || /clinch|knee|elbow|tie up|dirty box/i.test(t)) actCls = "ev-clinch";
+      else if (subtype === "ground" || /hammerfist|ground|mount|side control|guard|pass/i.test(t)) actCls = "ev-ground";
+      else if (subtype === "submission" || /submission|kimura|choke|armbar|triangle|tap/i.test(t)) actCls = "ev-sub-attempt";
+      else if (subtype === "strike" && landed === false) actCls = "ev-defensive";
+      else if (/CRITICAL/.test(sev)) actCls = "ev-critical";
+      else if (sev === "Devastating") actCls = "ev-critical";
+      else if (sev === "Flush") actCls = "ev-heavy";
+      else if (sev === "Solid" || sev === "Clean") actCls = "ev-strike";
+      else if (sev === "Glancing" || sev === "Blocked") actCls = "ev-defensive";
+      else if (/too gassed|can't/i.test(t)) actCls = "ev-defensive";
+      else if (/HURT|ROCKED|is hurt|is rocked/i.test(t)) actCls = "ev-hurt";
+      else if (/STUNNED|stunned/i.test(t)) actCls = "ev-stunned";
+      el.className += " " + actCls;
+      const f1N = state && state.fighter ? state.fighter.name : "";
+      const f2N = qs("#f2NameBar") ? qs("#f2NameBar").textContent : "";
+      if (f1N && t.startsWith(f1N)) el.className += " ev-f1";
+      else if (f2N && t.startsWith(f2N)) el.className += " ev-f2";
+      el.innerHTML = (ev.time ? "[" + escHtml(ev.time) + "] " : "") + escHtml(t);
+    }
+
+    if (el.textContent || el.innerHTML) {
+      const log = qs("#fightLog");
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    if (ev.f1_health && ev.type === "action") {
+      updateHealthBars(ev.f1_health, ev.f2_health);
+      if (ev.f1_state) updateFighterState(qs("#f1NameBar"), qs("#f1StateBar"), ev.f1_state);
+      if (ev.f2_state) updateFighterState(qs("#f2NameBar"), qs("#f2StateBar"), ev.f2_state);
+      if (ev.f1_total_score != null) updateScoreBars(ev.f1_total_score, ev.f2_total_score);
+      if (ev.f1_momentum != null) updateMomentumBars(ev.f1_momentum, ev.f2_momentum, ev.crowd_excitement);
+    }
+
+    const speed = fightSpeed || 1;
+    if (speed > 0) {
+      await sleep(speed === 0.5 ? 400 : speed === 1 ? 200 : speed === 2 ? 80 : 30);
+    } else {
+      await sleep(10);
+    }
+  }
+  return true;
 }
 
 function updateHealthBars(f1Health, f2Health) {
@@ -2537,7 +2659,6 @@ async function submitStrategy(stratId) {
   const resp = await api("/api/fight_action", { sid, strategy: stratId });
   if (resp.success) {
     fightPaused = false;
-    await replayFightEvents(resp.fight_result);
   }
 }
 

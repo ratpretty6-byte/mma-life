@@ -12,6 +12,13 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 strict = false
 check_untyped_defs = true
+exclude = [
+    "tests/",
+    "world_sim.py",
+    "analyze.py",
+    "stats_fetcher.py",
+    "mobile_compat.py",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

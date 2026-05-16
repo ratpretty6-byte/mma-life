@@ -7,10 +7,13 @@ import secrets
 import time
 import traceback
 import urllib.parse
+from collections import deque
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
-from threading import Lock, Thread
+from threading import Event, Lock, Thread
+
+from diskcache import Cache
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -48,6 +51,11 @@ init_lock = Lock()
 gs = {"initialized": False}
 _gs_lock = Lock()
 
+_session_cache = Cache(os.path.join(APP_DIR, ".session_cache"), size_limit=2**30, cull_limit=0)
+_session_cache.clear()  # Clear stale session cache on startup; world state persists via SQLite
+_fight_streams = {}
+_fight_streams_lock = Lock()
+
 def _gs_set(key, value):
     with _gs_lock:
         gs[key] = value
@@ -79,8 +87,6 @@ def ensure_initialized():
                 save_world_state(promotions, all_fighters)
                 world_sim = WorldSimulator(promotions, all_fighters)
             with _gs_lock:
-                gs["sessions"] = {}
-                gs["sessions_lock"] = Lock()
                 gs["promotions"] = promotions
                 gs["world"] = world
                 gs["national"] = national
@@ -97,13 +103,11 @@ def ensure_initialized():
             raise
 
 def get_or_create_session(session_id):
-    sl = _gs_get("sessions_lock")
-    if sl is None:
-        raise RuntimeError("Server not initialized yet")
-    with sl:
-        if session_id not in gs["sessions"]:
-            gs["sessions"][session_id] = load_session(session_id) or {"_created": time.time()}
-        return gs["sessions"][session_id]
+    if session_id not in _session_cache:
+        session = load_session(session_id) or {"_created": time.time()}
+        _session_cache[session_id] = session
+        _session_cache.expire(session_id, timedelta(hours=48))
+    return _session_cache[session_id]
 
 _world_sim_running = False
 _world_sim_lock = Lock()
@@ -152,6 +156,9 @@ Thread(target=_session_cleanup_loop, daemon=True).start()
 def _persist_session(sid, session):
     try:
         save_session(sid, session)
+        if sid in _session_cache:
+            _session_cache[sid] = session
+            _session_cache.expire(sid, timedelta(hours=48))
     except Exception as e:
         print(f"Failed to save session {sid}: {e}")
 
@@ -635,6 +642,97 @@ def get_opponents_data(session):
         })
     result.sort(key=lambda x: x["rank"])
     return result
+
+
+# ============================================================
+# FIGHT STREAMING — background thread with event polling
+# ============================================================
+
+class FightStream:
+    """Runs a fight in a background thread, buffering events for polling."""
+
+    def __init__(self, sid, fight, strategy, opponent_name):
+        self.sid = sid
+        self.fight = fight
+        self.initial_strategy = strategy
+        self.opponent_name = opponent_name
+        self.events = deque()
+        self.done = False
+        self.result = None
+        self.pause_event = Event()
+        self.waiting_for_input = False
+        self._thread = None
+
+    def start(self):
+        self._thread = Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
+        try:
+            self.fight.strategy1.set_pre_fight_strategy(self.initial_strategy)
+            ai_map = {
+                "brawler": "aggressive_striking", "counter_striker": "defensive_striking",
+                "wrestler": "wrestling_focus", "submission_artist": "submission_hunting",
+                "kickboxer": "kickboxing_focus", "boxer": "boxing_focus",
+                "muay_thai": "muay_thai_focus", "clinch_fighter": "clinch_dominance",
+            }
+            ai_s = ai_map.get(self.fight.fighter2.archetype, "balanced")
+            if ai_s == "balanced":
+                import random as rmod
+                from strategy import STRATEGIES as STRS
+                ai_s = rmod.choice([s["id"] for s in STRS])
+            self.fight.strategy2.set_pre_fight_strategy(ai_s)
+            gen = self.fight.simulate_fight_gen()
+            for event in gen:
+                if event.get("type") == "strategy_prompt":
+                    self.events.append(event)
+                    self.waiting_for_input = True
+                    self.pause_event.clear()
+                    self.pause_event.wait()
+                    self.waiting_for_input = False
+                elif event.get("type") == "complete":
+                    self.events.append(event)
+                    self.result = event
+                else:
+                    self.events.append(event)
+            self.done = True
+        except Exception as e:
+            self.events.append({"type": "error", "text": f"Fight error: {e}"})
+            self.done = True
+            import traceback as tbmod
+            tbmod.print_exc()
+
+    def submit_strategy(self, strategy):
+        if strategy is not None:
+            from strategy import find_strategy_by_id
+            strat = find_strategy_by_id(strategy)
+            if strat:
+                self.fight.strategy1.set_mid_fight_strategy(strat)
+        self.pause_event.set()
+
+    def get_new_events(self, from_index=0):
+        events_list = list(self.events)
+        return events_list[from_index:]
+
+    @property
+    def event_count(self):
+        return len(self.events)
+
+
+def get_fight_stream(sid):
+    with _fight_streams_lock:
+        return _fight_streams.get(sid)
+
+
+def set_fight_stream(sid, fs):
+    with _fight_streams_lock:
+        _fight_streams[sid] = fs
+
+
+def clear_fight_stream(sid):
+    with _fight_streams_lock:
+        _fight_streams.pop(sid, None)
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
@@ -1152,37 +1250,40 @@ class Handler(BaseHTTPRequestHandler):
                     traceback.print_exc()
                     self.json_resp({"error": f"Fight init failed: {str(ex)[:100]}"})
                     return
-                fight.strategy1.set_pre_fight_strategy(strat_id)
-                ai_map = {
-                    "brawler": "aggressive_striking", "counter_striker": "defensive_striking",
-                    "wrestler": "wrestling_focus", "submission_artist": "submission_hunting",
-                    "kickboxer": "kickboxing_focus", "boxer": "boxing_focus",
-                    "muay_thai": "muay_thai_focus", "clinch_fighter": "clinch_dominance",
-                    "balanced": random.choice([s["id"] for s in STRATEGIES]),
-                }
-                ai_s = ai_map.get(opponent.archetype, "balanced")
-                if ai_s == "balanced":
-                    ai_s = random.choice([s["id"] for s in STRATEGIES])
-                fight.strategy2.set_pre_fight_strategy(ai_s)
                 session["current_fight"] = fight
                 session["fight_started"] = True
-                result = fight.start_web_fight()
-                print(f"FIGHT RESULT: status={result.get('status')}, events={len(result.get('events', []))}")
-                if result.get('events'):
-                    for i, e in enumerate(result['events'][:5]):
-                        print(f"  event[{i}]: type={e.get('type')}, text={str(e.get('text',''))[:80]}")
-                self.json_resp({"success": True, "fight_result": result, "opponent": opponent.name})
+                fs = FightStream(sid, fight, strat_id, opponent.name)
+                set_fight_stream(sid, fs)
+                fs.start()
+                self.json_resp({"success": True, "fight_streaming": True, "opponent": opponent.name})
+
+            elif path == "/api/fight_events":
+                sid = params.get("sid", [""])[0]
+                from_index = int(params.get("from", ["0"])[0])
+                session = get_or_create_session(sid)
+                fs = get_fight_stream(sid)
+                if not fs:
+                    self.json_resp({"error": "No active fight stream"})
+                    return
+                new_events = fs.get_new_events(from_index)
+                self.json_resp({
+                    "success": True,
+                    "events": new_events,
+                    "done": fs.done,
+                    "total": fs.event_count,
+                    "waiting": fs.waiting_for_input,
+                })
 
             elif path == "/api/fight_action":
                 sid = body.get("sid", "")
                 strategy = body.get("strategy")
                 session = get_or_create_session(sid)
-                fight = session.get("current_fight")
-                if not fight:
-                    self.json_resp({"error": "No active fight"})
+                fs = get_fight_stream(sid)
+                if not fs:
+                    self.json_resp({"error": "No active fight stream"})
                     return
-                result = fight.submit_strategy_web(strategy)
-                self.json_resp({"success": True, "fight_result": result})
+                fs.submit_strategy(strategy)
+                self.json_resp({"success": True})
 
             elif path == "/api/scout_opponent":
                 sid = body.get("sid", "")
@@ -1272,6 +1373,15 @@ class Handler(BaseHTTPRequestHandler):
                 if not fight or not fb or not f:
                     self.json_resp({"error": "No fight to complete"})
                     return
+                # Wait for fight stream to finish if active
+                fs = get_fight_stream(sid)
+                if fs and not fs.done:
+                    fs.pause_event.set()  # Unpause if waiting
+                    for _ in range(100):
+                        if fs.done:
+                            break
+                        time.sleep(0.1)
+                    clear_fight_stream(sid)
                 opponent = fb.fighter2 if fb.fighter1 == f else fb.fighter1
                 winner = fight.winner
                 won = winner == f if winner else False

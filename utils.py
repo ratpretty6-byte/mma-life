@@ -4,6 +4,9 @@ import random
 from typing import Dict, List, Tuple
 
 import numpy as np
+from faker import Faker
+
+_faker = Faker()
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
 _config_cache: Dict[str, dict] = {}
@@ -288,8 +291,8 @@ def calculate_rating_from_attrs(attributes: Dict[str, float], physical_attrs: Li
 
 
 def generate_name() -> Tuple[str, str]:
-    first = random.choice(FIRST_NAMES)
-    last = random.choice(LAST_NAMES)
+    first = _faker.first_name()
+    last = _faker.last_name()
     return first, last
 
 
