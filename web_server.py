@@ -75,14 +75,12 @@ def ensure_initialized():
             existing = load_world_state()
             if existing:
                 promotions, all_fighters, world_sim, world_news = existing
-                world, national, regional = promotions
                 print(f"Loaded existing world: {len(all_fighters)} fighters, {len(promotions)} promotions")
             else:
                 print("Generating new game world...")
                 weight_classes = [wc["name"] for wc in utils.WEIGHT_CLASSES]
                 promotions = create_promotions(weight_classes)
-                world, national, regional = promotions
-                all_fighters = generate_fighter_pool(promotions, 3000)
+                all_fighters = generate_fighter_pool(promotions, 8000)
                 world_news = []
                 save_world_state(promotions, all_fighters)
                 world_sim = WorldSimulator(promotions, all_fighters)
@@ -152,6 +150,7 @@ def _session_cleanup_loop():
         time.sleep(3600)
         try:
             cleanup_stale_sessions(48)
+            _session_cache.cull()
         except Exception as e:
             print(f"Session cleanup error: {e}")
 
@@ -281,7 +280,8 @@ def ensure_available_opponents(session):
 def seed_regional_division(nationality: str, home_region: str, weight_class: str, count: int = 8):
     """Pre-seed the regional promotion with fighters matching a nationality."""
     from generator import generate_single_fighter
-    regional_promo = gs.get("regional")
+    regionals = get_promotions_by_tier("Regional")
+    regional_promo = regionals[0] if regionals else None
     if not regional_promo:
         return
     existing = [f for f in regional_promo.rankings.get(weight_class, [])
@@ -391,7 +391,7 @@ def get_state_dict(session):
             "rankings": [{"name": o.name, "rank": r+1, "record": o.get_record_string(), "rating": round(o.get_overall_rating(), 1)}
                          for r, o in enumerate((promo.rankings.get(f.weight_class) or [])[:15])] if promo else [],
             "champion": (promo.champions.get(f.weight_class).name if promo.champions.get(f.weight_class) else "N/A") if promo else "N/A",
-            "undisputed": promo.is_undisputed_champion(f, [gs.get("world"), gs.get("national"), gs.get("regional")]) if promo else False,
+            "undisputed": promo.is_undisputed_champion(f, get_promotions_by_tier()) if promo else False,
             "mandatory": promo._mandatory_challenges.get(f.weight_class).name if promo and promo._mandatory_challenges.get(f.weight_class) else None,
         } if promo else None,
         "contract": _get_contract_state(session),
@@ -492,11 +492,7 @@ def _get_training_state(session):
         return None
     from training import DRILLS as ALL_DRILLS
     available_drills = []
-    if t.current_camp:
-        drills = t.current_camp.available_drills
-    else:
-        drills = ALL_DRILLS
-    for d in drills:
+    for d in ALL_DRILLS:
         gym_bonus = t.get_gym_bonus_for_drill(d.name)
         available_drills.append({
             "name": d.name, "duration": d.duration_days, "type": d.drill_type,
@@ -504,11 +500,6 @@ def _get_training_state(session):
         })
     return {
         "in_training": t.in_training,
-        "in_camp": t.current_camp is not None,
-        "camp_name": t.current_camp.name if t.current_camp else None,
-        "camp_type": t.current_camp.camp_type if t.current_camp else None,
-        "camp_weeks": t.current_camp.duration_weeks if t.current_camp else 0,
-        "camp_cost": t.current_camp.cost if t.current_camp else 0,
         "drill_name": t.current_drill.name if t.current_drill else None,
         "intensity": t.intensity,
         "days_trained": t.days_trained,
@@ -526,7 +517,7 @@ def _get_gym_atmosphere(session):
         return None
     gym_name = f.gym
     gym_fighters = []
-    for prom in [gs.get("world"), gs.get("national"), gs.get("regional")]:
+    for prom in get_promotions_by_tier():
         if prom:
             for fighter in prom.fighters:
                 if fighter.gym == gym_name and fighter.name != f.name and not fighter.retired:
@@ -590,7 +581,7 @@ def _get_career_state(session, game_date=None):
         return None
     offer = None
     if hasattr(c, 'check_promotion_offer'):
-        promotions = (gs.get("world"), gs.get("national"), gs.get("regional"))
+        promotions = get_promotions_by_tier()
         offer = c.check_promotion_offer(promotions)
         if offer:
             offer = {"name": offer.name, "tier": offer.tier_name}
@@ -1147,52 +1138,19 @@ class Handler(BaseHTTPRequestHandler):
                     "fight_today": fight_today,
                 })
 
-            elif path == "/api/start_camp":
+            elif path == "/api/set_schedule":
                 sid = body.get("sid", "")
-                camp_idx = body.get("camp_idx", 0)
-                drill_idx = body.get("drill_idx", 0)
-                intensity = body.get("intensity", "moderate")
-                session = get_or_create_session(sid)
-                finance = session.get("finance")
-                training = session.get("training")
-                if not training or not finance:
-                    self.json_resp({"error": "Not initialized"})
-                    return
-                camps = TrainingCamp.get_available_camps()
-                if camp_idx >= len(camps):
-                    self.json_resp({"error": "Invalid camp"})
-                    return
-                camp = camps[camp_idx]
-                if drill_idx >= len(camp.available_drills):
-                    self.json_resp({"error": "Invalid drill"})
-                    return
-                drill = camp.available_drills[drill_idx]
-                if not finance.can_afford(camp.cost):
-                    self.json_resp({"error": f"Cannot afford {camp.cost}"})
-                    return
-                if training.start_camp(camp, drill, intensity, finance):
-                    self.json_resp({"success": True, "state": get_state_dict(session)})
-                else:
-                    self.json_resp({"error": "Failed to start camp"})
-
-            elif path == "/api/start_training":
-                sid = body.get("sid", "")
-                drill_idx = body.get("drill_idx", 0)
-                intensity = body.get("intensity", "moderate")
+                day_idx = body.get("day_idx", 0)
+                drill_name = body.get("drill_name", None)
                 session = get_or_create_session(sid)
                 training = session.get("training")
                 if not training:
                     self.json_resp({"error": "Not initialized"})
                     return
-                from training import DRILLS as ALL_DRILLS
-                if drill_idx >= len(ALL_DRILLS):
-                    self.json_resp({"error": "Invalid drill"})
-                    return
-                drill = ALL_DRILLS[drill_idx]
-                if training.start_training(drill, intensity):
-                    self.json_resp({"success": True, "state": get_state_dict(session)})
-                else:
-                    self.json_resp({"error": "Already training. Stop first."})
+                if not training.week_started:
+                    training.week_started = True
+                training.set_day_drill(day_idx, drill_name)
+                self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/stop_training":
                 sid = body.get("sid", "")
@@ -1200,14 +1158,6 @@ class Handler(BaseHTTPRequestHandler):
                 training = session.get("training")
                 if training:
                     training.stop_training()
-                self.json_resp({"success": True, "state": get_state_dict(session)})
-
-            elif path == "/api/end_camp":
-                sid = body.get("sid", "")
-                session = get_or_create_session(sid)
-                training = session.get("training")
-                if training:
-                    training.end_camp()
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/event_card":
@@ -1561,7 +1511,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not career:
                     self.json_resp({"error": "No career system"})
                     return
-                promotions = (gs.get("world"), gs.get("national"), gs.get("regional"))
+                promotions = get_promotions_by_tier()
                 offer = career.check_promotion_offer(promotions)
                 if not offer:
                     self.json_resp({"error": "No promotion offer available"})
@@ -1944,7 +1894,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not session.get("fighter"):
                     self.json_resp({"error": "No fighter to save"})
                     return
-                promotions_tuple = (gs.get("world"), gs.get("national"), gs.get("regional"))
+                promotions_tuple = get_promotions_by_tier()
                 world_data = (
                     promotions_tuple,
                     gs.get("all_fighters", []),
@@ -2077,20 +2027,7 @@ if __name__ == "__main__":
 
     gs["start_time"] = time.time()
 
-    def session_cleanup():
-        while True:
-            time.sleep(300)
-            sl = gs.get("sessions_lock")
-            if sl:
-                with sl:
-                    stale = [sid for sid, s in gs["sessions"].items()
-                             if time.time() - s.get("_created", 0) > 7200]
-                    for sid in stale:
-                        del gs["sessions"][sid]
-                    if stale:
-                        print(f"Cleaned {len(stale)} stale sessions")
-
-    Thread(target=session_cleanup, daemon=True).start()
+    Thread(target=_session_cleanup_loop, daemon=True).start()
 
     print(f"Server starting on port {PORT}...")
     server = ThreadedHTTPServer((HOST, PORT), Handler)
