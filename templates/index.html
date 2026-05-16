@@ -533,10 +533,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
           <div id="fatigueFill" style="height:100%;width:0%;border-radius:var(--radius-sm);transition:width .3s"></div>
         </div>
         <div class="flex-row" style="margin-top:6px;gap:4px" id="trainingActions">
-          <button class="btn btn-primary btn-sm hidden" id="btnStartTraining" onclick="showStartTraining()">Start Training</button>
-          <button class="btn btn-primary btn-sm hidden" id="btnStartCamp" onclick="showStartCamp()">Start Camp</button>
           <button class="btn btn-danger btn-sm hidden" id="btnStopTraining" onclick="stopTraining()">Stop Training</button>
-          <button class="btn btn-secondary btn-sm hidden" id="btnEndCamp" onclick="endCamp()">End Camp</button>
         </div>
       </div>
 
@@ -570,7 +567,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       <div id="fightPre" class="card">
         <div class="card-title">Available Opponents</div>
         <div id="opponentList"></div>
-        <div id="noOpponents" class="hidden" style="color:var(--text-muted);font-size:var(--text-base);text-align:center;padding:12px">No available opponents right now. Advance time to find fights.</div>
+        <div id="noOpponents" class="hidden" style="color:var(--text-muted);font-size:var(--text-base);text-align:center;padding:12px">No fight offers available right now.</div>
       </div>
       <div id="scoutSection" class="card hidden card-highlight" style="border-color:#4a9eff">
         <div class="flex-between"><div class="card-title">Scouting Report</div><span id="scoutLevel" style="font-size:var(--text-xs);color:var(--text-muted)"></span></div>
@@ -681,6 +678,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
         <div class="stat-row"><span class="stat-label">Current Rank</span><span class="stat-value" id="cRank">#--</span></div>
         <div class="stat-row"><span class="stat-label">Peak Rank</span><span class="stat-value" id="cPeak">#--</span></div>
         <div class="stat-row"><span class="stat-label">Promotion</span><span class="stat-value" id="cPromo">--</span></div>
+        <div class="stat-row"><span class="stat-label">Promo Style</span><span class="stat-value" id="cPromoStyle" style="font-size:var(--text-xs);color:var(--text-muted)">--</span></div>
         <div class="stat-row"><span class="stat-label">Champion</span><span class="stat-value" id="cChampion" style="color:var(--gold)">No</span></div>
       </div>
 
@@ -708,6 +706,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
         <div class="stat-row"><span class="stat-label">Trait</span><span class="stat-value" id="cTrait">--</span></div>
         <div class="stat-row"><span class="stat-label">Personality</span><span class="stat-value" id="cPersonality">--</span></div>
         <div class="stat-row"><span class="stat-label">Prime Status</span><span class="stat-value" id="cPrime">--</span></div>
+        <div class="stat-row"><span class="stat-label">Popularity</span><span class="stat-value" id="cPopularity">--</span></div>
         <div class="stat-row"><span class="stat-label">Signature Strike</span><span class="stat-value" id="cSignature">--</span></div>
       </div>
       <div class="card">
@@ -818,14 +817,26 @@ function setLoading(btn, loading) {
 }
 
 async function showContractOffers() {
-  const resp = await api("/api/free_agent_offers");
+  const f = state && state.fighter;
+  const resp = await api("/api/free_agent_offers" + (f ? "?sid=" + encodeURIComponent(sid) : ""));
   if (!resp.promotions) return;
   let html = '<div class="card-title" style="font-size:16px">Available Promotions</div>';
   html += '<div style="font-size:12px;color:#888;margin-bottom:8px">Review the offers below and sign with a promotion to begin your career.</div>';
   resp.promotions.forEach(p => {
+    const mmColors = {aggressive: "#ff4a4a", protective: "#4aff6a", balanced: "#ffd700"};
     html += `<div style="margin-bottom:8px;padding:10px;background:#1a1a2a;border-radius:6px">
-      <strong style="font-size:15px">${escHtml(p.name)}</strong> <span class="tag tag-promo">${escHtml(p.tier)}</span><br>
-      <span style="color:#888;font-size:12px">Base Pay: $${p.base_pay.toLocaleString()} | Win Bonus: $${p.win_bonus.toLocaleString()} | Perf Bonus: $${p.perf_bonus.toLocaleString()}</span><br>
+      <div class="flex-between">
+        <strong style="font-size:15px">${escHtml(p.name)}</strong>
+        <span class="tag tag-promo">${escHtml(p.tier)}</span>
+      </div>
+      <div style="font-size:11px;color:#888;margin:4px 0">${escHtml(p.personality || '')}</div>
+      <div style="display:flex;gap:8px;font-size:11px;color:#aaa;margin:4px 0">
+        <span>💰 $${p.base_pay.toLocaleString()}</span>
+        <span>🏆 Win: $${p.win_bonus.toLocaleString()}</span>
+        <span>🌟 Perf: $${p.perf_bonus.toLocaleString()}</span>
+        <span style="color:${mmColors[p.matchmaking] || '#888'}">🎯 ${p.matchmaking}</span>
+        <span>📊 ${'⭐'.repeat(p.prestige || 1)}</span>
+      </div>
       <button class="btn btn-primary btn-small" style="margin-top:4px" onclick="signFreeAgent('${escHtml(p.tier)}')">Sign Contract</button></div>`;
   });
   showModal(html);
@@ -1692,7 +1703,7 @@ function updateGymTab() {
   const t = state.training;
   const fin = state.finance;
   qs("#gymName").textContent = fin ? fin.gym : "None";
-  qs("#gymInfo").textContent = "Default gym — train to improve your attributes";
+  qs("#gymInfo").textContent = "Train by setting drills in the weekly schedule below.";
 
   const ga = state.gym_atmosphere;
   const gc = qs("#gymFightersCard");
@@ -1712,40 +1723,26 @@ function updateGymTab() {
     gc.style.display = "none";
   }
 
-  qs("#btnStartTraining").classList.add("hidden");
-  qs("#btnStartCamp").classList.add("hidden");
+  qs("#btnApplySchedule").classList.add("hidden");
   qs("#btnStopTraining").classList.add("hidden");
-  qs("#btnEndCamp").classList.add("hidden");
   qs("#fatigueBar").classList.add("hidden");
 
   if (t) {
     const fatigue = t.fatigue || 0;
-    if (t.in_training) {
-      qs("#fatigueBar").classList.remove("hidden");
-      const fill = qs("#fatigueFill");
-      fill.style.width = fatigue + "%";
-      if (fatigue > 70) fill.style.background = "#ff4a4a";
-      else if (fatigue > 40) fill.style.background = "#ffd700";
-      else fill.style.background = "#4aff6a";
+    qs("#fatigueBar").classList.remove("hidden");
+    const fill = qs("#fatigueFill");
+    fill.style.width = fatigue + "%";
+    if (fatigue > 70) fill.style.background = "#ff4a4a";
+    else if (fatigue > 40) fill.style.background = "#ffd700";
+    else fill.style.background = "#4aff6a";
 
-      if (t.in_camp) {
-        qs("#trainingStatus").innerHTML = `<span style="color:#4aff6a">Camp: ${escHtml(t.camp_name)}</span> &mdash; ${escHtml(t.drill_name)} | Day ${t.days_trained}/${t.camp_weeks*7} | Fatigue: ${fatigue}%`;
-        qs("#btnEndCamp").classList.remove("hidden");
-        qs("#btnStopTraining").classList.remove("hidden");
-      } else {
-        qs("#trainingStatus").innerHTML = `<span style="color:#4a9eff">Base Training</span> &mdash; ${escHtml(t.drill_name)} | Fatigue: ${fatigue}%`;
-        qs("#btnStopTraining").classList.remove("hidden");
-        qs("#btnStartCamp").classList.remove("hidden");
-      }
+    if (t.drill_name) {
+      qs("#trainingStatus").innerHTML = `<span style="color:#4a9eff">Training</span> &mdash; ${escHtml(t.drill_name)} | Fatigue: ${fatigue}%`;
     } else {
-      qs("#trainingStatus").innerHTML = `<span style="color:#888">Not training</span>`;
-      qs("#btnStartTraining").classList.remove("hidden");
-      qs("#btnStartCamp").classList.remove("hidden");
+      qs("#trainingStatus").innerHTML = `<span style="color:#888">Set your weekly schedule below</span>`;
     }
-  } else {
-    qs("#trainingStatus").innerHTML = `<span style="color:#888">Not training</span>`;
-    qs("#btnStartTraining").classList.remove("hidden");
   }
+  updateScheduleGrid();
 
   const fss = qs("#filmStudyStatus");
   if (t && t.film_study_available) {
@@ -1759,7 +1756,6 @@ function updateGymTab() {
     fss.textContent = "Recovery active: " + (t.recovery_type || "processing");
     fss.style.color = "#4a9eff";
   }
-  updateScheduleGrid();
 }
 
 function updateScheduleGrid() {
@@ -1855,23 +1851,13 @@ async function doFilmStudy() {
   else toast("Film study used 2/2 this week", "error");
 }
 
-async function showStartCamp() {
-  const resp = await api("/api/camps");
-  let html = '<div class="card-title" style="font-size:16px">Select Training Camp</div><div style="font-size:12px;color:#888;margin-bottom:8px">Camps cost money but boost your skills. Weekly schedule auto-filled.</div>';
-  resp.camps.forEach((c, ci) => {
-    html += `<div style="margin-bottom:10px;padding:10px;background:#1a1a2a;border-radius:6px">
-      <strong>${escHtml(c.name)}</strong> <span style="color:#888">(${c.weeks}w, $${c.cost.toLocaleString()})</span><br>
-      <select id="drillSel${ci}" style="margin-top:4px">`;
-    c.drills.forEach((d, di) => {
-      html += `<option value="${di}">${escHtml(d.name)} (${d.duration}d, ${d.type})</option>`;
-    });
-    html += '</select><br>';
-    html += '<select id="intSel' + ci + '" style="margin-top:4px;width:auto;display:inline-block">';
-    html += '<option value="light">Light</option><option value="moderate" selected>Moderate</option><option value="intense">Intense</option>';
-    html += '</select> ';
-    html += `<button class="btn btn-small btn-primary" onclick="startCamp(${ci})">Start Camp</button></div>`;
-  });
-  showModal(html);
+async function setDayDrill(dayIdx, drillName) {
+  const resp = await api("/api/set_schedule", { sid, day_idx: dayIdx, drill_name: drillName || null });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateScheduleGrid();
+  }
 }
 
 async function startCamp(campIdx) {
@@ -2857,8 +2843,9 @@ async function refreshCareerTab() {
   qs("#cRank").textContent = `#${f.rank}`;
   qs("#cPeak").textContent = `#${f.peak_rank}`;
   qs("#cPromo").textContent = p ? `${escHtml(p.name)} (${p.tier})` : "Free Agent";
+  qs("#cPromoStyle").textContent = p && p.personality ? escHtml(p.personality) : "";
+  qs("#cPromoStyle").style.color = "#888";
   qs("#cChampion").textContent = p && p.champion && p.champion === f.name ? "Yes" : "No";
-  qs("#cChampion").style.color = p && p.champion && p.champion === f.name ? "#ffd700" : "#fff";
   qs("#cAge").textContent = f.age;
   qs("#cNation").textContent = f.nationality || "--";
   qs("#cRegion").textContent = f.home_region || "--";
@@ -2868,6 +2855,9 @@ async function refreshCareerTab() {
   qs("#cTrait").textContent = traitName;
   qs("#cPersonality").textContent = persName;
   qs("#cRating").textContent = f.rating;
+  const pop = f.popularity || 0;
+  const popColor = pop >= 70 ? "#ffd700" : (pop >= 40 ? "#4aff6a" : "#888");
+  qs("#cPopularity").innerHTML = `<span style="color:${popColor}">${pop} / 100</span>`;
   const primeStatus = f.prime_status || "unknown";
   const primeColor = primeStatus === "prime" ? "#4aff6a" : (primeStatus === "developing" ? "#4a9eff" : "#ff9a4a");
   qs("#cPrime").innerHTML = `<span style="color:${primeColor}">${primeStatus.charAt(0).toUpperCase() + primeStatus.slice(1)}</span>`;

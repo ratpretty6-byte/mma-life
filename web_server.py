@@ -392,6 +392,7 @@ def get_state_dict(session):
                          for r, o in enumerate((promo.rankings.get(f.weight_class) or [])[:15])] if promo else [],
             "champion": (promo.champions.get(f.weight_class).name if promo.champions.get(f.weight_class) else "N/A") if promo else "N/A",
             "undisputed": promo.is_undisputed_champion(f, get_promotions_by_tier()) if promo else False,
+            "personality": promo.personality.get("description", "") if promo and hasattr(promo, "personality") else "",
             "mandatory": promo._mandatory_challenges.get(f.weight_class).name if promo and promo._mandatory_challenges.get(f.weight_class) else None,
         } if promo else None,
         "contract": _get_contract_state(session),
