@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import copy
 import json
 import os
 import random
@@ -42,7 +41,7 @@ from persistence import (
     save_to_slot,
     save_world_state,
 )
-from promotion import create_promotions, PROMOTION_PERSONALITIES
+from promotion import create_promotions
 from strategy import STRATEGIES
 from training import TrainingSystem
 from world_sim import WorldSimulator
@@ -102,6 +101,26 @@ def get_promotions_by_tier(tier_name=None):
     if tier_name:
         return [p for p in promos if p.tier_name == tier_name]
     return promos
+
+
+def get_promotion_by_name(name):
+    if not name:
+        return None
+    for p in get_promotions_by_tier():
+        if p.name == name:
+            return p
+    return None
+
+
+def get_session_promotion(session):
+    name = session.get("current_promotion_name")
+    if name:
+        return get_promotion_by_name(name)
+    return None
+
+
+def set_session_promotion(session, promo):
+    session["current_promotion_name"] = promo.name if promo else None
 
 
 def get_or_create_session(session_id):
@@ -184,12 +203,12 @@ def _auto_save(sid, session):
             return
         if session.get("current_fight") or session.get("fight_started"):
             return
-        promotions_tuple = (gs.get("world"), gs.get("national"), gs.get("regional"))
+        promotions_tuple = tuple(get_promotions_by_tier())
         world_data = (
             promotions_tuple,
-            gs.get("all_fighters", []),
-            gs.get("world_sim"),
-            gs.get("world_news", []),
+            _gs_get("all_fighters", []),
+            _gs_get("world_sim"),
+            _gs_get("world_news", []),
         )
         f = session.get("fighter")
         name = f"{f.name} (Auto)"
@@ -212,7 +231,7 @@ def _auto_save(sid, session):
 
 def ensure_regional_opponents(session):
     f = session.get("fighter")
-    promo = session.get("current_promotion")
+    promo = get_session_promotion(session)
     if not f or not promo or promo.tier_name != "Regional":
         return
     wc = f.weight_class
@@ -242,7 +261,7 @@ def ensure_regional_opponents(session):
 def ensure_available_opponents(session):
     """Replenish opponent pool for the player's current promotion tier."""
     f = session.get("fighter")
-    promo = session.get("current_promotion")
+    promo = get_session_promotion(session)
     if not f or not promo:
         return
     wc = f.weight_class
@@ -318,7 +337,7 @@ def get_state_dict(session):
             "nationalities": utils.NATIONALITIES,
             "regions": utils.REGIONS,
         }
-    promo = session.get("current_promotion")
+    promo = get_session_promotion(session)
     training = session.get("training")
     game_date = session.get("game_date", datetime.now())
     return {
@@ -536,7 +555,9 @@ def _get_finance_state(session):
     f = session.get("finance")
     if not f:
         return None
-    gym_name = f.fighter.gym
+    # Read gym from session fighter directly to avoid pickle reference breakage
+    session_fighter = session.get("fighter")
+    gym_name = session_fighter.gym if session_fighter else None
     gym_fee = 0
     if gym_name:
         for g in utils.GYMS:
@@ -611,7 +632,7 @@ def get_available_camps_data():
 
 def get_opponents_data(session):
     f = session.get("fighter")
-    promo = session.get("current_promotion")
+    promo = get_session_promotion(session)
     if not f or not promo:
         return []
     all_promos = [gs.get("world"), gs.get("national"), gs.get("regional")]
@@ -661,6 +682,7 @@ class FightStream:
         self._thread = None
 
     def start(self):
+        print(f"[FightStream] Starting for {self.sid}", flush=True)
         self._thread = Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -676,6 +698,7 @@ class FightStream:
             ai_s = ai_map.get(self.fight.fighter2.archetype, "balanced")
             if ai_s == "balanced":
                 import random as rmod
+
                 from strategy import STRATEGIES as STRS
                 ai_s = rmod.choice([s["id"] for s in STRS])
             self.fight.strategy2.set_pre_fight_strategy(ai_s)
@@ -694,10 +717,10 @@ class FightStream:
                     self.events.append(event)
             self.done = True
         except Exception as e:
-            self.events.append({"type": "error", "text": f"Fight error: {e}"})
-            self.done = True
             import traceback as tbmod
             tbmod.print_exc()
+            self.events.append({"type": "error", "text": f"Fight error: {e}"})
+            self.done = True
 
     def submit_strategy(self, strategy):
         if strategy is not None:
@@ -813,6 +836,7 @@ class Handler(BaseHTTPRequestHandler):
                 game_date = datetime(2025, 1, 6)
                 stance = utils.get_stance_for_background(bg)
                 f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, stance=stance, game_date=game_date)
+                f.is_player = True
                 regionals = get_promotions_by_tier("Regional")
                 regional = regionals[0] if regionals else None
                 career = CareerSystem(f)
@@ -835,7 +859,7 @@ class Handler(BaseHTTPRequestHandler):
                 session["health"] = health
                 session["media"] = media
                 session["event_sys"] = event_sys
-                session["current_promotion"] = regional
+                set_session_promotion(session, regional)
                 session["current_event"] = None
                 session["current_fight_booking"] = None
                 session["current_fight"] = None
@@ -853,7 +877,7 @@ class Handler(BaseHTTPRequestHandler):
                 sid = params.get("sid", [""])[0]
                 session = get_or_create_session(sid)
                 f = session.get("fighter")
-                promo = session.get("current_promotion")
+                promo = get_session_promotion(session)
                 if not f or not promo:
                     self.json_resp({"offers": []})
                     return
@@ -890,6 +914,15 @@ class Handler(BaseHTTPRequestHandler):
                 for p in gs["promotions"]:
                     if tier_filter and p.tier_name.lower() != tier_filter.lower():
                         continue
+                    # Only show Regional promotions for new fighters (0 career fights)
+                    if f and (f.career_total_fights or 0) == 0 and p.tier_name != "Regional":
+                        continue
+                    # Unlock National after 3 wins or a title
+                    if f and f.wins >= 3 and p.tier_name == "National":
+                        pass  # National is unlocked
+                    # Unlock World after 5 wins or National title
+                    if f and f.wins >= 5 and p.tier_name == "World":
+                        pass  # World is unlocked
                     # Only show promotions at or above player's level
                     if f:
                         tiers = ["Regional", "National", "World"]
@@ -1034,6 +1067,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id,
                             stance=stance, game_date=game_date, height=height, reach=reach)
+                f.is_player = True
 
                 # Age-scaled starting stats: 18yo starts ~25% below base, 35yo starts at base+5%
                 age_min = 18
@@ -1070,7 +1104,7 @@ class Handler(BaseHTTPRequestHandler):
                 session["health"] = health
                 session["media"] = media
                 session["event_sys"] = event_sys
-                session["current_promotion"] = None
+                set_session_promotion(session, None)
                 session["current_event"] = None
                 session["current_fight_booking"] = None
                 session["current_fight"] = None
@@ -1102,9 +1136,16 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": "Not initialized"})
                     return
 
-                result = training.advance_day()
+                # Block advancing during fight week
+                if fb:
+                    fb_age_days = max(0, (fb.date - session.get("game_date", datetime.now())).days) if fb.date else None
+                    if fb_age_days is not None and 0 < fb_age_days <= 5:
+                        self.json_resp({"error": f"Fight week in progress! {fb_age_days} days until the fight — cannot skip."})
+                        return
 
                 game_date = session.get("game_date")
+                result = training.advance_day(game_date)
+
                 if game_date:
                     game_date += timedelta(days=1)
                     session["game_date"] = game_date
@@ -1290,8 +1331,10 @@ class Handler(BaseHTTPRequestHandler):
                 reach_diff = (f.reach or 0) - (opponent.reach or 0)
 
                 def describe_comp(val, high, mid, low):
-                    if val >= 70: return high
-                    if val >= 50: return mid
+                    if val >= 70:
+                        return high
+                    if val >= 50:
+                        return mid
                     return low
 
                 comp_notes = []
@@ -1497,7 +1540,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": "Cannot sign"})
                     return
                 career.sign_with_promotion(promo, 4, game_date)
-                session["current_promotion"] = promo
+                set_session_promotion(session, promo)
                 ensure_regional_opponents(session)
                 _persist_session(sid, session)
                 _persist_world()
@@ -1518,7 +1561,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": "No promotion offer available"})
                     return
                 career.sign_with_promotion(offer, 4, game_date)
-                session["current_promotion"] = offer
+                set_session_promotion(session, offer)
                 ensure_regional_opponents(session)
                 _persist_session(sid, session)
                 _persist_world()
@@ -1540,11 +1583,18 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": "Not initialized"})
                     return
 
+                # Block advancing during fight week
+                if fb:
+                    fb_age_days = max(0, (fb.date - session.get("game_date", datetime.now())).days) if fb.date else None
+                    if fb_age_days is not None and 0 < fb_age_days <= 5:
+                        self.json_resp({"error": f"Fight week in progress! {fb_age_days} days until the fight — cannot skip."})
+                        return
+
                 game_date = session.get("game_date")
                 fight_today = False
 
                 for _ in range(days):
-                    training.advance_day()
+                    training.advance_day(game_date)
 
                     if game_date:
                         game_date += timedelta(days=1)
@@ -1589,9 +1639,16 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": "Not initialized"})
                     return
                 if not training.week_started:
-                    self.json_resp({"error": "Start training or a camp first to set up a schedule"})
-                    return
+                    training.week_started = True
                 training.set_day_drill(day_idx, drill_name)
+                self.json_resp({"success": True, "state": get_state_dict(session)})
+
+            elif path == "/api/stop_training":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                training = session.get("training")
+                if training:
+                    training.stop_training()
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/accept_offer":
@@ -1599,7 +1656,7 @@ class Handler(BaseHTTPRequestHandler):
                 opp_name = body.get("opponent", "")
                 session = get_or_create_session(sid)
                 f = session.get("fighter")
-                promo = session.get("current_promotion")
+                promo = get_session_promotion(session)
                 career = session.get("career")
                 game_date = session.get("game_date")
                 if not f or not promo:
@@ -1648,7 +1705,7 @@ class Handler(BaseHTTPRequestHandler):
                 sid = body.get("sid", "")
                 session = get_or_create_session(sid)
                 f = session.get("fighter")
-                promo = session.get("current_promotion")
+                promo = get_session_promotion(session)
                 if not f or not promo:
                     self.json_resp({"error": "Not signed"})
                     return
@@ -1679,6 +1736,30 @@ class Handler(BaseHTTPRequestHandler):
                 if finance:
                     finance.fire_agent(game_date)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
+
+            elif path == "/api/cut_weight":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                fb = session.get("current_fight_booking")
+                if not f or not fb:
+                    self.json_resp({"error": "No fight booked"})
+                    return
+                # Determine target weight from weight class max
+                target = f.natural_weight_lbs
+                for wc in utils.WEIGHT_CLASSES:
+                    if wc["name"] == f.weight_class:
+                        target = wc["max"]
+                        break
+                # Apply cut with intensity modifier
+                passed = f.cut_weight(target, fb.is_title_fight)
+                _persist_session(sid, session)
+                self.json_resp({
+                    "success": True, "passed": passed,
+                    "cut_lbs": f.weight_cut_lbs, "hydration": f.hydration_level,
+                    "weigh_in_pass": f.weigh_in_pass,
+                    "state": get_state_dict(session),
+                })
 
             elif path == "/api/join_gym":
                 sid = body.get("sid", "")

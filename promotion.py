@@ -1,10 +1,9 @@
 import random
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import utils
 from fighter import Fighter
-
 
 # Promotion personality templates
 PROMOTION_PERSONALITIES = [

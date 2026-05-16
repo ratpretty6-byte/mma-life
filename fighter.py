@@ -61,6 +61,7 @@ class Fighter:
     def __init__(self, name: str, age: int, weight_lbs: float, background: str = "mma", archetype: str = "balanced",
                  nationality: str = "American", home_region: str = "California", trait_id: str = None, personality_id: str = "humble",
                  stance: str = None, game_date: datetime = None, height: int = None, reach: int = None):
+        self.is_player = False
         self.name = name
         self.age = age
         self.base_weight_lbs = weight_lbs

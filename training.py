@@ -1,8 +1,10 @@
-from typing import Dict, List, Optional
-from fighter import Fighter
 import random
 from datetime import datetime
+from typing import Dict, List, Optional
+
 import utils
+from fighter import Fighter
+
 
 class TrainingDrill:
     def __init__(self, name: str, drill_type: str, affected_attrs: List[str],
@@ -113,6 +115,7 @@ class TrainingSystem:
     def set_day_drill(self, day_idx: int, drill_name: Optional[str]):
         if 0 <= day_idx <= 6:
             self.weekly_schedule[day_idx] = drill_name
+            self.week_started = True
 
     def get_today_drill(self) -> Optional[TrainingDrill]:
         name = self.weekly_schedule.get(self.current_week_day)
@@ -150,18 +153,12 @@ class TrainingSystem:
                   "gains": {}, "fatigue": self.fatigue, "injury": None,
                   "drill_over": False, "recovery": recovery_result}
 
-        if not self.in_training:
-            result["status"] = "idle"
-            self._advance_week_day()
-            return result
-
         if is_rest:
             self.fatigue = max(0.0, self.fatigue - 0.35)
             result["status"] = "rest"
             result["fatigue"] = self.fatigue
             for attr in self.fighter.PHYSICAL_ATTRS + self.fighter.MENTAL_ATTRS:
                 old_val = self.fighter.attributes[attr]
-                # Small upkeep gain on rest days
                 new_val = utils.clamp(old_val + 0.05, utils.ATTR_MIN, utils.ATTR_MAX)
                 self.fighter.attributes[attr] = new_val
                 if new_val - old_val > 0:
@@ -170,6 +167,7 @@ class TrainingSystem:
             return result
 
         self.current_drill = drill
+        self.in_training = True
         self.days_trained += 1
         intensity_mult = {"light": 0.6, "moderate": 1.0, "intense": 1.4}.get(self.intensity, 1.0)
 

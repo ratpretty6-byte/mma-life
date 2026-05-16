@@ -578,8 +578,21 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       <div id="fightReady" class="hidden card card-highlight">
         <div class="card-title" style="color:var(--gold)">Fight Week</div>
         <div id="fightMatchup"></div>
+        <div id="fightWeekTimeline" style="margin-top:6px;padding:6px;background:#0d0d1a;border-radius:6px"></div>
+        <div id="weightCutSection" class="hidden" style="margin-top:6px;padding:6px;background:#1a1a2a;border-radius:6px">
+          <div class="card-title" style="font-size:12px">⚖️ Weight Cut</div>
+          <div id="weightCutInfo" style="font-size:11px;color:#aaa"></div>
+          <div class="flex-row" style="margin-top:4px;gap:4px">
+            <button class="btn btn-ghost btn-small" onclick="doWeightCut('safe')" style="font-size:10px">Safe Cut</button>
+            <button class="btn btn-ghost btn-small" onclick="doWeightCut('standard')" style="font-size:10px">Standard</button>
+            <button class="btn btn-ghost btn-small" onclick="doWeightCut('aggressive')" style="font-size:10px">Aggressive</button>
+          </div>
+        </div>
         <div style="margin-top:8px">
-          <label>Choose Your Strategy:</label>
+          <div class="flex-row" style="gap:6px">
+            <button class="btn btn-ghost btn-small" onclick="showComparison(state.fight_booking?.opponent)" style="font-size:11px">📊 Tale of the Tape</button>
+          </div>
+          <label style="margin-top:8px;display:block">Choose Your Strategy:</label>
           <div id="stratSelect" class="strategy-grid"></div>
           <button class="btn btn-primary btn-lg" id="btnStartFight" style="margin-top:8px;width:100%" onclick="startFight()">START FIGHT</button>
         </div>
@@ -1723,13 +1736,11 @@ function updateGymTab() {
     gc.style.display = "none";
   }
 
-  qs("#btnApplySchedule").classList.add("hidden");
   qs("#btnStopTraining").classList.add("hidden");
-  qs("#fatigueBar").classList.add("hidden");
+  qs("#fatigueBar").classList.remove("hidden");
 
   if (t) {
     const fatigue = t.fatigue || 0;
-    qs("#fatigueBar").classList.remove("hidden");
     const fill = qs("#fatigueFill");
     fill.style.width = fatigue + "%";
     if (fatigue > 70) fill.style.background = "#ff4a4a";
@@ -1737,10 +1748,12 @@ function updateGymTab() {
     else fill.style.background = "#4aff6a";
 
     if (t.drill_name) {
-      qs("#trainingStatus").innerHTML = `<span style="color:#4a9eff">Training</span> &mdash; ${escHtml(t.drill_name)} | Fatigue: ${fatigue}%`;
+      qs("#trainingStatus").innerHTML = `<span style="color:#4a9eff">Training: ${escHtml(t.drill_name)}</span> | Fatigue: ${fatigue}% | Day: ${escHtml(t.schedule?.current_day || '')}`;
     } else {
-      qs("#trainingStatus").innerHTML = `<span style="color:#888">Set your weekly schedule below</span>`;
+      qs("#trainingStatus").innerHTML = `<span style="color:#888">Click a day below to set a drill</span>`;
     }
+  } else {
+    qs("#trainingStatus").innerHTML = `<span style="color:#888">Training system initializing...</span>`;
   }
   updateScheduleGrid();
 
@@ -1762,11 +1775,19 @@ function updateScheduleGrid() {
   const grid = qs("#scheduleGrid");
   if (!grid) return;
   const t = state && state.training;
+  const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
   if (!t || !t.schedule || !t.schedule.schedule) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px">Start training to set a weekly schedule</div>';
+    let html = "";
+    days.forEach((d, i) => {
+      html += `<div class="sched-day${i === 0 ? ' today' : ''}" onclick="showDrillPicker(${i}, null)">
+        <div class="day-name">${d.slice(0,3)}</div><div class="day-drill rest">Rest</div>
+      </div>`;
+    });
+    grid.innerHTML = html;
     return;
   }
-  const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
   const current = t.schedule.current_day;
   grid.innerHTML = "";
   days.forEach((d, i) => {
@@ -1831,6 +1852,23 @@ async function doSetDrill(dayIdx, drillName) {
     closeModal(null);
   } else {
     toast(resp.error || "Failed", "error");
+  }
+}
+
+async function doWeightCut(intensity) {
+  const resp = await api("/api/cut_weight", { sid, intensity });
+  if (resp.success) {
+    state = resp.state;
+    const wcEl = qs("#weightCutInfo");
+    if (resp.weigh_in_pass) {
+      wcEl.innerHTML = `✅ Weigh-in passed! Cut ${resp.cut_lbs.toFixed(1)} lbs. Hydration: ${resp.hydration.toFixed(0)}%`;
+    } else {
+      wcEl.innerHTML = `❌ Weigh-in failed! Cut ${resp.cut_lbs.toFixed(1)} lbs. Hydration: ${resp.hydration.toFixed(0)}%`;
+    }
+    toast(resp.weigh_in_pass ? "Weigh-in passed!" : "Weigh-in failed!", resp.weigh_in_pass ? "success" : "error");
+    updateAllUI();
+  } else {
+    toast(resp.error || "Weight cut failed", "error");
   }
 }
 
@@ -1920,6 +1958,41 @@ async function refreshFightTab() {
     qs("#fightMatchup").innerHTML = `<strong>${escHtml(state.fighter.name)}</strong> vs <strong>${escHtml(fb.opponent.name)}</strong><br>
       <span style="color:#888">${escHtml(fb.opponent.record)} | #${fb.opponent.rank}${canFight ? ' | <span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>' : ` | ${fb.days_until} days until fight`}</span>`;
     qs("#btnStartFight").style.display = canFight ? "inline-block" : "none";
+
+    // Show fight week timeline
+    const tl = qs("#fightWeekTimeline");
+    const weekEvents = ["Press Conference","Open Workout","Weigh-In","Faceoff","Rest Day","Fight Night"];
+    const daysUntil = fb.days_until;
+    if (!canFight && daysUntil > 0 && daysUntil <= 6) {
+      let tlHtml = '<div style="font-size:11px;color:#aaa;margin-bottom:4px">Fight Week Timeline:</div><div style="display:flex;gap:2px;font-size:10px">';
+      for (let i = 0; i < 6; i++) {
+        const eventDay = daysUntil - (5 - i);
+        const isPast = eventDay < 0;
+        const isNow = eventDay === 0;
+        const phaseIdx = i;
+        tlHtml += `<div style="flex:1;text-align:center;padding:3px 2px;border-radius:3px;${isNow ? 'background:var(--gold-glow);color:var(--gold);font-weight:700' : isPast ? 'color:#555' : 'color:#888'}">
+          <div>${weekEvents[phaseIdx]}</div><div style="font-size:8px">${isPast ? '✓' : isNow ? 'NOW' : eventDay > 0 ? `T-${eventDay}` : ''}</div>
+        </div>`;
+      }
+      tlHtml += '</div>';
+      tl.innerHTML = tlHtml;
+    } else {
+      tl.innerHTML = '';
+    }
+
+    // Show weight cut section on weigh-in day
+    const wcEl = qs("#weightCutSection");
+    const wcInfo = qs("#weightCutInfo");
+    if (daysUntil === 3) {  // 3 days = weigh-in
+      wcEl.classList.remove("hidden");
+      const w = state.fighter.weight;
+      const wcName = state.fighter.weight_class;
+      const maxWeight = {"Flyweight":125,"Bantamweight":135,"Featherweight":145,"Lightweight":155,"Welterweight":170,"Middleweight":185,"Light Heavyweight":205,"Heavyweight":265}[wcName] || 170;
+      wcInfo.innerHTML = `Current: ${w} lbs | Target: ${maxWeight} lbs | Need to cut: ${Math.max(0, w - maxWeight)} lbs`;
+    } else {
+      wcEl.classList.add("hidden");
+    }
+
     if (!canFight) {
       qs("#stratSelect").innerHTML = `<div style="text-align:center;padding:12px;color:#888">The fight hasn't arrived yet. Keep training!<br>Advance time in the Home tab.</div>`;
     } else {
@@ -1981,6 +2054,7 @@ async function loadFightOffers() {
         <span>Purse: <strong style="color:#4aff6a">$${o.base_purse.toLocaleString()}</strong></span>
         <span>Win Bonus: <strong style="color:#ffd700">$${o.win_bonus.toLocaleString()}</strong></span>
         <span>Pop: <strong style="color:${popColors[risk] || '#aaa'}">+${o.popularity_gain}</strong></span>
+        <button class="btn btn-ghost btn-small" style="margin-left:auto;font-size:10px;padding:2px 6px;min-height:0" onclick="event.stopPropagation();showComparison(o.opponent)">📊 Compare</button>
       </div>`;
     div.onclick = () => {
       // Show opponent comparison + accept/decline
@@ -2301,33 +2375,48 @@ async function startFight() {
   updateMomentumBars(0, 0, 50);
 
   fightReplaying = true;
+  // Small delay to let fight stream initialize
+  await sleep(100);
   await pollFightEvents();
 }
 
 async function pollFightEvents() {
   let fromIdx = 0;
+  let retries = 0;
   while (fightReplaying) {
-    const resp = await api(`/api/fight_events?sid=${encodeURIComponent(sid)}&from=${fromIdx}`);
-    if (!resp.success) { toast("Fight polling error", "error"); break; }
-    if (resp.events && resp.events.length) {
-      fromIdx += resp.events.length;
-      if (!await replayStreamedEvents(resp.events)) {
+    try {
+      const resp = await api(`/api/fight_events?sid=${encodeURIComponent(sid)}&from=${fromIdx}`);
+      if (!resp.success) {
+        retries++;
+        if (retries > 5) { toast("Fight polling error", "error"); break; }
+        await sleep(500);
+        continue;
+      }
+      retries = 0;
+      if (resp.events && resp.events.length) {
+        fromIdx += resp.events.length;
+        if (!await replayStreamedEvents(resp.events)) {
+          break;
+        }
+      }
+      if (resp.waiting) {
+        fightPaused = true;
+        const lastEv = resp.events ? resp.events[resp.events.length - 1] : null;
+        if (lastEv && lastEv.type === "strategy_prompt") {
+          showStrategyPrompt(lastEv);
+        }
+        while (fightPaused && fightReplaying) {
+          await sleep(100);
+        }
+      }
+      if (resp.done) {
+        await completeFight();
         break;
       }
-    }
-    if (resp.waiting) {
-      fightPaused = true;
-      const lastEv = resp.events ? resp.events[resp.events.length - 1] : null;
-      if (lastEv && lastEv.type === "strategy_prompt") {
-        showStrategyPrompt(lastEv);
-      }
-      while (fightPaused && fightReplaying) {
-        await sleep(100);
-      }
-    }
-    if (resp.done) {
-      await completeFight();
-      break;
+    } catch(e) {
+      retries++;
+      if (retries > 3) { toast("Fight connection lost", "error"); break; }
+      await sleep(500);
     }
     await sleep(200);
   }

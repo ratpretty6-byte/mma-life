@@ -1,9 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 
 from fighter import Fighter
 from promotion import Promotion
-
 
 CARD_POSITION_LABELS = ["prelim", "main_card", "co_main", "main_event"]
 FIGHT_WEEK_PHASES = ["announced", "press_conference", "open_workouts", "weigh_ins", "fight", "completed"]

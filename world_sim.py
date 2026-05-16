@@ -72,6 +72,8 @@ class WorldSimulator:
                 if not rp.rankings.get(wc):
                     continue
                 top = rp.rankings[wc][0]
+                if getattr(top, 'is_player', False):
+                    continue
                 if top.win_streak >= 3 and top.is_available(game_date) and not top.retired:
                     if national_promos:
                         target = random.choice(national_promos)
@@ -92,6 +94,8 @@ class WorldSimulator:
                 if not np.rankings.get(wc):
                     continue
                 top = np.rankings[wc][0]
+                if getattr(top, 'is_player', False):
+                    continue
                 if top.win_streak >= 2 and top.get_overall_rating() >= 65 and top.is_available(game_date) and not top.retired:
                     if world_promos:
                         target = random.choice(world_promos)
@@ -113,6 +117,8 @@ class WorldSimulator:
             for p in promo_list:
                 for wc in p.weight_classes:
                     for f in p.fighters[:]:
+                        if getattr(f, 'is_player', False):
+                            continue
                         if f.loss_streak >= 3 and f.rank > 3 and not f.retired and p.champions.get(wc) != f:
                             if down_promos:
                                 target = random.choice(down_promos)
