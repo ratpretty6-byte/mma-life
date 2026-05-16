@@ -119,7 +119,6 @@ NATIONALITY_WEIGHTS = {
 }
 
 def pick_nationality_and_region():
-    """Pick a nationality weighted by real-world MMA representation, and return a matching region."""
     nations = list(NATIONALITY_WEIGHTS.keys())
     weights = list(NATIONALITY_WEIGHTS.values())
     nat = random.choices(nations, weights=weights, k=1)[0]
@@ -141,7 +140,6 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
                       nationality=nationality, home_region=home_region,
                       trait_id=trait["id"] if trait else None,
                       personality_id=personality["id"])
-    # Height and reach based on weight class
     hr_range = utils.get_height_reach_range(fighter.weight_class)
     fighter.height = utils.gaussian_random(
         (hr_range["height_min"] + hr_range["height_max"]) // 2, 3,
@@ -152,10 +150,8 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
         hr_range["reach_min"], hr_range["reach_max"]
     )
 
-    # Use skill_mean and skill_std as baseline — this is the key fix
     base_val = utils.clamp(utils.gaussian_random(skill_mean, skill_std, 15, 95), 15, 95)
 
-    # Generate group-level talent modifiers (correlated attributes within groups)
     group_mods = {}
     for group_name, attrs in ATTRIBUTE_GROUPS.items():
         group_mods[group_name] = utils.gaussian_random(0, 5, -10, 10)
@@ -163,21 +159,16 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
     for attr in fighter.PHYSICAL_ATTRS + fighter.MENTAL_ATTRS:
         if attr not in fighter.attributes:
             continue
-
-        # Find which group this attr belongs to
         attr_group = None
         for gname, gattrs in ATTRIBUTE_GROUPS.items():
             if attr in gattrs:
                 attr_group = gname
                 break
-
         group_mod = group_mods.get(attr_group, 0)
-        # Per-attribute variance ±5 around the group baseline
         per_attr_var = utils.gaussian_random(0, 3, -6, 6)
         new_val = utils.clamp(base_val + group_mod + per_attr_var, utils.ATTR_MIN, utils.ATTR_MAX)
         fighter.attributes[attr] = new_val
 
-    # Ensure minimum floors for all fighters to prevent extreme glass jaws / total incompetence
     fighter.attributes["durability"] = max(fighter.attributes.get("durability", 0), 40)
     fighter.attributes["mental_toughness"] = max(fighter.attributes.get("mental_toughness", 0), 35)
     fighter.attributes["heart"] = max(fighter.attributes.get("heart", 0), 35)
@@ -189,7 +180,6 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
     fighter.attributes["blocking"] = max(fighter.attributes.get("blocking", 0), 20)
     fighter.attributes["danger_recognition"] = max(fighter.attributes.get("danger_recognition", 0), 20)
 
-    # Apply archetype stat profile
     profile = ARCHETYPE_PROFILES.get(archetype, {})
     for group_or_attr, adjustments in profile.items():
         if group_or_attr in ATTRIBUTE_GROUPS:
@@ -203,7 +193,6 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
                 fighter.attributes[group_or_attr] = utils.clamp(
                     fighter.attributes[group_or_attr] + adjustments, utils.ATTR_MIN, utils.ATTR_MAX)
 
-    # Cherry-pick direct flat adjustments (hand_speed, etc.)
     for attr_spec, val in profile.items():
         if isinstance(val, int) and attr_spec in fighter.attributes:
             fighter.attributes[attr_spec] = utils.clamp(
@@ -236,7 +225,6 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
     fighter.net_worth = fighter.wins * random.randint(1000, 10000) + random.randint(0, 50000)
     fighter.months_inactive = random.randint(1, 8)
 
-    # Cap starting fights based on age for realism
     max_starting_fights = max(3, fighter.age - 15)
     if fighter.wins + fighter.losses > max_starting_fights:
         total_fights = fighter.wins + fighter.losses
@@ -246,34 +234,51 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
         fighter.knockouts = min(fighter.knockouts, fighter.wins)
         fighter.submissions = min(fighter.submissions, fighter.wins)
 
+    # AI career data
+    fighter.career_earnings = fighter.net_worth
+    fighter.career_total_fights = fighter.wins + fighter.losses + fighter.draws
+    fighter.popularity = utils.clamp(fighter.wins * 3 + random.randint(0, 10), 0, 100)
+
     return fighter
 
+
 def assign_to_promotions(fighters: List[Fighter], promotions: List[Promotion]):
-    world, national, regional = promotions
+    # Distribute fighters across all promotions by tier
+    tiers = {"Regional": [], "National": [], "World": []}
+    for p in promotions:
+        tiers.setdefault(p.tier_name, []).append(p)
+
     for fighter in fighters:
         rating = fighter.get_overall_rating()
         win_pct = fighter.wins / max(1, fighter.wins + fighter.losses)
         if rating >= 68 and win_pct >= 0.60:
-            world._add_fighter_batch(fighter)
-        elif rating >= 35:
-            national._add_fighter_batch(fighter)
+            pool = tiers.get("World", promotions[-1:])
+        elif rating >= 45:
+            pool = tiers.get("National", promotions[-2:-1])
         else:
-            regional._add_fighter_batch(fighter)
+            pool = tiers.get("Regional", promotions[:1])
+        if pool:
+            promo = random.choice(pool)
+        else:
+            promo = random.choice(promotions)
+        promo._add_fighter_batch(fighter)
 
-    # Apply tier-based stat floors — elite fighters should be clearly better
-    for f in world.fighters:
-        for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
-            f.attributes[attr] = max(f.attributes[attr], 45)
-    for f in national.fighters:
-        for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
-            f.attributes[attr] = max(f.attributes[attr], 30)
-    for f in regional.fighters:
-        for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
-            f.attributes[attr] = max(f.attributes[attr], 25)
+    # Tier stat floors
+    for p in promotions:
+        tier = p.tier_name
+        if tier == "World":
+            floor = 45
+        elif tier == "National":
+            floor = 30
+        else:
+            floor = 25
+        for f in p.fighters:
+            for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
+                f.attributes[attr] = max(f.attributes[attr], floor)
 
-    # Re-rank all promotions once after batch
     for p in promotions:
         p.update_rankings()
+
 
 def generate_fighters(total: int = 8000) -> List[Fighter]:
     weight_probs = [0.10, 0.12, 0.14, 0.18, 0.16, 0.14, 0.10, 0.10]
@@ -285,7 +290,6 @@ def generate_fighters(total: int = 8000) -> List[Fighter]:
         weight_lbs = random.randint(wc["min"], wc["max"])
         skill_mean = utils.gaussian_random(55, 8, 35, 75)
         skill_std = utils.gaussian_random(10, 3, 5, 16)
-        # Reject extreme stat variance — max-min difference must be <= 50
         for attempt in range(3):
             fighter = generate_single_fighter(weight_lbs, skill_mean, skill_std)
             vals = list(fighter.attributes.values())
@@ -294,7 +298,8 @@ def generate_fighters(total: int = 8000) -> List[Fighter]:
         fighters.append(fighter)
     return fighters
 
-def generate_fighter_pool(promotions: List[Promotion], total: int = 5000) -> List[Fighter]:
+
+def generate_fighter_pool(promotions: List[Promotion], total: int = 8000) -> List[Fighter]:
     fighters = generate_fighters(total)
     assign_to_promotions(fighters, promotions)
     return fighters

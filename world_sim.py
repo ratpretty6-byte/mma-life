@@ -31,29 +31,103 @@ class WorldSimulator:
         results = []
         self.month_counter += 1
 
+        # Promotion mobility checks (every 2 months)
+        if self.month_counter % 2 == 0:
+            mobility_news = self._check_promotion_mobility(game_date)
+            results.extend(mobility_news)
+
         for promo in self.promotions:
             for wc in promo.weight_classes:
                 wc_results = self._simulate_weight_class(promo, wc, game_date, event_sys)
                 results.extend(wc_results)
             promo.update_rankings(game_date)
 
-        # Prospect pipeline: generate 2-3 new fighters every 3-4 months
         if self.month_counter % 4 == 0:
             prospect_news = self._generate_prospects(game_date)
             results.extend(prospect_news)
 
-        # Replenish thin divisions: if any weight class has < 15 fighters, generate more
         replenish_news = self._replenish_thin_divisions(game_date)
         results.extend(replenish_news)
 
-        # Age all fighters by ~1 month
         self._simulate_aging()
 
-        # Retirement simulation
         retirement_news = self._simulate_retirements(game_date)
         results.extend(retirement_news)
 
         return results
+
+    def _check_promotion_mobility(self, game_date: datetime) -> List[Dict]:
+        news = []
+        tiers = {"Regional": [], "National": [], "World": []}
+        for p in self.promotions:
+            tiers.setdefault(p.tier_name, []).append(p)
+
+        # Move top Regional fighters up to National
+        regional_promos = tiers.get("Regional", [])
+        national_promos = tiers.get("National", [])
+        world_promos = tiers.get("World", [])
+
+        for rp in regional_promos:
+            for wc in rp.weight_classes:
+                if not rp.rankings.get(wc):
+                    continue
+                top = rp.rankings[wc][0]
+                if top.win_streak >= 3 and top.is_available(game_date) and not top.retired:
+                    if national_promos:
+                        target = random.choice(national_promos)
+                        rp.release_fighter(top)
+                        target.sign_fighter(top, game_date=game_date)
+                        news.append({
+                            "type": "fighter_moved",
+                            "fighter": top.name,
+                            "from": rp.name,
+                            "to": target.name,
+                            "direction": "up",
+                            "reason": "called_up",
+                        })
+
+        # Move top National fighters up to World
+        for np in national_promos:
+            for wc in np.weight_classes:
+                if not np.rankings.get(wc):
+                    continue
+                top = np.rankings[wc][0]
+                if top.win_streak >= 2 and top.get_overall_rating() >= 65 and top.is_available(game_date) and not top.retired:
+                    if world_promos:
+                        target = random.choice(world_promos)
+                        np.release_fighter(top)
+                        target.sign_fighter(top, game_date=game_date)
+                        news.append({
+                            "type": "fighter_moved",
+                            "fighter": top.name,
+                            "from": np.name,
+                            "to": target.name,
+                            "direction": "up",
+                            "reason": "called_up",
+                        })
+
+        # Demote fighters on 3+ loss streaks
+        for tier_name, promo_list in [("World", world_promos), ("National", national_promos)]:
+            down_tier = "National" if tier_name == "World" else "Regional"
+            down_promos = tiers.get(down_tier, [])
+            for p in promo_list:
+                for wc in p.weight_classes:
+                    for f in p.fighters[:]:
+                        if f.loss_streak >= 3 and f.rank > 3 and not f.retired and p.champions.get(wc) != f:
+                            if down_promos:
+                                target = random.choice(down_promos)
+                                p.release_fighter(f)
+                                target.sign_fighter(f, game_date=game_date)
+                                news.append({
+                                    "type": "fighter_moved",
+                                    "fighter": f.name,
+                                    "from": p.name,
+                                    "to": target.name,
+                                    "direction": "down",
+                                    "reason": "demoted",
+                                })
+                                break
+        return news
 
     def _generate_prospects(self, game_date: datetime) -> List[Dict]:
         news = []

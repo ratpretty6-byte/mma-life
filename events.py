@@ -1,21 +1,35 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 from fighter import Fighter
 from promotion import Promotion
 
 
+CARD_POSITION_LABELS = ["prelim", "main_card", "co_main", "main_event"]
+FIGHT_WEEK_PHASES = ["announced", "press_conference", "open_workouts", "weigh_ins", "fight", "completed"]
+
+
+def position_to_index(pos: str) -> int:
+    return CARD_POSITION_LABELS.index(pos) if pos in CARD_POSITION_LABELS else 0
+
+
+def card_bonus_for_position(position: str) -> float:
+    return {"prelim": 0, "main_card": 2000, "co_main": 5000, "main_event": 10000}.get(position, 0)
+
+
 class FightBooking:
-    def __init__(self, fighter1: Fighter, fighter2: Fighter, date: datetime, weight_class: str, promotion: Promotion, is_title_fight: bool = False):
+    def __init__(self, fighter1: Fighter, fighter2: Fighter, date: datetime, weight_class: str, promotion: Promotion,
+                 is_title_fight: bool = False, risk_level: str = "50-50"):
         self.fighter1 = fighter1
         self.fighter2 = fighter2
         self.date = date
         self.weight_class = weight_class
         self.promotion = promotion
         self.is_title_fight = is_title_fight
+        self.risk_level = risk_level
         self.fight_position = "prelim"
         self.status = "announced"
-        self.phase = "announced"
+        self._phase_offset = 0
         self.winner = None
         self.method = None
         self.round = None
@@ -28,28 +42,28 @@ class FightBooking:
         self.cancellation_reason = reason
 
     def advance_phase(self) -> str:
-        phases = ["announced", "press_conference", "open_workouts", "weigh_ins", "fight", "completed"]
-        current_idx = phases.index(self.phase) if self.phase in phases else 0
-        if current_idx < len(phases) - 1:
-            self.phase = phases[current_idx + 1]
+        if self._phase_offset < len(FIGHT_WEEK_PHASES) - 1:
+            self._phase_offset += 1
         return self.phase
 
-    def set_fight_position(self, rank: int, is_title: bool):
-        if is_title:
-            self.fight_position = "main_event"
-        elif rank <= 5:
-            self.fight_position = "main_card"
-        else:
-            self.fight_position = "prelim"
+    @property
+    def phase(self) -> str:
+        return FIGHT_WEEK_PHASES[self._phase_offset] if self._phase_offset < len(FIGHT_WEEK_PHASES) else "completed"
+
+    def set_fight_position(self, position: str):
+        if position in CARD_POSITION_LABELS:
+            self.fight_position = position
+
+    def get_card_position_index(self) -> int:
+        return position_to_index(self.fight_position)
 
     def complete(self, winner: Fighter, method: str, round: Optional[int] = None, fight_stats: Dict = None):
         self.status = "completed"
-        self.phase = "completed"
+        self._phase_offset = len(FIGHT_WEEK_PHASES) - 1
         self.winner = winner
         self.method = method
         self.round = round
         self.fight_stats = fight_stats or {}
-
         if winner:
             loser = self.fighter2 if winner == self.fighter1 else self.fighter1
             winner.wins += 1
@@ -60,7 +74,6 @@ class FightBooking:
                 winner.knockouts += 1
             elif "Submission" in method:
                 winner.submissions += 1
-            # Shake ring rust on win
             winner.shake_ring_rust()
             loser.shake_ring_rust()
         else:
@@ -69,10 +82,12 @@ class FightBooking:
         self.promotion.update_rankings()
 
     def record_round_stats(self, round_num: int, stats: Dict):
-        """Record per-round statistics for enhanced scoring and news."""
         if "rounds" not in self.fight_stats:
             self.fight_stats["rounds"] = {}
         self.fight_stats["rounds"][round_num] = stats
+
+    def card_bonus(self) -> float:
+        return card_bonus_for_position(self.fight_position)
 
 
 class Event:
@@ -122,42 +137,25 @@ class Event:
         return candidates[0] if candidates else None
 
     def determine_bonuses(self) -> Optional[Dict]:
-        """
-        Enhanced bonus determination that considers:
-        - Fight excitement (significant strikes, near-finishes)
-        - Round finishes
-        - Submission/KO quality
-        - Fight of the Night vs Performance of the Night split
-        """
         best_fight = None
-        best_fight_score = 0
         best_perf = None
         best_perf_score = 0
+        best_fight_score = 0
 
         for f in self.fights:
             if f.status != "completed" or not f.winner:
                 continue
-
-            score = 50  # Base score
-
-            # Bonus for early round finishes
+            score = 50
             if f.round and f.round <= 2:
                 score += 25
-            elif f.round and f.round <= 1:
+            if f.round and f.round <= 1:
                 score += 35
-
-            # Method bonuses
             if "Submission" in (f.method or ""):
                 score += 15
-                # Back mount or rare submission = extra
-                if "rear_naked" in (f.method or "").lower():
-                    score += 10
             if "KO" in (f.method or ""):
                 score += 20
             if "TKO (Referee" in (f.method or ""):
-                score += 10  # Dominant performance
-
-            # Fight stats bonus if available
+                score += 10
             stats = f.fight_stats
             if stats:
                 rounds = stats.get("rounds", {})
@@ -167,27 +165,18 @@ class Event:
                 )
                 if total_sig_strikes > 50:
                     score += 10
-
-            # Update best performance
             if score > best_perf_score:
                 best_perf_score = score
                 best_perf = f
 
-        # Find best fight (back-and-forth, significant strikes)
-        if self.fights and not best_fight:
-            best_fight = self.fights[0]
-            best_fight_score = best_perf_score
-
         for f in self.fights:
             if f.status != "completed":
                 continue
-            # Fights going to decision with high activity are FOTN candidates
             if f.winner and f.round and f.round >= 3:
                 score = (f.fighter1.wins + f.fighter2.wins) * 2
                 fight_stats = f.fight_stats.get("rounds", {})
-                # Check if fight was competitive
                 if len(fight_stats) >= 3:
-                    score += 15  # Competitive multi-round fight
+                    score += 15
                 if score > best_fight_score:
                     best_fight_score = score
                     best_fight = f
@@ -202,6 +191,9 @@ class Event:
             result["perf_of_night"] = best_perf.winner.name
         return result if result else None
 
+    def get_sorted_fights(self) -> List[FightBooking]:
+        return sorted(self.fights, key=lambda f: f.get_card_position_index())
+
 
 class EventSystem:
     def __init__(self):
@@ -213,28 +205,64 @@ class EventSystem:
         self.upcoming_events.append(event)
         return event
 
-    def book_fight(self, event: Event, fighter1: Fighter, fighter2: Fighter, is_title_fight: bool = False) -> Optional[FightBooking]:
+    def book_fight(self, event: Event, fighter1: Fighter, fighter2: Fighter,
+                   is_title_fight: bool = False, risk_level: str = "50-50") -> Optional[FightBooking]:
         if event not in self.upcoming_events or fighter1.weight_class != fighter2.weight_class:
             return None
-        fight = FightBooking(fighter1, fighter2, event.date, fighter1.weight_class, event.promotion, is_title_fight)
-        fight.set_fight_position(fighter1.rank if fighter1 in event.promotion.fighters else 999, is_title_fight)
+        fight = FightBooking(fighter1, fighter2, event.date, fighter1.weight_class, event.promotion,
+                             is_title_fight, risk_level)
         event.add_fight(fight)
         return fight
 
-    def generate_card(self, event: Event, fighter: Fighter, promotion: Promotion):
-        wc = fighter.weight_class
+    def generate_card(self, event: Event, player_fb: FightBooking, promotion: Promotion, player: Fighter):
+        wc = player.weight_class
         ranked = promotion.rankings.get(wc, [])
-        if len(ranked) >= 4:
-            for i in range(0, min(len(ranked) - 1, 6), 2):
-                f1 = ranked[i]
-                f2 = ranked[i + 1]
-                if f1 == fighter or f2 == fighter:
-                    continue
-                if not f1.is_available() or not f2.is_available():
-                    continue
-                fb = self.book_fight(event, f1, f2, is_title_fight=False)
+        available = [f for f in ranked if f.is_available() and f != player and f != (player_fb.fighter1 if player_fb.fighter2 == player else player_fb.fighter2)]
+        import random
+        random.shuffle(available)
+
+        # Sort into positions
+        positions = []
+        # Main event is the player's fight (or the best other fight)
+        player_fb.set_fight_position("main_event" if player_fb.risk_level == "sacrifice" else self._auto_position(player))
+        positions.append(player_fb)
+
+        # Co-main: top available fighters
+        if len(available) >= 2:
+            fb = self.book_fight(event, available[0], available[1])
+            if fb:
+                fb.set_fight_position("co_main")
+                positions.append(fb)
+
+        # Main card: 3 fights
+        idx = 2
+        for _ in range(3):
+            if idx + 1 < len(available):
+                fb = self.book_fight(event, available[idx], available[idx + 1])
                 if fb:
-                    fb.set_fight_position(min(f1.rank, f2.rank), False)
+                    fb.set_fight_position("main_card")
+                    positions.append(fb)
+                idx += 2
+
+        # Prelims: 3-4 fights
+        for _ in range(4):
+            if idx + 1 < len(available):
+                fb = self.book_fight(event, available[idx], available[idx + 1])
+                if fb:
+                    fb.set_fight_position("prelim")
+                    positions.append(fb)
+                idx += 2
+
+    def _auto_position(self, player: Fighter) -> str:
+        pop = getattr(player, "popularity", 0)
+        rank = player.rank
+        if rank <= 2 or pop >= 70:
+            return "main_event"
+        if rank <= 4 or pop >= 50:
+            return "co_main"
+        if rank <= 8 or pop >= 30:
+            return "main_card"
+        return "prelim"
 
     def advance_time(self, game_date: datetime):
         for event in self.upcoming_events[:]:

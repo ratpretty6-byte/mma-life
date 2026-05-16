@@ -42,9 +42,9 @@ from persistence import (
     save_to_slot,
     save_world_state,
 )
-from promotion import create_promotions
+from promotion import create_promotions, PROMOTION_PERSONALITIES
 from strategy import STRATEGIES
-from training import TrainingCamp, TrainingSystem
+from training import TrainingSystem
 from world_sim import WorldSimulator
 
 init_lock = Lock()
@@ -88,9 +88,6 @@ def ensure_initialized():
                 world_sim = WorldSimulator(promotions, all_fighters)
             with _gs_lock:
                 gs["promotions"] = promotions
-                gs["world"] = world
-                gs["national"] = national
-                gs["regional"] = regional
                 gs["all_fighters"] = all_fighters
                 gs["world_sim"] = world_sim or WorldSimulator(promotions, gs.get("all_fighters"))
                 gs["world_news"] = world_news or []
@@ -101,6 +98,13 @@ def ensure_initialized():
             import traceback
             traceback.print_exc()
             raise
+
+def get_promotions_by_tier(tier_name=None):
+    promos = _gs_get("promotions") or []
+    if tier_name:
+        return [p for p in promos if p.tier_name == tier_name]
+    return promos
+
 
 def get_or_create_session(session_id):
     if session_id not in _session_cache:
@@ -379,6 +383,7 @@ def get_state_dict(session):
             "peak_rank": f.peak_rank,
             "scouting_level": getattr(f, 'times_scouted', 0),
             "signature_strikes": f.signature_strikes,
+            "popularity": round(getattr(f, "popularity", 10), 1),
         },
         "promotion": {
             "name": promo.name if promo else "Free Agent",
@@ -816,9 +821,11 @@ class Handler(BaseHTTPRequestHandler):
                 game_date = datetime(2025, 1, 6)
                 stance = utils.get_stance_for_background(bg)
                 f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, stance=stance, game_date=game_date)
-                regional = gs["regional"]
+                regionals = get_promotions_by_tier("Regional")
+                regional = regionals[0] if regionals else None
                 career = CareerSystem(f)
-                career.sign_with_promotion(regional, 4, game_date)
+                if regional:
+                    career.sign_with_promotion(regional, 4, game_date)
                 training = TrainingSystem(f)
                 finance = FinancialSystem(f)
                 health = HealthSystem(f)
@@ -849,23 +856,63 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/camps":
                 self.json_resp({"camps": get_available_camps_data()})
 
-            elif path == "/api/opponents":
+            elif path == "/api/fight_offers":
                 ensure_initialized()
                 sid = params.get("sid", [""])[0]
                 session = get_or_create_session(sid)
-                ensure_available_opponents(session)
-                self.json_resp({"opponents": get_opponents_data(session)})
+                f = session.get("fighter")
+                promo = session.get("current_promotion")
+                if not f or not promo:
+                    self.json_resp({"offers": []})
+                    return
+                offers = promo.generate_fight_offers(f, count=3)
+                offers_data = []
+                for o in offers:
+                    opp = o["opponent"]
+                    offers_data.append({
+                        "opponent": {
+                            "name": opp.name, "record": opp.get_record_string(),
+                            "rank": opp.rank, "rating": round(opp.get_overall_rating(), 1),
+                            "height": opp.height, "reach": opp.reach,
+                            "age": opp.age, "nationality": opp.nationality,
+                            "archetype": opp.archetype, "weight_class": opp.weight_class,
+                            "attributes": {k: round(v, 1) for k, v in opp.attributes.items()},
+                        },
+                        "risk": o["risk"],
+                        "purse_bonus": o["purse_bonus"],
+                        "popularity_gain": o["popularity_gain"],
+                        "card_position": o["card_position"],
+                        "base_purse": o["base_purse"],
+                        "win_bonus": o["win_bonus"],
+                    })
+                rel = promo.check_contract_relationship(f)
+                self.json_resp({"offers": offers_data, "relationship": rel})
 
             elif path == "/api/free_agent_offers":
                 ensure_initialized()
+                sid = params.get("sid", [""])[0]
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                tier_filter = params.get("tier", [""])[0]
                 promos = []
                 for p in gs["promotions"]:
-                    if p.tier_name != "Regional":
+                    if tier_filter and p.tier_name.lower() != tier_filter.lower():
                         continue
-                    promos.append({"name": p.name, "tier": p.tier_name,
-                                   "base_pay": p.base_pay, "win_bonus": p.win_bonus,
-                                   "perf_bonus": p.perf_bonus,
-                                   "num_fighters": len(p.fighters)})
+                    # Only show promotions at or above player's level
+                    if f:
+                        tiers = ["Regional", "National", "World"]
+                        player_tier_idx = tiers.index(p.tier_name) if p.tier_name in tiers else 0
+                    personality = getattr(p, "personality", {})
+                    promos.append({
+                        "name": p.name, "tier": p.tier_name,
+                        "base_pay": p.base_pay, "win_bonus": p.win_bonus,
+                        "perf_bonus": p.perf_bonus,
+                        "num_fighters": len(p.fighters),
+                        "personality": personality.get("description", ""),
+                        "matchmaking": personality.get("matchmaking_style", "balanced"),
+                        "marketing": personality.get("marketing_power", 1.0),
+                        "prestige": personality.get("prestige", 1),
+                    })
                 self.json_resp({"promotions": promos})
 
             elif path == "/api/fight_state":
@@ -1005,9 +1052,12 @@ class Handler(BaseHTTPRequestHandler):
                 for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
                     f.attributes[attr] = utils.clamp(f.attributes[attr] + stat_mod, utils.ATTR_MIN, utils.ATTR_MAX)
 
-                regional = gs["regional"]
-                national = gs["national"]
-                world = gs["world"]
+                regionals = get_promotions_by_tier("Regional")
+                nationals = get_promotions_by_tier("National")
+                worlds = get_promotions_by_tier("World")
+                regional = regionals[0] if regionals else None
+                national = nationals[0] if nationals else None
+                world = worlds[0] if worlds else None
 
                 career = CareerSystem(f)
                 training = TrainingSystem(f)
@@ -1160,50 +1210,24 @@ class Handler(BaseHTTPRequestHandler):
                     training.end_camp()
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
-            elif path == "/api/book_fight":
-                sid = body.get("sid", "")
-                opp_name = body.get("opponent", "")
-                weeks_out = body.get("weeks", 8)
+            elif path == "/api/event_card":
+                sid = params.get("sid", [""])[0]
                 session = get_or_create_session(sid)
-                f = session.get("fighter")
-                promo = session.get("current_promotion")
-                game_date = session.get("game_date", datetime.now())
-                if not f or not promo:
-                    self.json_resp({"error": "Not signed"})
+                event = session.get("current_event")
+                if not event:
+                    self.json_resp({"fights": []})
                     return
-                all_promos = [gs.get("world"), gs.get("national"), gs.get("regional")]
-                opps = promo.get_available_opponents(f, all_promotions=[p for p in all_promos if p and p != promo])
-                target = None
-                opp_name_clean = opp_name.strip().lower()
-                for o, d in opps:
-                    if o.name.strip().lower() == opp_name_clean:
-                        target = o
-                        break
-                # Fallback: search all promotions' fighters with case-insensitive match
-                if not target:
-                    for p in [promo] + [ap for ap in all_promos if ap and ap != promo]:
-                        for o in p.fighters:
-                            if o.name.strip().lower() == opp_name_clean and o.weight_class == f.weight_class:
-                                target = o
-                                break
-                        if target:
-                            break
-                if not target:
-                    self.json_resp({"error": "Opponent not found"})
-                    return
-                opponent = copy.deepcopy(target)
-                session["_opponent_original"] = target
-                is_title = promo.champions.get(f.weight_class) is not None and opponent.name == promo.champions[f.weight_class].name
-                fight_date = game_date + timedelta(weeks=weeks_out)
-                es = session.get("event_sys")
-                event = es.create_event(f"Fight Night: {f.name} vs {opponent.name}", fight_date, promo)
-                fb = es.book_fight(event, f, opponent, is_title_fight=is_title)
-                es.generate_card(event, f, promo)
-                session["current_event"] = event
-                session["current_fight_booking"] = fb
-                session["fight_completed"] = False
-                session["career"].add_rivalry(opponent)
-                self.json_resp({"success": True, "state": get_state_dict(session)})
+                fights_data = []
+                for fb in event.get_sorted_fights():
+                    fights_data.append({
+                        "fighter1": fb.fighter1.name, "fighter2": fb.fighter2.name,
+                        "position": fb.fight_position, "status": fb.status,
+                        "is_title": fb.is_title_fight, "risk": fb.risk_level,
+                        "winner": fb.winner.name if fb.winner else None,
+                        "method": fb.method, "round": fb.round,
+                        "is_player_fight": fb.fighter1 == session.get("fighter") or fb.fighter2 == session.get("fighter"),
+                    })
+                self.json_resp({"success": True, "event_name": event.name, "fights": fights_data})
 
             elif path == "/api/start_fight":
                 sid = body.get("sid", "")
@@ -1437,6 +1461,20 @@ class Handler(BaseHTTPRequestHandler):
                     if bonuses_data:
                         bonuses = bonuses_data
 
+                # Apply popularity changes
+                pop_gain = 0
+                fb_state = session.get("current_fight_booking")
+                if fb_state:
+                    pos = fb_state.fight_position
+                    pop_by_pos = {"prelim": 2 if won else -1, "main_card": 5 if won else -2,
+                                  "co_main": 10 if won else -5, "main_event": 15 if won else -8}
+                    pop_gain = pop_by_pos.get(pos, 0) if won else pop_by_pos.get(pos, 0)
+                    if "KO" in method or "TKO" in method:
+                        pop_gain += 5
+                    if is_title:
+                        pop_gain += 10 if won else -3
+                f.popularity = utils.clamp(getattr(f, "popularity", 10) + pop_gain, 0, 100)
+
                 # Record career damage after fight
                 if fight.fight_log:
                     f.record_fight_damage(fight.f1_head_damage if f == fight.fighter1 else fight.f2_head_damage,
@@ -1605,84 +1643,68 @@ class Handler(BaseHTTPRequestHandler):
                 training.set_day_drill(day_idx, drill_name)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
-            elif path == "/api/fight_offer":
+            elif path == "/api/accept_offer":
                 sid = body.get("sid", "")
                 opp_name = body.get("opponent", "")
                 session = get_or_create_session(sid)
                 f = session.get("fighter")
                 promo = session.get("current_promotion")
                 career = session.get("career")
+                game_date = session.get("game_date")
                 if not f or not promo:
                     self.json_resp({"error": "Not signed"})
                     return
-                opps = promo.get_available_opponents(f)
+                offers = promo.generate_fight_offers(f, count=3)
                 target = None
-                for o, d in opps:
-                    if o.name == opp_name:
-                        target = o
+                offer_data = None
+                for o in offers:
+                    if o["opponent"].name == opp_name:
+                        target = o["opponent"]
+                        offer_data = o
                         break
                 if not target:
-                    self.json_resp({"error": "Opponent not found"})
+                    self.json_resp({"error": "Offer no longer available"})
                     return
-                contract_pay = None
-                if career and career.contract:
-                    contract_pay = {
-                        "base_pay": career.contract.base_pay,
-                        "win_bonus": career.contract.win_bonus,
-                        "total": career.contract.base_pay + career.contract.win_bonus,
-                    }
-                rivalry_status = None
+                # Reset declined counter on accept
+                f.declined_offers_count = getattr(f, "declined_offers_count", 0)
+                f.declined_offers_count = max(0, f.declined_offers_count - 1)
+                # Deep copy opponent for booking
+                import copy
+                target = copy.deepcopy(target)
+                session["_opponent_original"] = target
+                # Create event and booking
+                weeks_out = body.get("weeks", 8)
+                fight_date = (game_date or datetime.now()) + timedelta(weeks=weeks_out)
+                is_title = (promo.champions.get(f.weight_class) is not None
+                            and target.name == promo.champions[f.weight_class].name)
+                es = session.get("event_sys") or EventSystem()
+                event = es.create_event(f"Fight Night: {f.name} vs {target.name}", fight_date, promo)
+                risk = offer_data.get("risk", "50-50") if offer_data else "50-50"
+                fb = es.book_fight(event, f, target, is_title_fight=is_title, risk_level=risk)
+                if fb:
+                    fb.set_fight_position(offer_data.get("card_position", "main_card") if offer_data else "main_card")
+                es.generate_card(event, fb, promo, f)
+                session["event_sys"] = es
+                session["current_event"] = event
+                session["current_fight_booking"] = fb
+                session["fight_completed"] = False
                 if career:
-                    for r in career.rivalries:
-                        opp_r = r.get_opponent(f)
-                        if opp_r and opp_r.name == target.name:
-                            rivalry_status = {"intensity": r.intensity, "fights": len(r.fights), "trilogy": r.trilogy}
-                            break
-                fight_history = []
-                for fh in [f, target]:
-                    recent = []
-                    total = fh.wins + fh.losses
-                    last_5 = min(total, 5)
-                    w_streak = fh.win_streak
-                    l_streak = fh.loss_streak
-                    for i in range(last_5):
-                        if w_streak > 0:
-                            recent.append("W")
-                            w_streak -= 1
-                        elif l_streak > 0:
-                            recent.append("L")
-                            l_streak -= 1
-                        else:
-                            prob = fh.wins / max(1, total)
-                            recent.append("W" if random.random() < prob else "L")
-                    fight_history.append({
-                        "name": fh.name,
-                        "recent": recent,
-                    })
-                self.json_resp({
-                    "success": True,
-                    "offer": {
-                        "opponent": {
-                            "name": target.name,
-                            "record": target.get_record_string(),
-                            "rank": target.rank,
-                            "rating": round(target.get_overall_rating(), 1),
-                            "archetype": target.archetype,
-                            "height": target.height,
-                            "reach": target.reach,
-                            "age": target.age,
-                            "nationality": target.nationality,
-                            "win_streak": target.win_streak,
-                            "loss_streak": target.loss_streak,
-                            "knockouts": target.knockouts,
-                            "submissions": target.submissions,
-                            "attributes": {k: round(v, 1) for k, v in target.attributes.items()},
-                        },
-                        "contract_pay": contract_pay,
-                        "rivalry": rivalry_status,
-                        "fight_history": fight_history,
-                    }
-                })
+                    career.add_rivalry(target)
+                _persist_session(sid, session)
+                self.json_resp({"success": True, "state": get_state_dict(session)})
+
+            elif path == "/api/decline_offer":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                promo = session.get("current_promotion")
+                if not f or not promo:
+                    self.json_resp({"error": "Not signed"})
+                    return
+                f.declined_offers_count = getattr(f, "declined_offers_count", 0) + 1
+                rel = promo.check_contract_relationship(f)
+                _persist_session(sid, session)
+                self.json_resp({"success": True, "relationship": rel})
 
             elif path == "/api/hire_agent":
                 sid = body.get("sid", "")
@@ -1949,7 +1971,6 @@ class Handler(BaseHTTPRequestHandler):
                         return
                     loaded_session, world_data = result
                     promotions, all_fighters, world_sim, world_news = world_data
-                    world, national, regional = promotions
 
                     # Match session fighter with loaded world fighters
                     loaded_f = loaded_session.get("fighter")
@@ -1976,16 +1997,13 @@ class Handler(BaseHTTPRequestHandler):
                     # Replace global world state with snapshot
                     with _gs_lock:
                         gs["promotions"] = promotions
-                        gs["world"] = world
-                        gs["national"] = national
-                        gs["regional"] = regional
                         gs["all_fighters"] = all_fighters
                         gs["world_sim"] = world_sim
                         gs["world_news"] = world_news or []
 
-                    # Replace session data
-                    with gs["sessions_lock"]:
-                        gs["sessions"][sid] = loaded_session
+                    # Replace session data — now via diskcache
+                    _session_cache[sid] = loaded_session
+                    _session_cache.expire(sid, timedelta(hours=48))
 
                     self.json_resp({
                         "success": True,

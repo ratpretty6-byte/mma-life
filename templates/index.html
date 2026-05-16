@@ -1925,55 +1925,162 @@ async function stopTraining() {
 
 async function refreshFightTab() {
   if (state && state.strategies) STRATS = state.strategies;
-  if (state && state.has_fight) {
+  const fb = state.fight_booking;
+  if (fb) {
     qs("#fightPre").classList.add("hidden");
     qs("#fightReady").classList.remove("hidden");
     qs("#fightLive").classList.add("hidden");
-    const fb = state.fight_booking;
-    if (fb) {
-      const canFight = fb.days_until <= 0;
-      qs("#fightMatchup").innerHTML = `<strong>${escHtml(state.fighter.name)}</strong> vs <strong>${escHtml(fb.opponent.name)}</strong><br>
-        <span style="color:#888">${escHtml(fb.opponent.record)} | #${fb.opponent.rank}${canFight ? ' | <span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>' : ` | ${fb.days_until} days until fight`}</span>`;
-      qs("#btnStartFight").style.display = canFight ? "inline-block" : "none";
-      if (!canFight) {
-        qs("#stratSelect").innerHTML = `<div style="text-align:center;padding:12px;color:#888">The fight hasn't arrived yet. Keep training!<br>Advance time in the Home tab.</div>`;
-      } else {
-        loadStrategySelect("stratSelect");
-      }
+    const canFight = fb.days_until <= 0;
+    qs("#fightMatchup").innerHTML = `<strong>${escHtml(state.fighter.name)}</strong> vs <strong>${escHtml(fb.opponent.name)}</strong><br>
+      <span style="color:#888">${escHtml(fb.opponent.record)} | #${fb.opponent.rank}${canFight ? ' | <span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>' : ` | ${fb.days_until} days until fight`}</span>`;
+    qs("#btnStartFight").style.display = canFight ? "inline-block" : "none";
+    if (!canFight) {
+      qs("#stratSelect").innerHTML = `<div style="text-align:center;padding:12px;color:#888">The fight hasn't arrived yet. Keep training!<br>Advance time in the Home tab.</div>`;
+    } else {
+      loadStrategySelect("stratSelect");
     }
+    // Also load event card if available
+    loadEventCard();
+  } else if (state && state.contract && Object.keys(state.contract).length) {
+    qs("#fightPre").classList.remove("hidden");
+    qs("#fightReady").classList.add("hidden");
+    qs("#fightLive").classList.add("hidden");
+    loadFightOffers();
   } else {
     qs("#fightPre").classList.remove("hidden");
     qs("#fightReady").classList.add("hidden");
     qs("#fightLive").classList.add("hidden");
-    loadOpponents();
+    qs("#opponentList").innerHTML = '<div style="text-align:center;padding:12px;color:#888">Sign a contract first!<br>Check the Career tab for promotion offers.</div>';
+    qs("#noOpponents").classList.add("hidden");
   }
 }
 
-async function loadOpponents() {
-  const resp = await api("/api/opponents?sid=" + encodeURIComponent(sid));
+async function loadFightOffers() {
+  const resp = await api("/api/fight_offers?sid=" + encodeURIComponent(sid));
   const list = qs("#opponentList");
   const none = qs("#noOpponents");
   list.innerHTML = "";
-  if (!resp.opponents || !resp.opponents.length) {
+  if (!resp.offers || !resp.offers.length) {
     none.classList.remove("hidden");
+    none.innerHTML = "No offers available right now. Advance time to get new offers.";
     return;
   }
   none.classList.add("hidden");
-  resp.opponents.forEach(o => {
-    const diffClass = o.difficulty.includes("step up") || o.difficulty.includes("tough") ? "diff-hard" :
-                      o.difficulty.includes("should win") ? "diff-easy" :
-                      o.difficulty.includes("pick em") ? "diff-pick" : "diff-medium";
-    const st = o.win_streak > 0 ? `W${o.win_streak}` : (o.loss_streak > 0 ? `L${Math.abs(o.loss_streak)}` : "");
+
+  if (resp.relationship && resp.relationship.warning) {
+    const warn = document.createElement("div");
+    warn.style.cssText = "padding:8px;margin-bottom:8px;background:#2a1a1a;border:1px solid #ff4a4a;border-radius:6px;font-size:12px;color:#ff9a4a";
+    warn.innerHTML = "⚠ " + escHtml(resp.relationship.warning);
+    list.appendChild(warn);
+  }
+
+  const riskLabels = {sacrifice: "🔥 SACRIFICE", tough: "💪 TOUGH", "50-50": "⚖️ 50-50", gimme: "🎁 GIMME"};
+  const riskColors = {sacrifice: "#ff4a4a", tough: "#ff9a4a", "50-50": "#ffd700", gimme: "#4aff6a"};
+  const popColors = {sacrifice: "#ff4a4a", tough: "#ff9a4a", "50-50": "#ffd700", gimme: "#4aff6a"};
+
+  resp.offers.forEach(o => {
+    const opp = o.opponent;
+    const risk = o.risk || "50-50";
     const div = document.createElement("div");
-    div.className = "opponent-card";
-    const rankDir = o.rank < state.fighter.rank ? "↑" : (o.rank > state.fighter.rank ? "↓" : "=");
-    const rankColor = o.rank < state.fighter.rank ? "#4aff6a" : (o.rank > state.fighter.rank ? "#ff4a4a" : "#888");
-    div.innerHTML = `<div><span class="name">${escHtml(o.name)}</span> <span class="record">${escHtml(o.record)}</span><br>
-      <small><span style="color:${rankColor}">#${o.rank} ${rankDir}</span> | ${escHtml(o.nationality || '--')} | ${escHtml(o.archetype)} | Rating: ${o.rating}</small></div>
-      <div style="text-align:right"><span class="diff ${diffClass}">${escHtml(o.difficulty)}</span><br><small>${st}</small></div>`;
-    div.onclick = () => showComparison(o);
+    div.className = "offer-card";
+    div.style.cssText = "border-left:3px solid " + (riskColors[risk] || "#888") + ";padding:8px;margin:6px 0;background:#12121e;border-radius:6px;cursor:pointer";
+    div.innerHTML = `
+      <div class="flex-between">
+        <div><strong style="color:${riskColors[risk] || '#fff'}">${riskLabels[risk] || risk.toUpperCase()}</strong>
+          <span style="font-size:11px;color:#888;margin-left:4px">${escHtml(o.card_position || 'prelim')}</span></div>
+        <span class="diff diff-${risk === 'sacrifice' ? 'hard' : risk === 'tough' ? 'hard' : risk === '50-50' ? 'pick' : 'easy'}">${escHtml(risk.toUpperCase())}</span>
+      </div>
+      <div style="margin-top:4px"><strong>${escHtml(opp.name)}</strong> <span style="color:#888">${escHtml(opp.record)} | #${opp.rank} | ${escHtml(opp.nationality)} | ${opp.rating}</span></div>
+      <div style="display:flex;gap:12px;margin-top:4px;font-size:11px;color:#aaa">
+        <span>Purse: <strong style="color:#4aff6a">$${o.base_purse.toLocaleString()}</strong></span>
+        <span>Win Bonus: <strong style="color:#ffd700">$${o.win_bonus.toLocaleString()}</strong></span>
+        <span>Pop: <strong style="color:${popColors[risk] || '#aaa'}">+${o.popularity_gain}</strong></span>
+      </div>`;
+    div.onclick = () => {
+      // Show opponent comparison + accept/decline
+      showOfferModal(o, resp.relationship);
+    };
     list.appendChild(div);
   });
+}
+
+async function loadEventCard() {
+  const resp = await api("/api/event_card?sid=" + encodeURIComponent(sid));
+  if (!resp.success || !resp.fights || !resp.fights.length) return;
+  let html = `<div style="margin-top:8px;padding:8px;background:#0d0d1a;border-radius:6px">
+    <div class="card-title" style="font-size:12px">${escHtml(resp.event_name)} — Full Card</div>`;
+  const posClasses = {prelim: "prelim", main_card: "maincard", co_main: "comain", main_event: "mainevent"};
+  resp.fights.forEach(f => {
+    const isPlayer = f.is_player_fight;
+    const hasWinner = f.winner;
+    const cls = posClasses[f.position] || "prelim";
+    html += `<div style="display:flex;align-items:center;padding:4px 0;${isPlayer ? 'border-left:3px solid var(--gold);padding-left:6px;' : ''}font-size:12px">
+      <span class="tag tag-${cls}" style="min-width:70px">${escHtml(f.position.replace('_', ' '))}</span>
+      <span style="flex:1;text-align:center;${isPlayer ? 'color:var(--gold);font-weight:700' : ''}">
+        ${escHtml(f.fighter1)} vs ${escHtml(f.fighter2)}${f.is_title ? ' 👑' : ''}
+      </span>
+      <span style="color:#888;font-size:11px">${hasWinner ? escHtml(f.winner) + ' by ' + escHtml(f.method) + ' R' + f.round : f.status}</span>
+    </div>`;
+  });
+  html += `</div>`;
+  const el = document.getElementById("fightMatchup");
+  if (el) el.innerHTML += html;
+}
+
+function showOfferModal(o, relationship) {
+  const opp = o.opponent;
+  const riskLabels = {sacrifice: "🔥 SACRIFICE", tough: "💪 TOUGH", "50-50": "⚖️ 50-50", gimme: "🎁 GIMME"};
+  const riskColors = {sacrifice: "#ff4a4a", tough: "#ff9a4a", "50-50": "#ffd700", gimme: "#4aff6a"};
+  let html = `<div class="card-title" style="font-size:16px">Fight Offer</div>
+    <div style="text-align:center">
+      <span style="color:${riskColors[o.risk] || '#fff'};font-weight:700;font-size:18px">${riskLabels[o.risk] || o.risk.toUpperCase()}</span>
+      <span style="font-size:12px;color:#888;margin-left:6px">— ${escHtml(o.card_position)}</span>
+    </div>
+    <div class="compare-grid" style="margin-top:8px">
+      <div style="text-align:center"><strong style="color:var(--accent)">${escHtml(state.fighter.name)}</strong></div>
+      <div style="text-align:center;font-size:10px;color:var(--text-muted)">VS</div>
+      <div style="text-align:center"><strong style="color:#4a9eff">${escHtml(opp.name)}</strong></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;font-size:11px;color:#aaa">
+      <div>Record: ${escHtml(state.fighter.record)}</div><div>Record: ${escHtml(opp.record)}</div>
+      <div>Rank: #${state.fighter.rank}</div><div>Rank: #${opp.rank}</div>
+      <div>Rating: ${state.fighter.rating}</div><div>Rating: ${opp.rating}</div>
+    </div>
+    <div style="margin-top:8px;padding:8px;background:#1a1a2a;border-radius:6px;font-size:12px">
+      <div class="flex-between"><span>Base Purse:</span><span style="color:#4aff6a">$${o.base_purse.toLocaleString()}</span></div>
+      <div class="flex-between"><span>Win Bonus:</span><span style="color:#ffd700">$${o.win_bonus.toLocaleString()}</span></div>
+      <div class="flex-between"><span>Popularity Gain:</span><span style="color:${riskColors[o.risk]}">+${o.popularity_gain} on win</span></div>
+      <div class="flex-between"><span>Card Position:</span><span style="color:#4a9eff">${escHtml(o.card_position.replace('_', ' '))}</span></div>
+    </div>`;
+  // Accept/Decline buttons
+  html += `<div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+    <button class="btn btn-primary" onclick="closeModal(null);acceptOffer('${escHtml(opp.name)}')">Accept Offer</button>
+    <button class="btn btn-ghost" onclick="closeModal(null);declineOffer()">Decline</button>
+  </div>`;
+  showModal(html);
+}
+
+async function acceptOffer(oppName) {
+  const resp = await api("/api/accept_offer", { sid, opponent: oppName, weeks: 8 });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateAllUI();
+    refreshFightTab();
+    toast("Fight booked!", "success");
+  } else {
+    toast(resp.error || "Failed to book fight", "error");
+  }
+}
+
+async function declineOffer() {
+  const resp = await api("/api/decline_offer", { sid });
+  if (resp.success) {
+    toast("Offer declined", "info");
+    loadFightOffers();
+  } else {
+    toast(resp.error || "Error", "error");
+  }
 }
 
 function showComparison(o) {
