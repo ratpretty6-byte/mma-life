@@ -5,12 +5,10 @@ Usage: python3 analyze.py [report_type]
   reports: all, balance, fighters, promotions, careers
 """
 
-import sqlite3
 import json
 import os
+import sqlite3
 import sys
-from collections import Counter
-from datetime import datetime
 
 DB_PATH = os.environ.get("MMALIFE_DB",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "mma_life.db"))

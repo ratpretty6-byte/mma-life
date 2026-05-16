@@ -1,7 +1,7 @@
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
 import random
-import numpy as np
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
 import utils
 
 

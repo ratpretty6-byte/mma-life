@@ -1,17 +1,18 @@
 """
 Balance validation test: runs bulk simulations and asserts rates match real UFC stats.
 """
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import unittest
 import json
 import random
+import unittest
 from collections import Counter
-from fighter import Fighter
-from fight import Fight
 
+from fight import Fight
+from fighter import Fighter
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "config", "real_stats.json")
 

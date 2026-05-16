@@ -1,15 +1,22 @@
 import random
-import math
+from typing import Dict, Generator, List, Optional
+
 import numpy as np
-from typing import Dict, Optional, List, Generator
-from fighter import Fighter
-from positions import PositionSystem, Position
-from strategy import StrategySystem, STRATEGIES
-from commentary import CommentaryEngine
+
 import utils
-from utils import get_combos_for_position, calculate_feint_chance, calculate_feint_recognition
-from utils import get_breathing_level, get_breathing_recovery_modifier, BREATHING_THRESHOLDS, BREATHING_RECOVERY_BETWEEN_ROUNDS
-from utils import get_stance_modifiers
+from commentary import CommentaryEngine
+from fighter import Fighter
+from positions import Position, PositionSystem
+from strategy import StrategySystem
+from utils import (
+    BREATHING_RECOVERY_BETWEEN_ROUNDS,
+    calculate_feint_chance,
+    calculate_feint_recognition,
+    get_breathing_level,
+    get_breathing_recovery_modifier,
+    get_combos_for_position,
+    get_stance_modifiers,
+)
 
 # ============================================================
 # CONSTANTS
@@ -34,7 +41,6 @@ STRIKE_PROFILES = {
 }
 
 # Import from utils for enhanced combo system
-from utils import COMBOS as NEW_COMBOS
 
 STAMINA_COST = {
     "jab": 1, "cross": 2, "hook": 3, "uppercut": 3,
@@ -198,7 +204,6 @@ class Referee:
             return None
 
         # Determine foul type based on position
-        from positions import Position
         pos = self.f1_fouls if fighter_num == 1 else self.f2_fouls  # just to access position_ref
         # Choose foul type
         fouls = []
@@ -244,21 +249,21 @@ class Referee:
         undetected = max(0, total_fouls - warnings - (1 if self.f1_dq or self.f2_dq else 0))
 
         if undetected == 1:
-            return f"verbal"
+            return "verbal"
         elif undetected == 2:
             self.f1_warnings += 1 if fighter_num == 1 else 0
             self.f2_warnings += 1 if fighter_num == 2 else 0
-            return f"official warning"
+            return "official warning"
         elif undetected == 3:
             self.f1_warnings += 1 if fighter_num == 1 else 0
             self.f2_warnings += 1 if fighter_num == 2 else 0
-            return f"point deduction"
+            return "point deduction"
         else:
             if fighter_num == 1:
                 self.f1_dq = True
             else:
                 self.f2_dq = True
-            return f"disqualification"
+            return "disqualification"
 
     def is_dq(self, fighter_num: int) -> bool:
         if fighter_num == 1:
@@ -1394,7 +1399,7 @@ class Fight:
         elif r < 0.90:
             self.fight_log.append(f"{attacker.name} switches stance, changing the look.")
         else:
-            self.fight_log.append(f"Both fighters circle in the center, neither committing.")
+            self.fight_log.append("Both fighters circle in the center, neither committing.")
         self.referee.record_damage_taken(defender, True, attacker=attacker)
         return True
 
@@ -1554,7 +1559,7 @@ class Fight:
             self.referee.foul_timeout_actions -= 1
             if self.referee.foul_timeout_actions <= 0:
                 self.referee.foul_timeout_active = False
-                self.fight_log.append(f"The referee restarts the action!")
+                self.fight_log.append("The referee restarts the action!")
             return
 
         atk1, def1, atk_state1, def_state1, strat1 = (

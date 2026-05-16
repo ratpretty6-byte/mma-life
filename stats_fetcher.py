@@ -11,16 +11,15 @@ Usage:
   python3 stats_fetcher.py --since 2010 --limit 50 --save  # Limit to first N
 """
 
-import urllib.request
-import urllib.error
 import json
 import os
-import sys
 import re
+import sys
 import time
+import urllib.error
+import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
-
 
 BASE_URL = "http://ufcstats.com"
 EVENTS_URL = BASE_URL + "/statistics/events/completed?page=all"

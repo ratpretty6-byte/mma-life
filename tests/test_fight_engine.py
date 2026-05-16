@@ -1,16 +1,16 @@
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import unittest
 import random
-import numpy as np
 import unittest
-from fighter import Fighter
+
+import numpy as np
+
 from fight import Fight
-from positions import PositionSystem, Position
-from strategy import StrategySystem
-from datetime import datetime
+from fighter import Fighter
+from positions import Position, PositionSystem
 
 
 class TestFightSimulation(unittest.TestCase):

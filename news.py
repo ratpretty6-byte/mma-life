@@ -1,5 +1,6 @@
-from typing import Dict, List, Optional
 import random
+from typing import Dict, List, Optional
+
 
 def format_news_item(item: Dict) -> Dict:
     news_type = item.get("type", "unknown")
@@ -100,7 +101,7 @@ def _format_fight_result(item: Dict) -> Dict:
 
     rnd_info = item.get("rivalry_info")
     if rnd_info:
-        body += f" This fight adds another chapter to their growing rivalry."
+        body += " This fight adds another chapter to their growing rivalry."
 
     return {"headline": headline, "body": body, "severity": severity}
 
@@ -191,7 +192,7 @@ def _format_press_conference(item: Dict) -> Dict:
         body = f"The faceoff between {fighter} and {opponent} was electric. The crowd erupted."
     else:
         headline = f"{fighter} and {opponent} show respect ahead of clash"
-        body = f"Both fighters kept it professional at today's press conference."
+        body = "Both fighters kept it professional at today's press conference."
     return {"headline": headline, "body": body, "severity": "routine"}
 
 def _format_scandal(item: Dict) -> Dict:

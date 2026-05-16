@@ -1,6 +1,6 @@
 try:
-    from jnius import autoclass
     from android import mActivity
+    from jnius import autoclass
     ANDROID = True
 except ImportError:
     ANDROID = False

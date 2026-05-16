@@ -1,7 +1,8 @@
 import random
 from typing import Dict, List, Optional
-from fighter import Fighter
+
 import utils
+from fighter import Fighter
 
 # STYLES dict is now the single source of truth for strategy modifiers
 # Imported from utils to keep one canonical definition

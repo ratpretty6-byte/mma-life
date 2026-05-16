@@ -1,7 +1,8 @@
-from typing import Dict, List, Optional
-from fighter import Fighter
-from datetime import datetime, timedelta
 import random
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
+from fighter import Fighter
 
 INJURY_TYPES = {
     "cut": {"base_severity": 0.3, "recovery_days": 7, "affected_attrs": ["striking_accuracy"]},

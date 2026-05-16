@@ -1,8 +1,8 @@
-from typing import Dict, List, Optional, Tuple
-import random
-import math
 import json
 import os
+import random
+from typing import Dict, List, Tuple
+
 import numpy as np
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")

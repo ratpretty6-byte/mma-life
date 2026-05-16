@@ -8,4 +8,8 @@ __pycache__/
 nohup.out
 *.db
 *.db.bak
+*.db-shm
+*.db-wal
+.coverage
+htmlcov/
 temp_*

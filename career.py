@@ -1,11 +1,13 @@
-from typing import Dict, List, Optional, Tuple
-from fighter import Fighter
-from promotion import Promotion, Contract
-from events import FightBooking
-from datetime import datetime, timedelta
-import utils
 import random
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
+
+import utils
+from events import FightBooking
+from fighter import Fighter
 from news import StorylineTracker
+from promotion import Contract, Promotion
+
 
 class Rivalry:
     def __init__(self, fighter1: Fighter, fighter2: Fighter):
@@ -246,20 +248,20 @@ class CareerSystem:
         total_wins = self.fighter.wins
 
         if total_wins == 1:
-            new_milestones.append(f"First career win — the journey begins!")
+            new_milestones.append("First career win — the journey begins!")
         if total_wins == 5:
             new_milestones.append(f"5 wins — establishing yourself in the {wc} division!")
         if total_wins == 10:
-            new_milestones.append(f"10 wins — double digits! The division is taking notice.")
+            new_milestones.append("10 wins — double digits! The division is taking notice.")
         if total_wins == 20:
-            new_milestones.append(f"20 wins — a true veteran of the sport!")
+            new_milestones.append("20 wins — a true veteran of the sport!")
 
         if self._longest_win_streak == 3:
-            new_milestones.append(f"3 wins in a row — first real winning streak!")
+            new_milestones.append("3 wins in a row — first real winning streak!")
         if self._longest_win_streak == 5:
-            new_milestones.append(f"5 straight wins — contender status!")
+            new_milestones.append("5 straight wins — contender status!")
         if self._longest_win_streak == 7:
-            new_milestones.append(f"7 fight win streak — you're a force to be reckoned with!")
+            new_milestones.append("7 fight win streak — you're a force to be reckoned with!")
         if self._longest_win_streak == 10:
             new_milestones.append(f"10 IN A ROW! Historic dominance in the {wc} division!")
 

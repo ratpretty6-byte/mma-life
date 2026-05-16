@@ -1,20 +1,14 @@
-import sqlite3
 import json
-import pickle
 import os
-import threading
+import pickle
 import random
-from typing import Dict, List, Optional, Any
+import sqlite3
+import threading
 from datetime import datetime
+from typing import Dict, List, Optional
+
 from fighter import Fighter
 from promotion import Promotion
-from training import TrainingSystem, TrainingCamp
-from career import CareerSystem
-from finance import FinancialSystem
-from health import HealthSystem
-from media import MediaSystem
-from events import EventSystem
-from world_sim import WorldSimulator
 
 SAVE_FORMAT_VERSION = 1
 
@@ -302,6 +296,7 @@ def load_promotions(all_fighters: List[Fighter]) -> List[Promotion]:
         cursor = conn.execute("SELECT * FROM promotions")
         rows = cursor.fetchall()
         if not rows:
+            from promotion import create_promotions
             return create_promotions([wc["name"] for wc in utils.WEIGHT_CLASSES])
         columns = [desc[0] for desc in cursor.description]
         fighter_map = {f.name: f for f in all_fighters}
@@ -403,7 +398,6 @@ def save_world_state(promotions, all_fighters, world_sim=None, world_news=None):
 
 
 def load_world_state():
-    from promotion import create_promotions
     with _lock:
         conn = _get_conn()
         cursor = conn.execute("SELECT COUNT(*) FROM fighters")

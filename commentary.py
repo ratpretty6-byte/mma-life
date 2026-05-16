@@ -1,8 +1,8 @@
 import random
 from typing import Dict, List, Optional
+
 from fighter import Fighter
-from positions import PositionSystem, Position
-from utils import SEVERITY_TIERS
+from positions import Position
 
 BACKGROUND_ENTRANCES = {
     "muay_thai": [
@@ -752,13 +752,13 @@ class CommentaryEngine:
         if fighter.win_streak >= 3:
             return f"riding a {fighter.win_streak}-fight win streak"
         elif fighter.win_streak == 2:
-            return f"won their last two"
+            return "won their last two"
         elif fighter.win_streak == 1:
-            return f"coming off a win"
+            return "coming off a win"
         elif fighter.loss_streak >= 3:
             return f"on a {fighter.loss_streak}-fight skid"
         elif fighter.loss_streak >= 1:
-            return f"looking to bounce back from a loss"
+            return "looking to bounce back from a loss"
         return "looking to make a statement"
 
     def _get_background_entrance(self, fighter: Fighter) -> Optional[str]:
@@ -853,7 +853,7 @@ class CommentaryEngine:
                         lower_ranked_fighter=lower_ranked.name,
                         f1=fighter1.name, f2=fighter2.name,
                         style1=fighter1.background or "MMA", style2=fighter2.background or "MMA",
-                        rank_info=f"#{higher_ranked.rank}-ranked {higher_ranked.name} faces #{lower_ranked.rank} {lower_ranked.name}" if diff > 10 else f"close rankings here",
+                        rank_info=f"#{higher_ranked.rank}-ranked {higher_ranked.name} faces #{lower_ranked.rank} {lower_ranked.name}" if diff > 10 else "close rankings here",
                         goal1=self._get_style_goal(fighter1),
                         goal2=self._get_style_goal(fighter2),
                     ))
@@ -948,9 +948,9 @@ class CommentaryEngine:
         streak = self._get_streak_text(fighter)
         desc_parts.append(f"{streak}")
         if fighter.win_streak >= 3:
-            desc_parts.append(f"and looking confident")
+            desc_parts.append("and looking confident")
         if is_main_event:
-            desc_parts.append(f"headlining tonight's card")
+            desc_parts.append("headlining tonight's card")
 
         description = ", ".join(desc_parts)
         template = random.choice(self.walkout_templates)
@@ -960,29 +960,29 @@ class CommentaryEngine:
         advice_pool = []
         if needs_finish:
             advice_pool = [
-                f"You need a finish! Go get it!",
-                f"This is it! Leave it all in the cage!",
-                f"Go for broke! You're down on the cards!",
-                f"You're behind! Hunt for the finish — takedown, knockout, anything!",
-                f"Desperate times! Empty the gas tank, this round is everything!",
-                f"Champions find a way! Go out there and take it!",
+                "You need a finish! Go get it!",
+                "This is it! Leave it all in the cage!",
+                "Go for broke! You're down on the cards!",
+                "You're behind! Hunt for the finish — takedown, knockout, anything!",
+                "Desperate times! Empty the gas tank, this round is everything!",
+                "Champions find a way! Go out there and take it!",
             ]
         else:
             advice_pool = [
-                f"Keep working, you're doing great!",
-                f"Stick to the game plan!",
-                f"Calm down, breathe, and execute.",
-                f"Press forward, you're winning these exchanges!",
-                f"Watch for his power shot, stay focused!",
-                f"He's slowing down, pick up the pace!",
-                f"Let your hands go, you're the better fighter!",
-                f"Stay behind the jab, establish your range!",
-                f"Mix in the takedown to keep him guessing!",
-                f"Body work! Break him down to the body!",
-                f"Patience, it's your round. Pick your shots!",
-                f"He's loading up, make him miss and counter!",
-                f"Pressure him! Don't let him breathe for a second!",
-                f"Feint and find the opening, he's starting to read you.",
+                "Keep working, you're doing great!",
+                "Stick to the game plan!",
+                "Calm down, breathe, and execute.",
+                "Press forward, you're winning these exchanges!",
+                "Watch for his power shot, stay focused!",
+                "He's slowing down, pick up the pace!",
+                "Let your hands go, you're the better fighter!",
+                "Stay behind the jab, establish your range!",
+                "Mix in the takedown to keep him guessing!",
+                "Body work! Break him down to the body!",
+                "Patience, it's your round. Pick your shots!",
+                "He's loading up, make him miss and counter!",
+                "Pressure him! Don't let him breathe for a second!",
+                "Feint and find the opening, he's starting to read you.",
             ]
 
         advice = random.choice(advice_pool)

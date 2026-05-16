@@ -1,8 +1,9 @@
-from typing import Dict, List, Optional
 from datetime import datetime
+from typing import Dict, List, Optional
+
 from fighter import Fighter
 from promotion import Promotion
-import random
+
 
 class FightBooking:
     def __init__(self, fighter1: Fighter, fighter2: Fighter, date: datetime, weight_class: str, promotion: Promotion, is_title_fight: bool = False):

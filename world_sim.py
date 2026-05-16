@@ -1,14 +1,15 @@
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
-from fighter import Fighter
-from promotion import Promotion
-from fight import Fight
-from events import EventSystem
-from generator import generate_single_fighter
-import random
 import copy
-import math
+import random
+from datetime import datetime
+from typing import Dict, List, Optional
+
 import utils
+from events import EventSystem
+from fight import Fight
+from fighter import Fighter
+from generator import generate_single_fighter
+from promotion import Promotion
+
 
 class WorldSimulator:
     def __init__(self, promotions: List[Promotion], all_fighters: List = None):

@@ -1,8 +1,9 @@
+from datetime import datetime
 from typing import Dict, List, Optional
-from fighter import Fighter
-from datetime import datetime, timedelta
-import random
+
 import utils
+from fighter import Fighter
+
 
 class Transaction:
     def __init__(self, amount: float, category: str, description: str, date: datetime = None, game_date: datetime = None):

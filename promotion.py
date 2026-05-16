@@ -1,8 +1,9 @@
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-from fighter import Fighter
-from datetime import datetime, timedelta
+
 import utils
-import random
+from fighter import Fighter
+
 
 class Contract:
     def __init__(self, fighter: Fighter, promotion: 'Promotion', fights_remaining: int,

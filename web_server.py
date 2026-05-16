@@ -1,34 +1,48 @@
 #!/usr/bin/env python3
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from socketserver import ThreadingMixIn
+import copy
 import json
 import os
-import urllib.parse
-import traceback
 import random
-import copy
 import secrets
-from datetime import datetime, timedelta
-from threading import Lock, Thread
 import time
+import traceback
+import urllib.parse
+from datetime import datetime, timedelta
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+from threading import Lock, Thread
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
-from persistence import init_db, save_world_state, load_world_state, save_session, load_session, delete_session, cleanup_stale_sessions, save_to_slot, load_from_slot, list_saves, delete_save, export_save, import_save, SaveIncompatibleError
-from fighter import Fighter
-from training import TrainingSystem, TrainingCamp, DAYS_OF_WEEK
-from promotion import Promotion, create_promotions
+import utils
 from career import CareerSystem
-from finance import FinancialSystem
-from health import HealthSystem
-from media import MediaSystem
 from events import EventSystem
 from fight import Fight
-from strategy import StrategySystem, STRATEGIES
+from fighter import Fighter
+from finance import FinancialSystem
 from generator import generate_fighter_pool
-from world_sim import WorldSimulator
+from health import HealthSystem
+from media import MediaSystem
 from news import format_news_items
-import utils
+from persistence import (
+    SaveIncompatibleError,
+    cleanup_stale_sessions,
+    delete_save,
+    export_save,
+    import_save,
+    init_db,
+    list_saves,
+    load_from_slot,
+    load_session,
+    load_world_state,
+    save_session,
+    save_to_slot,
+    save_world_state,
+)
+from promotion import create_promotions
+from strategy import STRATEGIES
+from training import TrainingCamp, TrainingSystem
+from world_sim import WorldSimulator
 
 init_lock = Lock()
 gs = {"initialized": False}
@@ -697,10 +711,10 @@ class Handler(BaseHTTPRequestHandler):
                 if trait_id in (None, 'None', ''):
                     trait_id = None
                 personality_id = params.get("personality_id", ["humble"])[0]
-                
+
                 wc_data = utils.WEIGHT_CLASSES[wc]
                 weight = random.randint(wc_data["min"], wc_data["max"])
-                
+
                 game_date = datetime(2025, 1, 6)
                 stance = utils.get_stance_for_background(bg)
                 f = Fighter(name, age, weight, bg, "balanced", nationality, region, trait_id, personality_id, stance=stance, game_date=game_date)
@@ -729,7 +743,7 @@ class Handler(BaseHTTPRequestHandler):
                 session["current_fight_booking"] = None
                 session["current_fight"] = None
                 session["game_date"] = game_date
-                
+
                 self.send_response(302)
                 self.send_header("Location", f"/?sid={sid}")
                 self.end_headers()
@@ -810,7 +824,7 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-length", 0))
             content_type = self.headers.get("Content-Type", "")
             raw_body = self.rfile.read(length) if length else b""
-            
+
             # Handle both JSON and form-encoded data
             if "application/json" in content_type:
                 body = json.loads(raw_body) if raw_body else {}
@@ -820,7 +834,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = {k: v[0] if len(v) == 1 else v for k, v in body.items()}
             else:
                 body = {}
-                
+
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
 
@@ -838,7 +852,7 @@ class Handler(BaseHTTPRequestHandler):
                     age = 25
                 bg = body.get("background", "mma")
                 wc_param = body.get("weight_class", 3)
-                
+
                 # Handle both string weight class names and integer indices
                 if isinstance(wc_param, str):
                     # Find the weight class index by name
@@ -923,7 +937,7 @@ class Handler(BaseHTTPRequestHandler):
                 session["game_date"] = game_date
 
                 seed_regional_division(nationality, region, f.weight_class, 10)
-                
+
                 _persist_session(sid, session)
 
                 _auto_save(sid, session)
@@ -1655,6 +1669,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/balance_test":
                 """Run multiple simulated fights and return aggregate stats."""
                 from copy import deepcopy
+
                 from generator import generate_single_fighter
                 sid = body.get("sid", "")
                 iterations = body.get("iterations", 100)
@@ -1928,12 +1943,12 @@ if __name__ == "__main__":
     class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         """Handle each request in a new thread"""
         daemon_threads = True
-    
+
     PORT = int(os.environ.get("PORT", 8000))
     HOST = "0.0.0.0"
-    
+
     gs["start_time"] = time.time()
-    
+
     def session_cleanup():
         while True:
             time.sleep(300)
@@ -1946,9 +1961,9 @@ if __name__ == "__main__":
                         del gs["sessions"][sid]
                     if stale:
                         print(f"Cleaned {len(stale)} stale sessions")
-    
+
     Thread(target=session_cleanup, daemon=True).start()
-    
+
     print(f"Server starting on port {PORT}...")
     server = ThreadedHTTPServer((HOST, PORT), Handler)
     server.allow_reuse_address = True

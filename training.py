@@ -1,8 +1,10 @@
-from typing import Dict, List, Optional
-from fighter import Fighter
 import random
 from datetime import datetime
+from typing import Dict, List, Optional
+
 import utils
+from fighter import Fighter
+
 
 class TrainingDrill:
     def __init__(self, name: str, drill_type: str, affected_attrs: List[str],

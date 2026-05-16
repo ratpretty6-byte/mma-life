@@ -1,15 +1,31 @@
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import unittest
 import tempfile
-from persistence import init_db, save_fighters, load_fighters, save_session, load_session, delete_session, save_to_slot, load_from_slot, list_saves, delete_save, export_save, import_save, SaveIncompatibleError
-from generator import generate_fighter_pool
-from promotion import create_promotions
-from fighter import Fighter
+import unittest
 from datetime import datetime
+
 import utils
+from fighter import Fighter
+from generator import generate_fighter_pool
+from persistence import (
+    SaveIncompatibleError,
+    delete_save,
+    delete_session,
+    export_save,
+    import_save,
+    init_db,
+    list_saves,
+    load_fighters,
+    load_from_slot,
+    load_session,
+    save_fighters,
+    save_session,
+    save_to_slot,
+)
+from promotion import create_promotions
 
 
 class TestPersistence(unittest.TestCase):
@@ -18,7 +34,6 @@ class TestPersistence(unittest.TestCase):
         self._orig_db = os.environ.get("MMALIFE_DB", "")
         self.tmp_db = tempfile.mktemp(suffix=".db")
         os.environ["MMALIFE_DB"] = self.tmp_db
-        from persistence import _conn
         import persistence
         persistence._conn = None
         init_db()
@@ -72,9 +87,9 @@ class TestPersistence(unittest.TestCase):
             self.assertEqual(orig.attributes, loaded_f.attributes)
 
     def test_session_pickle_complex(self):
-        from training import TrainingSystem
         from career import CareerSystem
         from finance import FinancialSystem
+        from training import TrainingSystem
         f = Fighter("Pickle Test", 25, 170, "mma", "balanced")
         sid = "complex-session"
         session = {
@@ -94,9 +109,9 @@ class TestPersistence(unittest.TestCase):
     # --- Save Slot Tests ---
 
     def test_save_load_slot_roundtrip(self):
-        from training import TrainingSystem
         from career import CareerSystem
         from finance import FinancialSystem
+        from training import TrainingSystem
         f = Fighter("Slot Test", 25, 170, "mma", "balanced")
         f.wins = 5
         f.losses = 1
@@ -194,8 +209,8 @@ class TestPersistence(unittest.TestCase):
 
     def test_version_mismatch_rejected(self):
         import pickle
-        import sqlite3
-        from persistence import _get_conn, SAVE_FORMAT_VERSION
+
+        from persistence import _get_conn
         f = Fighter("Version Test", 25, 170, "mma", "balanced")
         sid = "version-test-user"
         conn = _get_conn()
@@ -213,7 +228,6 @@ class TestPersistence(unittest.TestCase):
             load_from_slot(sid, 0)
 
     def test_corrupt_save_handled(self):
-        import sqlite3
         from persistence import _get_conn
         sid = "corrupt-test-user"
         conn = _get_conn()

@@ -1,10 +1,9 @@
 import random
-import math
-import numpy as np
-from typing import List, Dict, Tuple
+from typing import Dict, List
+
+import utils
 from fighter import Fighter
 from promotion import Promotion
-import utils
 
 ARCHETYPE_STRATEGY_MAP = {
     "brawler": "aggressive_striking",

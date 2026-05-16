@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 from enum import Enum
-from typing import Optional, Dict, Tuple
+from typing import Dict, Optional
+
 import utils
 from fighter import Fighter
 

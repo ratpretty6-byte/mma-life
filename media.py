@@ -1,8 +1,9 @@
-from typing import Dict, List, Optional
-from fighter import Fighter
-from datetime import datetime
 import random
-import utils
+from datetime import datetime
+from typing import Dict, List
+
+from fighter import Fighter
+
 
 class MediaSystem:
     def __init__(self, fighter: Fighter):
@@ -61,7 +62,7 @@ class MediaSystem:
         result = f"Press conference: {self.fighter.name} vs {opponent.name} - "
         pop_gain = 0
         if choice == "respectful":
-            result += f"Both fighters show mutual respect."
+            result += "Both fighters show mutual respect."
             pop_gain = 1.0
             self.set_public_image("hero")
         elif choice == "trash_talk":
@@ -69,7 +70,7 @@ class MediaSystem:
             pop_gain = 3.0
             self.fighter.attributes["composure"] = max(0, self.fighter.attributes["composure"] - 2)
         elif choice == "staredown":
-            result += f"Intense staredown! The crowd is going wild!"
+            result += "Intense staredown! The crowd is going wild!"
             pop_gain = 2.0
 
         self.update_popularity(pop_gain)
