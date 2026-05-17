@@ -151,6 +151,33 @@ def _relink_session_fighter(session):
             if af.name == loaded_f.name and af.age == loaded_f.age:
                 found = af
                 break
+    if not found:
+        for promo in promotions:
+            for fighters in promo.rankings.values():
+                for pf in fighters:
+                    if pf.name == loaded_f.name and pf.age == loaded_f.age:
+                        found = pf
+                        break
+                if found:
+                    break
+            if found:
+                break
+    if not found:
+        promo_name = session.get("current_promotion_name")
+        if promo_name:
+            for promo in promotions:
+                if promo.name == promo_name:
+                    wc = loaded_f.weight_class
+                    if wc not in promo.rankings:
+                        promo.rankings[wc] = []
+                    loaded_f.rank = len(promo.rankings[wc]) + 1
+                    promo.rankings[wc].append(loaded_f)
+                    promo.fighters.append(loaded_f)
+                    promo.update_rankings()
+                    if all_fighters is not None and loaded_f not in all_fighters:
+                        all_fighters.append(loaded_f)
+                    found = loaded_f
+                    break
     if found:
         session["fighter"] = found
         for key in ["career", "training", "finance", "health", "media"]:
@@ -1540,6 +1567,9 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 career.sign_with_promotion(promo, 4, game_date)
                 set_session_promotion(session, promo)
+                all_fighters = gs.get("all_fighters")
+                if all_fighters is not None and f not in all_fighters:
+                    all_fighters.append(f)
                 ensure_regional_opponents(session)
                 _persist_session(sid, session)
                 _persist_world()
