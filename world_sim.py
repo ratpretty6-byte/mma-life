@@ -38,6 +38,8 @@ class WorldSimulator:
 
         for promo in self.promotions:
             for wc in promo.weight_classes:
+                for fighter in promo.rankings.get(wc, []):
+                    fighter.recover_injuries(game_date)
                 wc_results = self._simulate_weight_class(promo, wc, game_date, event_sys)
                 results.extend(wc_results)
             promo.update_rankings(game_date)

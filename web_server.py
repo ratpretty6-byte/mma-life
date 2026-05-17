@@ -634,38 +634,6 @@ def get_available_camps_data():
         result.append({"name": c.name, "type": c.camp_type, "weeks": c.duration_weeks, "cost": c.cost, "drills": drills})
     return result
 
-def get_opponents_data(session):
-    f = session.get("fighter")
-    promo = get_session_promotion(session)
-    if not f or not promo:
-        return []
-    all_promos = [gs.get("world"), gs.get("national"), gs.get("regional")]
-    opps = promo.get_available_opponents(f, all_promotions=[p for p in all_promos if p and p != promo])
-    result = []
-    for opp, difficulty in opps:
-        result.append({
-            "name": opp.name,
-            "record": opp.get_record_string(),
-            "rank": opp.rank,
-            "rating": round(opp.get_overall_rating(), 1),
-            "archetype": opp.archetype,
-            "age": opp.age,
-            "nationality": opp.nationality,
-            "height": opp.height,
-            "reach": opp.reach,
-            "wins": opp.wins,
-            "losses": opp.losses,
-            "knockouts": opp.knockouts,
-            "submissions": opp.submissions,
-            "win_streak": opp.win_streak,
-            "loss_streak": opp.loss_streak,
-            "difficulty": difficulty,
-            "attributes": {k: round(v, 1) for k, v in opp.attributes.items()},
-        })
-    result.sort(key=lambda x: x["rank"])
-    return result
-
-
 # ============================================================
 # FIGHT STREAMING — background thread with event polling
 # ============================================================
@@ -885,6 +853,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not f or not promo:
                     self.json_resp({"offers": []})
                     return
+                ensure_available_opponents(session)
                 offers = promo.generate_fight_offers(f, count=3)
                 offers_data = []
                 for o in offers:
@@ -921,16 +890,10 @@ class Handler(BaseHTTPRequestHandler):
                     # Only show Regional promotions for new fighters (0 career fights)
                     if f and (f.career_total_fights or 0) == 0 and p.tier_name != "Regional":
                         continue
-                    # Unlock National after 3 wins or a title
-                    if f and f.wins >= 3 and p.tier_name == "National":
-                        pass  # National is unlocked
-                    # Unlock World after 5 wins or National title
-                    if f and f.wins >= 5 and p.tier_name == "World":
-                        pass  # World is unlocked
-                    # Only show promotions at or above player's level
-                    if f:
-                        tiers = ["Regional", "National", "World"]
-                        player_tier_idx = tiers.index(p.tier_name) if p.tier_name in tiers else 0
+                    if f and f.wins < 3 and p.tier_name == "National":
+                        continue
+                    if f and f.wins < 5 and p.tier_name == "World":
+                        continue
                     personality = getattr(p, "personality", {})
                     promos.append({
                         "name": p.name, "tier": p.tier_name,
@@ -1196,6 +1159,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not training.week_started:
                     training.week_started = True
                 training.set_day_drill(day_idx, drill_name)
+                _persist_session(sid, session)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/stop_training":
@@ -1204,6 +1168,7 @@ class Handler(BaseHTTPRequestHandler):
                 training = session.get("training")
                 if training:
                     training.stop_training()
+                _persist_session(sid, session)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/event_card":
@@ -1632,15 +1597,6 @@ class Handler(BaseHTTPRequestHandler):
                     "state": get_state_dict(session),
                     "fight_today": fight_today,
                 })
-
-            elif path == "/api/stop_training":
-                sid = body.get("sid", "")
-                session = get_or_create_session(sid)
-                training = session.get("training")
-                if training:
-                    training.stop_training()
-                _persist_session(sid, session)
-                self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/accept_offer":
                 sid = body.get("sid", "")

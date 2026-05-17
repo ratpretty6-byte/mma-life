@@ -430,12 +430,12 @@ def save_to_slot(sid: str, slot_index: int, display_name: str,
     save_id = f"{sid}_slot_{slot_index}"
     f = session_data.get("fighter")
     career = session_data.get("career")
-    promo = session_data.get("current_promotion")
+    promo_name = session_data.get("current_promotion_name")
     game_date = session_data.get("game_date")
 
     fighter_name = f.name if f else "Unknown"
     record = f.get_record_string() if f else "0-0-0"
-    promo_name = promo.name if promo else "Free Agent"
+    promo_name = promo_name or "Free Agent"
     date_str = game_date.strftime("%Y-%m-%d") if game_date else "Unknown"
     in_fight = 1 if (session_data.get("current_fight") or session_data.get("fight_started")) else 0
 

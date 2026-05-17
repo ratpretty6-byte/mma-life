@@ -110,16 +110,24 @@ class CareerSystem:
                 return riv
         return self.add_rivalry(opponent)
 
-    def check_promotion_offer(self, promotions: Tuple[Promotion, Promotion, Promotion] = None) -> Optional[Promotion]:
+    def check_promotion_offer(self, promotions: List[Promotion] = None) -> Optional[Promotion]:
         if self.current_tier_index <= 0:
             return None
         if not self.current_promotion:
             return None
         if self.fighter.rank == 1 and promotions:
-            next_tier = promotions[self.current_tier_index - 1]
-            rating = self.fighter.get_overall_rating()
-            if rating >= 50:
-                return next_tier
+            current_tier = self.current_promotion.tier_name
+            if current_tier == "Regional":
+                next_tier_name = "National"
+            elif current_tier == "National":
+                next_tier_name = "World"
+            else:
+                return None
+            next_tier_promos = [p for p in promotions if p.tier_name == next_tier_name]
+            if next_tier_promos:
+                rating = self.fighter.get_overall_rating()
+                if rating >= 50:
+                    return next_tier_promos[0]
         return None
 
     def try_retire(self, force: bool = False, game_date: datetime = None) -> bool:
