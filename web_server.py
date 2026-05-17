@@ -128,7 +128,35 @@ def get_or_create_session(session_id):
         session = load_session(session_id) or {"_created": time.time()}
         _session_cache[session_id] = session
         _session_cache.expire(session_id, timedelta(hours=48))
+        if session.get("fighter") and _gs_get("initialized"):
+            _relink_session_fighter(session)
     return _session_cache[session_id]
+
+
+def _relink_session_fighter(session):
+    loaded_f = session.get("fighter")
+    if not loaded_f:
+        return
+    promotions = _gs_get("promotions", [])
+    all_fighters = _gs_get("all_fighters", [])
+    db_id = getattr(loaded_f, '_db_id', None)
+    found = None
+    for af in all_fighters:
+        af_id = getattr(af, '_db_id', None)
+        if db_id and af_id and af_id == db_id:
+            found = af
+            break
+    if not found:
+        for af in all_fighters:
+            if af.name == loaded_f.name and af.age == loaded_f.age:
+                found = af
+                break
+    if found:
+        session["fighter"] = found
+        for key in ["career", "training", "finance", "health", "media"]:
+            obj = session.get(key)
+            if obj:
+                obj.fighter = found
 
 _world_sim_running = False
 _world_sim_lock = Lock()
@@ -1495,16 +1523,18 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/sign_free_agent":
                 ensure_initialized()
                 sid = body.get("sid", "")
+                promo_name = body.get("name", "")
                 tier_name = body.get("tier", "Regional")
                 session = get_or_create_session(sid)
                 career = session.get("career")
                 f = session.get("fighter")
                 game_date = session.get("game_date")
-                promo = None
-                for p in gs["promotions"]:
-                    if p.tier_name == tier_name:
-                        promo = p
-                        break
+                promo = get_promotion_by_name(promo_name)
+                if not promo:
+                    for p in gs["promotions"]:
+                        if p.tier_name == tier_name:
+                            promo = p
+                            break
                 if not career or not promo or not f:
                     self.json_resp({"error": "Cannot sign"})
                     return

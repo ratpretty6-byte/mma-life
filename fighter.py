@@ -151,6 +151,21 @@ class Fighter:
         self.migration_camps_remaining = 0
         self._style_evolution_tracker: Dict[str, int] = {}
 
+    def __eq__(self, other):
+        if not isinstance(other, Fighter):
+            return NotImplemented
+        db_id = getattr(self, '_db_id', None)
+        other_id = getattr(other, '_db_id', None)
+        if db_id is not None and other_id is not None:
+            return db_id == other_id
+        return self.name == other.name and self.age == other.age
+
+    def __hash__(self):
+        db_id = getattr(self, '_db_id', None)
+        if db_id is not None:
+            return hash(db_id)
+        return hash((self.name, self.age))
+
     def _init_attributes(self):
         base = 50
         bg_bonuses = {
