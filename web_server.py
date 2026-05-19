@@ -1009,12 +1009,12 @@ class Handler(BaseHTTPRequestHandler):
 
             elif path == "/api/fight_offer":
                 ensure_initialized()
-                sid = body.get("sid", "")
+                sid = params.get("sid", [""])[0]
                 session = get_or_create_session(sid)
                 f = session.get("fighter")
                 career = session.get("career")
                 promo = get_session_promotion(session)
-                opp_name = body.get("opponent", "")
+                opp_name = params.get("opponent", [""])[0]
                 if not f or not promo:
                     self.json_resp({"success": False, "error": "Not signed"})
                     return
@@ -1565,6 +1565,67 @@ class Handler(BaseHTTPRequestHandler):
                     "composite_notes": comp_notes,
                 }
                 self.json_resp({"success": True, "scouting": scouting_report})
+
+            elif path == "/api/fight_offer":
+                ensure_initialized()
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                career = session.get("career")
+                promo = get_session_promotion(session)
+                opp_name = body.get("opponent", "")
+                if not f or not promo:
+                    self.json_resp({"success": False, "error": "Not signed"})
+                    return
+                offers = promo.generate_fight_offers(f, count=3)
+                target = None
+                offer_data = None
+                for o in offers:
+                    if o["opponent"].name == opp_name:
+                        target = o["opponent"]
+                        offer_data = o
+                        break
+                if not target:
+                    self.json_resp({"success": False, "error": "Offer no longer available"})
+                    return
+                contract_pay = {
+                    "base_pay": offer_data["base_purse"],
+                    "win_bonus": offer_data["win_bonus"],
+                    "total": offer_data["base_purse"] + offer_data["win_bonus"],
+                }
+                rivalry = None
+                if career:
+                    for r in career.rivalries:
+                        if target in (r.fighter1, r.fighter2):
+                            other = r.fighter2 if r.fighter1 == target else r.fighter1
+                            rivalry = {
+                                "intensity": r.intensity,
+                                "fights": len(r.fights),
+                                "trilogy": r.trilogy,
+                                "opponent": other.name,
+                                "record": r.get_record(f),
+                            }
+                            break
+                fight_history = []
+                for fighter in (f, target):
+                    recent = []
+                    w = fighter.win_streak or 0
+                    ls = fighter.loss_streak or 0
+                    if w > 0:
+                        recent = [f"W"] * min(w, 5)
+                    elif ls > 0:
+                        recent = [f"L"] * min(ls, 5)
+                    else:
+                        recent = ["W", "L", "W"]
+                    fight_history.append({"name": fighter.name, "recent": recent})
+                self.json_resp({
+                    "success": True,
+                    "offer": {
+                        "contract_pay": contract_pay,
+                        "rivalry": rivalry,
+                        "fight_history": fight_history,
+                    }
+                })
 
             elif path == "/api/fight_bonuses":
                 sid = body.get("sid", "")

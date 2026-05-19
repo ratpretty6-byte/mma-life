@@ -28,10 +28,11 @@ web_server.py (HTTP API + session management)
 ```
 
 ### State Management
-- **No database currently** — all in-memory via `gs` global dict in web_server.py
-- Sessions stored per `sid` in `gs["sessions"]`
+- **SQLite persistence** via `persistence.py` (`mma_life.db`). Sessions auto-saved on day advance, fight completion, promotion changes.
+- Sessions stored per `sid` in `gs["sessions"]`. Survive server restarts via `save_session`/`load_session`.
 - World sim runs monthly via daemon thread
 - Session cleanup every 5 min (2h timeout)
+- Save slots via `save_to_slot`/`load_from_slot` for manual save/load
 
 ### Fighter Model (fighter.py)
 - 21 physical attrs + 8 mental attrs (0-100 scale)
@@ -69,6 +70,28 @@ web_server.py (HTTP API + session management)
 - 30% tax on income >$50k/month
 - Basic investment system
 
+### Fight Week System (`web_server.py`)
+- Triggered when `days_until_fight <= 5` after booking a fight
+- Auto-triggered on `advance_day` (returns event in `day_result.fight_week_event`)
+- Interactive endpoints allow player choices with stat effects:
+  - `/api/press_conference` — 3 choices (respectful/trash_talk/staredown) affecting popularity, composure, confidence
+  - `/api/open_workout` — 3 choices (technical/power/showboat) with attribute gains and popularity
+  - `/api/cut_weight` — 3 intensity levels (safe/standard/aggressive) affecting success chance, hydration recovery, penalties
+  - `/api/faceoff` — 3 choices (intense/calm/dismissive) with charisma vs composure stat check
+  - `/api/rest_day` — 4 recovery options (ice_bath/massage/meditation/light_spar) for fatigue, injury, attribute bonuses
+- Events tracked in `fight_week_progress` dict per session
+- Event order: press_conference → open_workout → weigh_in → faceoff → rest_day
+- Weight cut failure: hydration penalty, purse deduction, potential fight cancellation
+- Rest day skill unlocked after completing other events
+
+### Scouting System (frontend only)
+- Opponent stats visibility depends on `fighter.scouting_level`:
+  - `scouting_level < 1`: stats show as "???"
+  - `scouting_level < 3`: rounded ranges ("40-50", "60-70")
+  - `scouting_level >= 3`: exact values
+- Tale of the Tape shows: Record, Rank, Rating, Height, Reach, Age, KOs, Subs, Style (archetype), Background, Stance
+- Difficulty tags computed from `risk` field: sacrifice→"Step Up", tough→"Tough Fight", 50-50→"Pick 'Em", gimme→"Should Win"
+
 ## Known Bugs & Issues
 
 ### Critical Bugs (gameplay-affecting)
@@ -82,11 +105,18 @@ web_server.py (HTTP API + session management)
 
 ### Code Quality Issues
 - 3200-line fight.py needs splitting (after tests)
-- Hundreds of hardcoded magic numbers (damage, stamina, financial)
-- No persistence (in-memory only)
-- No tests
+- Hundreds of hardcoded magic numbers (damage, stamina, financial) — some now in `config/combat.json`
 - Sessions insecure (user-provided SID)
-- README is 1 line
+- Frontend is a monolithic `index.html` (no component framework)
+- Some fight week event effects are unbalanced (weights not playtested)
+- World sim doesn't handle fighters stuck in fight week state
+
+### Fixed Bugs (recently resolved)
+1. `fighter.py:__hash__`: Fixed crash on partially-constructed Fighter during `copy.deepcopy` (`deepcopy` of Fighter via `Contract`→`Promotion`→`contracts` dict key calls `__hash__` before `__init__` finishes `name` assignment). Fixed with `getattr` fallback.
+2. `persistence.py:save_promotions`: Fixed fighter deduplication using `{f.name: f}` dict — lost fighters with duplicate names. Fixed by using `_db_id` as key.
+3. `web_server.py:get_fight_booking_state`: Removed nationality filter causing empty opponent pools.
+4. `web_server.py:advance_day`: Removed hard block during fight week — now auto-triggers events and returns them in response.
+5. `templates/index.html:showComparison`: Fixed `o.difficulty` undefined crash by computing difficulty from `risk` field lookup. Fixed CSS grid alignment with `.compare-grid-3` class.
 
 ## Available Tooling
 
@@ -111,13 +141,19 @@ Reports: `all`, `balance`, `fighters`, `promotions`, `careers`, `world`
 - Reads player session data
 
 ### Agents
-- `playtester` — bulk fight sims + balance analysis
-- `reviewer` — code quality + stdlib enforcement
+- `playtester` — bulk fight sims + balance analysis + fight week flow validation
+- `reviewer` — code quality + stdlib enforcement + frontend review rules
 - `game-analyst` — database queries + game data reports
+- `frontend-debugger` — Playwright UI testing, screenshot comparison, console error detection
+- `e2e-tester` — full end-to-end API flow: create → book → fight week → fight → results
+- `fight-engine-tuner` — 500+ sim balance analysis, archetype matchups, combat.json tuning
+- `save-validator` — SQLite schema integrity, orphaned records, corruption detection
+- `performance-profiler` — CPU + memory profiling, O(n²) loop detection, deepcopy cost analysis
 
 ### Commands
-- `/playtest` — run 50 bulk sims, report KO/sub/decision rates
+- `/playtest` — run 500+ bulk sims, report KO/sub/decision rates, archetype matchups
 - `/game-analyze` — comprehensive game data report from SQLite
+- `/test-all` — run the full testing suite: reviewer → unittest → fight-engine-tuner → frontend-debugger → e2e-tester → save-validator → performance-profiler
 
 ## Coding Conventions
 - **No external dependencies** — Python stdlib only (except opencode tooling)

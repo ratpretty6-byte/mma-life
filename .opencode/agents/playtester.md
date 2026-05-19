@@ -12,7 +12,8 @@ You are a playtester for the MMA Life Simulator. Your job is to verify game bala
 
 ## How to Test
 
-1. Start the server in the background:
+### Method A: API Bulk Simulation
+1. Start the server:
    ```
    python3 /workspace/mma-life/web_server.py &>/tmp/mma_server.log &
    sleep 2
@@ -20,13 +21,62 @@ You are a playtester for the MMA Life Simulator. Your job is to verify game bala
 
 2. Create a test session:
    ```
-   curl -s 'http://localhost:8080/api/start' | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('sid',''))"
+   SID=$(curl -s 'http://localhost:8080/api/start' | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('sid',''))")
    ```
 
-3. Run bulk simulations via the API:
+3. Run bulk simulations:
    ```
-   curl -s 'http://localhost:8080/api/bulk_simulate?count=50&seed=42'
+   curl -s 'http://localhost:8080/api/bulk_simulate?count=200&seed=42'
    ```
+
+### Method B: Direct Python (faster, no server needed)
+```python
+import os, sys, random, numpy as np
+sys.path.insert(0, '/workspace/mma-life')
+os.chdir('/workspace/mma-life')
+from fight import Fight
+from fighter import Fighter
+from collections import Counter
+
+def run_bulk(n=200, seed=42):
+    random.seed(seed)
+    np.random.seed(seed % 2**30)
+    results = Counter()
+    for i in range(n):
+        f1 = Fighter(f"A_{i}", 28, 170, "mma", "balanced")
+        f2 = Fighter(f"B_{i}", 28, 170, "mma", "balanced")
+        fight = Fight(f1, f2, rounds=3)
+        for event in fight.simulate_fight_gen():
+            if event["type"] == "complete":
+                break
+        results[fight.method] += 1
+    total = sum(results.values())
+    for k in ["KO","SUB","DEC"]:
+        print(f"{k}: {results[k]/total*100:.1f}%")
+```
+
+### Method C: Fight Week Flow (E2E via API)
+```bash
+# Create fighter
+curl -s -X POST -d "name=Tester&sid=$SID" 'http://localhost:8080/api/create_fighter'
+
+# Book fight
+OPP=$(curl -s "http://localhost:8080/api/state?sid=$SID" | python3 -c "import json,sys; print(json.load(sys.stdin)['opponents'][0]['name'])")
+curl -s -X POST -d "opponent=$OPP&sid=$SID" 'http://localhost:8080/api/book_fight'
+
+# Advance through fight week events
+for event in press_conference open_workout weigh_in faceoff rest_day; do
+  curl -s -X POST -d "sid=$SID" 'http://localhost:8080/api/advance_day'
+  curl -s -X POST -d "sid=$SID&choice=standard" "http://localhost:8080/api/$event" 2>/dev/null
+done
+
+# Start and complete fight
+curl -s -X POST -d "sid=$SID" 'http://localhost:8080/api/start_fight'
+curl -s -X POST -d "sid=$SID&strategy=balanced" 'http://localhost:8080/api/fight_action'
+curl -s -X POST -d "sid=$SID&strategy=balanced" 'http://localhost:8080/api/fight_action'
+curl -s -X POST -d "sid=$SID&strategy=balanced" 'http://localhost:8080/api/fight_action'
+curl -s -X POST -d "sid=$SID" 'http://localhost:8080/api/complete_fight'
+```
 
 4. Analyze results:
    - Check KO rate (should be ~30-40% of finishes)
@@ -34,6 +84,8 @@ You are a playtester for the MMA Life Simulator. Your job is to verify game bala
    - Check decision rate (~30-50%)
    - Check round 1 finish rare (currently hardcoded to prevent)
    - Verify no crashes or infinite loops
+   - **Fight week flow**: verify all events complete without error
+   - **Training**: verify `/api/start_training` can be called and returns drills
 
 5. Stop the server when done:
    ```
@@ -41,8 +93,12 @@ You are a playtester for the MMA Life Simulator. Your job is to verify game bala
    ```
 
 ## Testing Checklist
-- [ ] Run 50 fights with seed
-- [ ] Check KO/SUB/DEC distribution
+- [ ] Run 200+ fights with seed (via API or direct Python)
+- [ ] Check KO/SUB/DEC distribution within expected ranges
 - [ ] Verify no round goes beyond round 5
 - [ ] Check that stamina varies across rounds
 - [ ] Verify submissions happen in appropriate positions
+- [ ] **Fight week e2e**: press conference → open workout → weigh-in → faceoff → rest day → fight
+- [ ] **Weight cut**: test safe/standard/aggressive intensity → verify effects
+- [ ] **Training**: call start_training → verify drills available → complete session
+- [ ] **Regression**: compare KO rates before and after fight.py changes
