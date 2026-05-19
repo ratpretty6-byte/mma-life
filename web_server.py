@@ -43,7 +43,7 @@ from persistence import (
 )
 from promotion import create_promotions
 from strategy import STRATEGIES
-from training import TrainingSystem
+from training import DAYS_OF_WEEK, TrainingSystem
 from world_sim import WorldSimulator
 
 init_lock = Lock()
@@ -499,6 +499,71 @@ def _get_contract_state(session):
         "is_champion": c.contract.champion if hasattr(c.contract, 'champion') else False,
     }
 
+FIGHT_WEEK_EVENTS = {
+    5: "press_conference",
+    4: "open_workout",
+    3: "weigh_in",
+    2: "faceoff",
+    1: "rest_day",
+}
+
+def _trigger_fight_week_event(session, days_until):
+    f = session.get("fighter")
+    media = session.get("media")
+    fb = session.get("current_fight_booking")
+    training = session.get("training")
+    event_name = FIGHT_WEEK_EVENTS.get(days_until, "rest")
+    if not f or not fb:
+        return {"event": "rest", "text": "Rest day."}
+    opponent = fb.fighter2 if fb.fighter1 == f else fb.fighter1
+
+    if event_name == "press_conference":
+        if media:
+            result = media.do_press_conference(opponent)
+        else:
+            result = {"text": f"Press conference: {f.name} and {opponent.name} face the media.", "popularity_gain": 1.0}
+        result["event"] = "press_conference"
+
+    elif event_name == "open_workout":
+        if media:
+            result = media.do_open_workout()
+        else:
+            result = {"text": f"Open workouts: {f.name} drills for the media.", "popularity_gain": 0.5}
+        result["event"] = "open_workout"
+
+    elif event_name == "weigh_in":
+        result = {
+            "event": "weigh_in",
+            "text": f"Weigh-in day! {f.name} needs to make weight.",
+            "needs_action": True,
+        }
+
+    elif event_name == "faceoff":
+        charisma = f.attributes.get("charisma", 50)
+        oppose_composure = opponent.attributes.get("composure", 50)
+        score = charisma - oppose_composure + random.uniform(-10, 10)
+        if score > 5:
+            text = f"{f.name} wins the staredown! {opponent.name} looks rattled."
+            f.attributes["composure"] = min(100, f.attributes.get("composure", 50) + 3)
+        elif score < -5:
+            text = f"{opponent.name} gets into {f.name}'s head during the faceoff."
+            f.attributes["composure"] = max(0, f.attributes.get("composure", 50) - 3)
+        else:
+            text = "Both fighters hold their ground during the faceoff."
+        result = {"event": "faceoff", "text": text}
+
+    elif event_name == "rest_day":
+        f.months_inactive = max(0, f.months_inactive - 1)
+        text = f"Rest day. {f.name} conserves energy for tomorrow."
+        result = {"event": "rest_day", "text": text}
+
+    else:
+        result = {"event": "rest", "text": "A quiet day."}
+
+    if fb and hasattr(fb, 'advance_phase'):
+        fb.advance_phase()
+    return result
+
 def _get_fight_booking_state(session):
     fb = session.get("current_fight_booking")
     if not fb:
@@ -521,6 +586,8 @@ def _get_fight_booking_state(session):
             "record": opponent.get_record_string(),
             "rank": opponent.rank,
             "archetype": opponent.archetype,
+            "background": opponent.background,
+            "stance": opponent.stance,
             "nationality": opponent.nationality,
             "age": opponent.age,
             "height": opponent.height,
@@ -535,6 +602,7 @@ def _get_fight_booking_state(session):
         "is_title": fb.is_title_fight,
         "days_until": days_until,
         "fight_week_day": fight_week_day,
+        "fight_week_progress": session.get("fight_week_progress", {}),
     }
 
 def _get_fight_state(session):
@@ -924,6 +992,9 @@ class Handler(BaseHTTPRequestHandler):
                             "height": opp.height, "reach": opp.reach,
                             "age": opp.age, "nationality": opp.nationality,
                             "archetype": opp.archetype, "weight_class": opp.weight_class,
+                            "background": opp.background,
+                            "win_streak": opp.win_streak, "loss_streak": opp.loss_streak,
+                            "knockouts": opp.knockouts, "submissions": opp.submissions,
                             "attributes": {k: round(v, 1) for k, v in opp.attributes.items()},
                         },
                         "risk": o["risk"],
@@ -935,6 +1006,67 @@ class Handler(BaseHTTPRequestHandler):
                     })
                 rel = promo.check_contract_relationship(f)
                 self.json_resp({"offers": offers_data, "relationship": rel})
+
+            elif path == "/api/fight_offer":
+                ensure_initialized()
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                career = session.get("career")
+                promo = get_session_promotion(session)
+                opp_name = body.get("opponent", "")
+                if not f or not promo:
+                    self.json_resp({"success": False, "error": "Not signed"})
+                    return
+                offers = promo.generate_fight_offers(f, count=3)
+                target = None
+                offer_data = None
+                for o in offers:
+                    if o["opponent"].name == opp_name:
+                        target = o["opponent"]
+                        offer_data = o
+                        break
+                if not target:
+                    self.json_resp({"success": False, "error": "Offer no longer available"})
+                    return
+                contract_pay = {
+                    "base_pay": offer_data["base_purse"],
+                    "win_bonus": offer_data["win_bonus"],
+                    "total": offer_data["base_purse"] + offer_data["win_bonus"],
+                }
+                rivalry = None
+                if career:
+                    for r in career.rivalries:
+                        if target in (r.fighter1, r.fighter2):
+                            other = r.fighter2 if r.fighter1 == target else r.fighter1
+                            rivalry = {
+                                "intensity": r.intensity,
+                                "fights": len(r.fights),
+                                "trilogy": r.trilogy,
+                                "opponent": other.name,
+                                "record": r.get_record(f),
+                            }
+                            break
+                fight_history = []
+                for fighter in (f, target):
+                    recent = []
+                    w = fighter.win_streak or 0
+                    ls = fighter.loss_streak or 0
+                    if w > 0:
+                        recent = [f"W"] * min(w, 5)
+                    elif ls > 0:
+                        recent = [f"L"] * min(ls, 5)
+                    else:
+                        recent = ["W", "L", "W"]
+                    fight_history.append({"name": fighter.name, "recent": recent})
+                self.json_resp({
+                    "success": True,
+                    "offer": {
+                        "contract_pay": contract_pay,
+                        "rivalry": rivalry,
+                        "fight_history": fight_history,
+                    }
+                })
 
             elif path == "/api/free_agent_offers":
                 ensure_initialized()
@@ -1162,15 +1294,32 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": "Not initialized"})
                     return
 
-                # Block advancing during fight week
+                # Fight week handling — advance normally, block training, auto-trigger events
+                fight_week_event = None
                 if fb:
                     fb_age_days = max(0, (fb.date - session.get("game_date", datetime.now())).days) if fb.date else None
                     if fb_age_days is not None and 0 < fb_age_days <= 5:
-                        self.json_resp({"error": f"Fight week in progress! {fb_age_days} days until the fight — cannot skip."})
-                        return
+                        fight_week_event = _trigger_fight_week_event(session, fb_age_days)
 
                 game_date = session.get("game_date")
-                result = training.advance_day(game_date)
+
+                if fight_week_event:
+                    result = {
+                        "day": DAYS_OF_WEEK[datetime.now().weekday()],
+                        "is_rest": True,
+                        "fight_week_event": fight_week_event,
+                        "status": "fight_week",
+                        "gains": {},
+                        "fatigue": 0,
+                        "injury": None,
+                        "drill_over": False,
+                    }
+                    session["_last_fight_week_event"] = fight_week_event
+                    progress = session.setdefault("fight_week_progress", {})
+                    if fight_week_event.get("event") and fight_week_event["event"] not in ("weigh_in",):
+                        progress[fight_week_event["event"]] = fight_week_event
+                else:
+                    result = training.advance_day(game_date)
 
                 if game_date:
                     game_date += timedelta(days=1)
@@ -1777,21 +1926,172 @@ class Handler(BaseHTTPRequestHandler):
                 if not f or not fb:
                     self.json_resp({"error": "No fight booked"})
                     return
-                # Determine target weight from weight class max
                 target = f.natural_weight_lbs
                 for wc in utils.WEIGHT_CLASSES:
                     if wc["name"] == f.weight_class:
                         target = wc["max"]
                         break
-                # Apply cut with intensity modifier
-                passed = f.cut_weight(target, fb.is_title_fight)
+                intensity = body.get("intensity", "standard")
+                if intensity not in ("safe", "standard", "aggressive"):
+                    intensity = "standard"
+                passed = f.cut_weight(target, fb.is_title_fight, intensity)
                 _persist_session(sid, session)
+
+                wc_result = {
+                    "event": "weigh_in",
+                    "text": f"Weigh-in: {'PASSED' if passed else 'FAILED'}. Cut {f.weight_cut_lbs:.1f} lbs. Hydration: {f.hydration_level:.0f}%",
+                    "passed": passed,
+                    "cut_lbs": f.weight_cut_lbs,
+                    "hydration": f.hydration_level,
+                }
+                progress = session.setdefault("fight_week_progress", {})
+                progress["weigh_in"] = wc_result
+
                 self.json_resp({
                     "success": True, "passed": passed,
                     "cut_lbs": f.weight_cut_lbs, "hydration": f.hydration_level,
                     "weigh_in_pass": f.weigh_in_pass,
                     "state": get_state_dict(session),
                 })
+
+            elif path == "/api/press_conference":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                media = session.get("media")
+                fb = session.get("current_fight_booking")
+                choice = body.get("choice", "staredown")
+                if not f or not fb:
+                    self.json_resp({"error": "No fight booked"})
+                    return
+                if choice not in ("respectful", "trash_talk", "staredown"):
+                    choice = "staredown"
+                opponent = fb.fighter2 if fb.fighter1 == f else fb.fighter1
+                if media and hasattr(media, 'do_press_conference'):
+                    result = media.do_press_conference(opponent)
+                else:
+                    result = {"text": f"Press conference: {f.name} and {opponent.name} face the media.", "popularity_gain": 1.0}
+                if choice == "respectful":
+                    result["text"] = f"Respectful press conference from {f.name}, praising {opponent.name}."
+                    result["popularity_gain"] = 1.5
+                    if f.attributes.get("composure"):
+                        f.attributes["composure"] = min(100, f.attributes["composure"] + 2)
+                elif choice == "trash_talk":
+                    result["text"] = f"WAR OF WORDS! {f.name} unloads on {opponent.name} at the press conference!"
+                    result["popularity_gain"] = 3.0
+                    if opponent.attributes.get("composure"):
+                        opponent.attributes["composure"] = max(0, opponent.attributes["composure"] - 3)
+                    if f.attributes.get("composure"):
+                        f.attributes["composure"] = max(0, f.attributes["composure"] - 2)
+                else:
+                    result["text"] = f"Intense staredown! {f.name} and {opponent.name} face off at the press conference."
+                    result["popularity_gain"] = 2.0
+                progress = session.setdefault("fight_week_progress", {})
+                progress["press_conference"] = result
+                _persist_session(sid, session)
+                self.json_resp({"success": True, "event_result": result, "state": get_state_dict(session)})
+
+            elif path == "/api/open_workout":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                media = session.get("media")
+                choice = body.get("choice", "technical")
+                if not f:
+                    self.json_resp({"error": "Not initialized"})
+                    return
+                result = {"text": f"Open workouts: {f.name} shows skills.", "popularity_gain": 1.0}
+                if choice == "power":
+                    result["text"] = f"{f.name} unleashes POWER strikes at open workouts! The crowd roars!"
+                    result["popularity_gain"] = 2.0
+                    for attr in ["striking_power", "kick_power"]:
+                        f.attributes[attr] = min(100, f.attributes.get(attr, 50) + 0.5)
+                elif choice == "showboat":
+                    result["text"] = f"{f.name} puts on a SHOW at open workouts! Flashy moves and charisma."
+                    result["popularity_gain"] = 2.5
+                    f.attributes["charisma"] = min(100, f.attributes.get("charisma", 50) + 1)
+                else:
+                    result["text"] = f"{f.name} looks sharp and technical at open workouts."
+                    result["popularity_gain"] = 1.5
+                    for attr in ["hand_speed", "striking_accuracy", "footwork_defense"]:
+                        f.attributes[attr] = min(100, f.attributes.get(attr, 50) + 0.5)
+                if media:
+                    media.update_popularity(result["popularity_gain"])
+                progress = session.setdefault("fight_week_progress", {})
+                progress["open_workout"] = result
+                _persist_session(sid, session)
+                self.json_resp({"success": True, "event_result": result, "state": get_state_dict(session)})
+
+            elif path == "/api/faceoff":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                fb = session.get("current_fight_booking")
+                choice = body.get("choice", "calm")
+                if not f or not fb:
+                    self.json_resp({"error": "No fight booked"})
+                    return
+                opponent = fb.fighter2 if fb.fighter1 == f else fb.fighter1
+                charisma = f.attributes.get("charisma", 50)
+                mental_toughness = f.attributes.get("mental_toughness", 50)
+                opp_composure = opponent.attributes.get("composure", 50)
+                score_mod = {"intense": 5, "calm": 0, "dismissive": 3}
+                score = charisma + mental_toughness - opp_composure + score_mod.get(choice, 0) + random.uniform(-8, 8)
+                if score > 10:
+                    text = f"{f.name} dominates the faceoff! {opponent.name} looks visibly shaken."
+                    f.attributes["composure"] = min(100, f.attributes.get("composure", 50) + 4)
+                    opponent.attributes["composure"] = max(0, opponent.attributes["composure"] - 4)
+                elif score > 0:
+                    text = f"{f.name} gets the better of the faceoff exchange."
+                    f.attributes["composure"] = min(100, f.attributes.get("composure", 50) + 2)
+                    opponent.attributes["composure"] = max(0, opponent.attributes["composure"] - 1)
+                elif score > -10:
+                    text = f"Neither fighter backs down. The faceoff is intense!"
+                else:
+                    text = f"{opponent.name} gets into {f.name}'s head during the faceoff."
+                    f.attributes["composure"] = max(0, f.attributes.get("composure", 50) - 4)
+                    opponent.attributes["composure"] = min(100, opponent.attributes.get("composure", 50) + 2)
+                result = {"text": text, "score": score}
+                progress = session.setdefault("fight_week_progress", {})
+                progress["faceoff"] = result
+                _persist_session(sid, session)
+                self.json_resp({"success": True, "event_result": result, "state": get_state_dict(session)})
+
+            elif path == "/api/rest_day":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                f = session.get("fighter")
+                training = session.get("training")
+                choice = body.get("choice", "ice_bath")
+                if not f:
+                    self.json_resp({"error": "Not initialized"})
+                    return
+                result = {"text": f"{f.name} takes it easy on rest day.", "fatigue_recovery": 0.15}
+                if choice == "massage":
+                    result["text"] = f"{f.name} gets a deep tissue massage. Muscles feel loose and ready."
+                    result["fatigue_recovery"] = 0.25
+                    for inj in f.injuries:
+                        inj["severity"] = max(0, inj["severity"] - 0.2)
+                elif choice == "meditation":
+                    result["text"] = f"{f.name} meditates and visualizes victory. Mental focus sharpens."
+                    result["fatigue_recovery"] = 0.15
+                    for attr in ["mental_toughness", "composure", "fight_iq"]:
+                        f.attributes[attr] = min(100, f.attributes.get(attr, 50) + 1)
+                elif choice == "light_spar":
+                    result["text"] = f"{f.name} does light sparring to keep the edge."
+                    result["fatigue_recovery"] = 0.05
+                    for attr in ["hand_speed", "striking_accuracy", "footwork_defense"]:
+                        f.attributes[attr] = min(100, f.attributes.get(attr, 50) + 0.5)
+                else:
+                    result["text"] = f"{f.name} rests with ice baths. Body recovers."
+                    result["fatigue_recovery"] = 0.25
+                if training:
+                    training.fatigue = max(0.0, training.fatigue - result.get("fatigue_recovery", 0.15))
+                result["fatigue"] = round(training.fatigue * 100) if training else 0
+                progress = session.setdefault("fight_week_progress", {})
+                progress["rest_day"] = result
+                _persist_session(sid, session)
+                self.json_resp({"success": True, "event_result": result, "state": get_state_dict(session)})
 
             elif path == "/api/join_gym":
                 sid = body.get("sid", "")

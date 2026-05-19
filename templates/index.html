@@ -224,7 +224,9 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 
 /* Utilities */
 .speed-row { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
-.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.compare-grid { display: grid; gap: 12px; }
+.compare-grid-2 { grid-template-columns: 1fr 1fr; }
+.compare-grid-3 { grid-template-columns: 1fr auto 1fr; }
 .compare-col { background: var(--bg-elevated); border-radius: var(--radius-md); padding: 10px; }
 .compare-col h4 { color: var(--accent); font-size: var(--text-base); margin-bottom: 6px; }
 .flex-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -274,7 +276,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
   .bottom-tabs { display: flex; }
   body { padding-bottom: 56px; }
   .strategy-grid { grid-template-columns: 1fr; }
-  .compare-grid { grid-template-columns: 1fr; }
+  .compare-grid-3 { grid-template-columns: 1fr; }
   .attr-bar .label { width: 90px; font-size: var(--text-xs); }
   .schedule-grid { font-size: 10px; }
   .header h1 { font-size: 14px; }
@@ -591,6 +593,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
         <div class="card-title" style="color:var(--gold)">Fight Week</div>
         <div id="fightMatchup"></div>
         <div id="fightWeekTimeline" style="margin-top:6px;padding:6px;background:#0d0d1a;border-radius:6px"></div>
+        <div id="fightWeekActions" style="margin-top:6px"></div>
         <div id="weightCutSection" class="hidden" style="margin-top:6px;padding:6px;background:#1a1a2a;border-radius:6px">
           <div class="card-title" style="font-size:12px">⚖️ Weight Cut</div>
           <div id="weightCutInfo" style="font-size:11px;color:#aaa"></div>
@@ -1966,6 +1969,22 @@ async function endCamp() {
   if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Camp ended — base training continues", "success"); }
 }
 
+async function doWeightCut(intensity) {
+  const resp = await api("/api/cut_weight", { sid, intensity });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    const msg = resp.passed
+      ? `Weigh-in passed! Cut ${resp.cut_lbs.toFixed(1)} lbs. Hydration: ${resp.hydration.toFixed(0)}%`
+      : `Weigh-in FAILED! Cut ${resp.cut_lbs.toFixed(1)} lbs but didn't make weight.`;
+    toast(msg, resp.passed ? "success" : "error");
+    updateAllUI();
+    refreshFightTab();
+  } else {
+    toast(resp.error || "Weight cut failed", "error");
+  }
+}
+
 async function showStartTraining() {
   const t = state ? state.training : null;
   if (!t || !t.available_drills || t.available_drills.length === 0) {
@@ -1999,6 +2018,58 @@ async function stopTraining() {
   if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Training stopped", "success"); }
 }
 
+async function doPressConf(choice) {
+  const resp = await api("/api/press_conference", { sid, choice });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateAllUI();
+    refreshFightTab();
+    toast(resp.event_result.text, "info");
+  } else {
+    toast(resp.error || "Press conference error", "error");
+  }
+}
+
+async function doOpenWorkout(choice) {
+  const resp = await api("/api/open_workout", { sid, choice });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateAllUI();
+    refreshFightTab();
+    toast(resp.event_result.text, "info");
+  } else {
+    toast(resp.error || "Open workout error", "error");
+  }
+}
+
+async function doFaceoff(choice) {
+  const resp = await api("/api/faceoff", { sid, choice });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateAllUI();
+    refreshFightTab();
+    toast(resp.event_result.text, "info");
+  } else {
+    toast(resp.error || "Faceoff error", "error");
+  }
+}
+
+async function doRestDay(choice) {
+  const resp = await api("/api/rest_day", { sid, choice });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    updateAllUI();
+    refreshFightTab();
+    toast(resp.event_result.text, "info");
+  } else {
+    toast(resp.error || "Rest day error", "error");
+  }
+}
+
 // --- FIGHT ---
 
 async function refreshFightTab() {
@@ -2013,39 +2084,116 @@ async function refreshFightTab() {
       <span style="color:#888">${escHtml(fb.opponent.record)} | #${fb.opponent.rank}${canFight ? ' | <span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>' : ` | ${fb.days_until} days until fight`}</span>`;
     qs("#btnStartFight").style.display = canFight ? "inline-block" : "none";
 
-    // Show fight week timeline
+    // Show fight week timeline + interactive events
     const tl = qs("#fightWeekTimeline");
     const weekEvents = ["Press Conference","Open Workout","Weigh-In","Faceoff","Rest Day","Fight Night"];
+    const weekEventIds = ["press_conference","open_workout","weigh_in","faceoff","rest_day","fight_night"];
     const daysUntil = fb.days_until;
+    const fwp = fb.fight_week_progress || {};
     if (!canFight && daysUntil > 0 && daysUntil <= 6) {
       let tlHtml = '<div style="font-size:11px;color:#aaa;margin-bottom:4px">Fight Week Timeline:</div><div style="display:flex;gap:2px;font-size:10px">';
       for (let i = 0; i < 6; i++) {
         const eventDay = daysUntil - (5 - i);
         const isPast = eventDay < 0;
         const isNow = eventDay === 0;
-        const phaseIdx = i;
-        tlHtml += `<div style="flex:1;text-align:center;padding:3px 2px;border-radius:3px;${isNow ? 'background:var(--gold-glow);color:var(--gold);font-weight:700' : isPast ? 'color:#555' : 'color:#888'}">
-          <div>${weekEvents[phaseIdx]}</div><div style="font-size:8px">${isPast ? '✓' : isNow ? 'NOW' : eventDay > 0 ? `T-${eventDay}` : ''}</div>
+        const eid = weekEventIds[i];
+        const done = fwp[eid];
+        tlHtml += `<div style="flex:1;text-align:center;padding:3px 2px;border-radius:3px;${isNow ? 'background:var(--gold-glow);color:var(--gold);font-weight:700' : done ? 'background:var(--bg-elevated);color:#4aff6a' : isPast ? 'color:#555' : 'color:#888'}">
+          <div>${weekEvents[i]}</div><div style="font-size:8px">${done ? '✓' : isNow ? 'NOW' : eventDay > 0 ? `T-${eventDay}` : ''}</div>
         </div>`;
       }
       tlHtml += '</div>';
       tl.innerHTML = tlHtml;
+
+      // Show interactive fight week event card
+      let fwHtml = '';
+      if (daysUntil === 5 && !fwp.press_conference) {
+        fwHtml = '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+          '<div class="card-title" style="font-size:12px">🎤 Press Conference</div>' +
+          '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Choose your approach:</div>' +
+          '<div class="flex-row" style="gap:4px">' +
+          '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'respectful\')">Respectful</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'trash_talk\')">Trash Talk</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'staredown\')">Staredown</button>' +
+          '</div></div>';
+      } else if (fwp.press_conference) {
+        const r = fwp.press_conference;
+        fwHtml = '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
+          '<div style="font-size:11px;color:#4aff6a">✓ Press Conference Complete</div>' +
+          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+      }
+      if (daysUntil === 4 && !fwp.open_workout) {
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+          '<div class="card-title" style="font-size:12px">🏋️ Open Workout</div>' +
+          '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Showcase your skills:</div>' +
+          '<div class="flex-row" style="gap:4px">' +
+          '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'technical\')">Technical</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'power\')">Power</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'showboat\')">Showboat</button>' +
+          '</div></div>';
+      } else if (fwp.open_workout) {
+        const r = fwp.open_workout;
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
+          '<div style="font-size:11px;color:#4aff6a">✓ Open Workout Complete</div>' +
+          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+      }
+      if (daysUntil === 3 && !fwp.weigh_in) {
+        const w = state.fighter.weight;
+        const wcName = state.fighter.weight_class;
+        const maxWeight = {"Flyweight":125,"Bantamweight":135,"Featherweight":145,"Lightweight":155,"Welterweight":170,"Middleweight":185,"Light Heavyweight":205,"Heavyweight":265}[wcName] || 170;
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+          '<div class="card-title" style="font-size:12px">⚖️ Weigh-In</div>' +
+          '<div style="font-size:11px;color:#aaa">Current: ' + w + ' lbs | Target: ' + maxWeight + ' lbs | Cut: ' + Math.max(0, w - maxWeight) + ' lbs</div>' +
+          '<div class="flex-row" style="margin-top:4px;gap:4px">' +
+          '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'safe\')" style="font-size:10px">Safe Cut</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'standard\')" style="font-size:10px">Standard</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'aggressive\')" style="font-size:10px">Aggressive</button>' +
+          '</div></div>';
+      } else if (fwp.weigh_in) {
+        const r = fwp.weigh_in;
+        const passed = r.passed ? '<span style="color:#4aff6a">PASSED</span>' : '<span style="color:#e62400">FAILED</span>';
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
+          '<div style="font-size:11px">✓ Weigh-In ' + passed + '</div>' +
+          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+      }
+      if (daysUntil === 2 && !fwp.faceoff) {
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+          '<div class="card-title" style="font-size:12px">👀 Faceoff</div>' +
+          '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Choose your demeanor:</div>' +
+          '<div class="flex-row" style="gap:4px">' +
+          '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'intense\')">Intense Stare</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'calm\')">Calm & Collected</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'dismissive\')">Dismissive</button>' +
+          '</div></div>';
+      } else if (fwp.faceoff) {
+        const r = fwp.faceoff;
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
+          '<div style="font-size:11px;color:#4aff6a">✓ Faceoff Complete</div>' +
+          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+      }
+      if (daysUntil === 1 && !fwp.rest_day) {
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+          '<div class="card-title" style="font-size:12px">🧘 Rest Day</div>' +
+          '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Choose recovery:</div>' +
+          '<div class="flex-row" style="gap:4px">' +
+          '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'ice_bath\')">Ice Bath</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'massage\')">Massage</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'meditation\')">Meditation</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'light_spar\')">Light Spar</button>' +
+          '</div></div>';
+      } else if (fwp.rest_day) {
+        const r = fwp.rest_day;
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
+          '<div style="font-size:11px;color:#4aff6a">✓ Rest Day Complete</div>' +
+          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+      }
+      qs("#fightWeekActions").innerHTML = fwHtml;
     } else {
       tl.innerHTML = '';
+      qs("#fightWeekActions").innerHTML = '';
     }
 
-    // Show weight cut section on weigh-in day
-    const wcEl = qs("#weightCutSection");
-    const wcInfo = qs("#weightCutInfo");
-    if (daysUntil === 3) {  // 3 days = weigh-in
-      wcEl.classList.remove("hidden");
-      const w = state.fighter.weight;
-      const wcName = state.fighter.weight_class;
-      const maxWeight = {"Flyweight":125,"Bantamweight":135,"Featherweight":145,"Lightweight":155,"Welterweight":170,"Middleweight":185,"Light Heavyweight":205,"Heavyweight":265}[wcName] || 170;
-      wcInfo.innerHTML = `Current: ${w} lbs | Target: ${maxWeight} lbs | Need to cut: ${Math.max(0, w - maxWeight)} lbs`;
-    } else {
-      wcEl.classList.add("hidden");
-    }
+    qs("#weightCutSection").classList.add("hidden");
 
     if (!canFight) {
       qs("#stratSelect").innerHTML = `<div style="text-align:center;padding:12px;color:#888">The fight hasn't arrived yet. Keep training!<br>Advance time in the Home tab.</div>`;
@@ -2150,7 +2298,7 @@ function showOfferModal(o, relationship) {
       <span style="color:${riskColors[o.risk] || '#fff'};font-weight:700;font-size:18px">${riskLabels[o.risk] || o.risk.toUpperCase()}</span>
       <span style="font-size:12px;color:#888;margin-left:6px">— ${escHtml(o.card_position)}</span>
     </div>
-    <div class="compare-grid" style="margin-top:8px">
+    <div class="compare-grid compare-grid-3" style="margin-top:8px">
       <div style="text-align:center"><strong style="color:var(--accent)">${escHtml(state.fighter.name)}</strong></div>
       <div style="text-align:center;font-size:10px;color:var(--text-muted)">VS</div>
       <div style="text-align:center"><strong style="color:#4a9eff">${escHtml(opp.name)}</strong></div>
@@ -2199,9 +2347,9 @@ async function declineOffer() {
 
 function showComparison(o) {
   const f = state.fighter;
+  const scouted = state.fighter.scouting_level || 0;
   const groups = f.stat_groups || {};
   const keyAttrs = f.stat_key || ["striking_power","striking_accuracy","hand_speed","cardio","durability","wrestling_defense","submission_defense","head_movement","fight_iq","mental_toughness","heart","composure"];
-  const allAttrs = (f.physical_attrs || []).concat(f.mental_attrs || []);
 
   function arrow(my, op) {
     if (my > op) return '<span style="color:#4aff6a">▲</span>';
@@ -2209,10 +2357,29 @@ function showComparison(o) {
     return '<span style="color:#666">=</span>';
   }
 
+  function oppVal(attr) {
+    const raw = o.attributes ? o.attributes[attr] || 50 : 50;
+    if (o.risk && scouted < 1) return "???";
+    if (scouted < 1 && state.fight_booking) return "???";
+    if (scouted < 3) {
+      const r = Math.round(raw / 10) * 10;
+      return r + "-" + (r + 10);
+    }
+    return raw.toFixed(0);
+  }
+
+  function oppValNum(attr) {
+    if (o.risk && scouted < 1) return 50;
+    if (scouted < 1 && state.fight_booking) return 50;
+    const raw = o.attributes ? o.attributes[attr] || 50 : 50;
+    if (scouted < 3) return Math.round(raw / 10) * 10 + 5;
+    return raw;
+  }
+
   let html = `<div class="card-title" style="font-size:16px;text-align:center">${escHtml(f.name)} vs ${escHtml(o.name)}</div>`;
 
   // Tale of the Tape
-  html += `<div class="compare-grid" style="margin-bottom:8px">
+  html += `<div class="compare-grid compare-grid-3" style="margin-bottom:8px">
     <div class="compare-col"><h4 style="color:var(--accent);font-size:13px">${escHtml(f.name)}</h4></div>
     <div class="compare-col" style="text-align:center;font-size:10px;color:var(--text-muted)">TALE OF THE TAPE</div>
     <div class="compare-col"><h4 style="color:#4a9eff;font-size:13px;text-align:right">${escHtml(o.name)}</h4></div>
@@ -2227,24 +2394,28 @@ function showComparison(o) {
     ["Age", f.age, o.age],
     ["KOs", f.knockouts||0, o.knockouts],
     ["Subs", f.submissions||0, o.submissions],
+    ["Style", (f.archetype||"").replace(/_/g," "), (o.archetype||"").replace(/_/g," ")],
+    ["Background", (f.background||"").replace(/_/g," "), (o.background||"").replace(/_/g," ")],
+    ["Stance", (f.stance||""), (o.stance||"")],
   ];
   tapeStats.forEach(([label, myVal, opVal]) => {
     const adv = typeof myVal === 'number' && typeof opVal === 'number' ? arrow(myVal, opVal) : '';
-    html += `<div class="compare-grid" style="margin:2px 0;font-size:12px">
+    html += `<div class="compare-grid compare-grid-3" style="margin:2px 0;font-size:12px">
       <div style="text-align:right;padding-right:4px">${myVal} ${adv}</div>
       <div style="text-align:center;font-size:10px;color:var(--text-muted)">${label}</div>
       <div style="text-align:left;padding-left:4px">${opVal}</div>
     </div>`;
   });
 
-  // Key Stats side-by-side bars
-  html += `<div style="margin-top:8px"><div class="card-title" style="font-size:12px">Key Stats</div>`;
+  // Key Stats side-by-side bars with scouting awareness
+  html += `<div style="margin-top:8px"><div class="card-title" style="font-size:12px">Key Stats ${scouted < 1 ? '<span style="color:#888;font-size:10px">— scout to see opponent stats</span>' : scouted < 3 ? '<span style="color:#ffd700;font-size:10px">— estimates (scout more for precision)</span>' : ''}</div>`;
   keyAttrs.forEach(attr => {
     const myVal = f.attributes ? f.attributes[attr] || 50 : 50;
-    const opVal = o.attributes ? o.attributes[attr] || 50 : 50;
-    const adv = arrow(myVal, opVal);
+    const opDisplay = oppVal(attr);
+    const opBar = oppValNum(attr);
+    const adv = opDisplay === "???" ? '' : arrow(myVal, opBar);
     const barMy = Math.min(100, myVal);
-    const barOp = Math.min(100, opVal);
+    const barOp = Math.min(100, opBar);
     const isPhys = f.physical_attrs && f.physical_attrs.includes(attr);
     html += `<div style="display:flex;align-items:center;gap:4px;margin:3px 0">
       <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
@@ -2252,13 +2423,14 @@ function showComparison(o) {
       </div>
       <span style="width:110px;font-size:10px;color:#aaa;text-align:center">${escHtml(attr.replace(/_/g,' '))} ${adv}</span>
       <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-        <div style="float:left;height:100%;width:${barOp}%;background:${isPhys ? 'linear-gradient(90deg,var(--accent),#4a9eff)' : 'linear-gradient(90deg,#ff6a4a,#8a4aff)'};border-radius:3px"></div>
+        <div style="float:left;height:100%;width:${opDisplay === '???' ? 0 : barOp}%;background:${isPhys ? 'linear-gradient(90deg,var(--accent),#4a9eff)' : 'linear-gradient(90deg,#ff6a4a,#8a4aff)'};border-radius:3px"></div>
       </div>
+      <span style="width:28px;font-size:9px;color:#888;text-align:center">${opDisplay}</span>
     </div>`;
   });
   html += `</div>`;
 
-  // All Attributes (collapsible grouped)
+  // All Attributes (collapsible grouped) with scouting
   html += `<div style="margin-top:8px">
     <div class="card-title" style="font-size:12px;cursor:pointer" onclick="const e=this.nextElementSibling;e.style.display=e.style.display==='none'?'block':'none'">All Attributes <span style="font-size:10px;color:var(--text-muted)">▼</span></div>
     <div style="display:none">`;
@@ -2267,13 +2439,14 @@ function showComparison(o) {
     html += `<div style="margin:4px 0"><span style="font-size:10px;color:var(--text-muted);text-transform:uppercase">${escHtml(groupName)}</span>`;
     attrs.forEach(attr => {
       const myVal = f.attributes ? f.attributes[attr] || 50 : 50;
-      const opVal = o.attributes ? o.attributes[attr] || 50 : 50;
-      const color = myVal > opVal ? "#4aff6a" : (myVal < opVal ? "#e62400" : "#888");
+      const opDisp = oppVal(attr);
+      const opNum = oppValNum(attr);
+      const color = opDisp === "???" ? "#888" : (myVal > opNum ? "#4aff6a" : (myVal < opNum ? "#e62400" : "#888"));
       html += `<div style="display:flex;font-size:10px;padding:1px 0">
         <span style="flex:1;color:#aaa">${escHtml(attr.replace(/_/g,' '))}</span>
-        <span style="width:30px;text-align:right;color:${myVal > opVal ? '#4aff6a' : '#ccc'}">${myVal.toFixed(0)}</span>
+        <span style="width:30px;text-align:right;color:${myVal > opNum ? '#4aff6a' : '#ccc'}">${myVal.toFixed(0)}</span>
         <span style="width:20px;text-align:center;color:#666">vs</span>
-        <span style="width:30px;color:${opVal > myVal ? '#e62400' : '#ccc'}">${opVal.toFixed(0)}</span>
+        <span style="width:30px;color:${color}">${opDisp}</span>
       </div>`;
     });
     html += `</div>`;
@@ -2283,9 +2456,13 @@ function showComparison(o) {
   const st = o.win_streak > 0 ? `W${o.win_streak}` : (o.loss_streak > 0 ? `L${Math.abs(o.loss_streak)}` : "");
   const streakHtml = st ? `<span style="color:${o.win_streak > 0 ? '#4aff6a' : '#e62400'};font-weight:700">${st}</span>` : "";
 
+  const diffLookup = {sacrifice:"Step Up", tough:"Tough Fight", "50-50":"Pick 'Em", gimme:"Should Win"};
+  const diff = o.risk ? diffLookup[o.risk] || "Pick 'Em" : (o.difficulty || "Unknown");
+  const diffClass = diff.includes("Step Up") || diff.includes("Tough") ? "diff-hard" : diff.includes("Should Win") ? "diff-easy" : diff.includes("Pick") ? "diff-pick" : "diff-medium";
+
   html += `<div style="margin-top:10px;padding:8px;background:#1a1a2a;border-radius:6px;font-size:12px">
     <div class="flex-row" style="justify-content:center">
-      <span class="tag ${o.difficulty.includes('step up') || o.difficulty.includes('tough') ? 'diff-hard' : o.difficulty.includes('should win') ? 'diff-easy' : o.difficulty.includes('pick em') ? 'diff-pick' : 'diff-medium'}">${escHtml(o.difficulty)}</span>
+      <span class="tag ${diffClass}">${escHtml(diff)}</span>
       ${streakHtml}
       <span>${escHtml(o.nationality)} | ${escHtml(o.archetype)}</span>
     </div>`;

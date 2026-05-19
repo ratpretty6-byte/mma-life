@@ -486,10 +486,11 @@ class Fighter:
             return best
         return None
 
-    def cut_weight(self, target_weight_lbs: float, is_title_fight: bool = False) -> bool:
+    def cut_weight(self, target_weight_lbs: float, is_title_fight: bool = False, intensity: str = "standard") -> bool:
         """
         Full weight cutting system.
         Factors: cut size, discipline, cardio, age, cumulative damage from past cuts.
+        intensity: safe (+10% success), standard, aggressive (-10% success, worse hydration)
         Returns True if weigh-in passed.
         """
         self.weight_cut_lbs = max(0, self.base_weight_lbs - target_weight_lbs)
@@ -513,7 +514,11 @@ class Fighter:
         success_chance -= max(0, (age - 30)) * 0.008
         success_chance -= len(self.cut_history) * 0.02
 
-        # Cumulative cut damage - repeated bad cuts make future cuts harder
+        # Intensity modifier
+        intensity_mult = {"safe": 0.10, "standard": 0.0, "aggressive": -0.10}
+        success_chance += intensity_mult.get(intensity, 0.0)
+
+        # Cumulative cut damage
         avg_cut = 0.0
         if self.cut_history:
             avg_cut = sum(h["cut_lbs"] for h in self.cut_history) / len(self.cut_history)
@@ -522,7 +527,6 @@ class Fighter:
             if avg_cut > 18:
                 success_chance -= 0.10
 
-        # Title fights add pressure
         if is_title_fight:
             success_chance -= 0.05
 
@@ -538,15 +542,18 @@ class Fighter:
             "fight_date": datetime.now()
         })
 
-        # Rehydration
+        # Rehydration — intensity affects hydration recovery
         if self.weigh_in_pass:
             base_hydration = 60.0
             base_hydration += (discipline - 50) * 0.3
             base_hydration += (cardio - 50) * 0.2
             base_hydration -= self.weight_cut_lbs * 1.5
+            hyd_mult = {"safe": 1.2, "standard": 1.0, "aggressive": 0.7}
+            base_hydration *= hyd_mult.get(intensity, 1.0)
             self.hydration_level = utils.clamp(base_hydration, 10.0, 100.0)
         else:
-            self.hydration_level = utils.clamp(self.hydration_level - 20, 5.0, 100.0)
+            hyd_penalty = {"safe": 10, "standard": 20, "aggressive": 30}
+            self.hydration_level = utils.clamp(self.hydration_level - hyd_penalty.get(intensity, 20), 5.0, 100.0)
 
         return self.weigh_in_pass
 
