@@ -164,7 +164,10 @@ class Fighter:
         db_id = getattr(self, '_db_id', None)
         if db_id is not None:
             return hash(db_id)
-        return hash((self.name, self.age))
+        name = getattr(self, 'name', None)
+        if name is not None:
+            return hash((name, getattr(self, 'age', 0)))
+        return hash(id(self))
 
     def _init_attributes(self):
         base = 50
