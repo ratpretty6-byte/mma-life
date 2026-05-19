@@ -291,7 +291,7 @@ def ensure_regional_opponents(session):
         return
     wc = f.weight_class
     available = [opp for opp in promo.rankings.get(wc, [])
-                 if opp != f and opp.nationality == f.nationality and opp.is_available()]
+                 if opp != f and opp.is_available()]
     if len(available) >= 5:
         return
     to_create = 8 - len(available)
@@ -326,7 +326,7 @@ def ensure_available_opponents(session):
         return
 
     available = [opp for opp in promo.rankings.get(wc, [])
-                 if opp != f and opp.nationality == f.nationality and opp.is_available()]
+                 if opp != f and opp.is_available()]
     if len(available) >= 3:
         return
 
@@ -504,7 +504,11 @@ def _get_fight_booking_state(session):
     if not fb:
         return None
     f = session.get("fighter")
+    if not f:
+        return None
     opponent = fb.fighter2 if fb.fighter1 == f else fb.fighter1
+    if not opponent:
+        return None
     game_date = session.get("game_date", datetime.now())
     days_until = max(0, (fb.date - game_date).days) if fb.date else 0
     fight_week_day = None
@@ -1223,6 +1227,27 @@ class Handler(BaseHTTPRequestHandler):
                 training = session.get("training")
                 if training:
                     training.stop_training()
+                _persist_session(sid, session)
+                self.json_resp({"success": True, "state": get_state_dict(session)})
+
+            elif path == "/api/start_training":
+                sid = body.get("sid", "")
+                session = get_or_create_session(sid)
+                training = session.get("training")
+                if not training:
+                    self.json_resp({"error": "Not initialized"})
+                    return
+                from training import DRILLS
+                drill_idx = body.get("drill_idx", 0)
+                intensity = body.get("intensity", "moderate")
+                if not isinstance(drill_idx, int) or drill_idx < 0 or drill_idx >= len(DRILLS):
+                    self.json_resp({"error": "Invalid drill index"})
+                    return
+                drill = DRILLS[drill_idx]
+                success = training.start_training(drill, intensity)
+                if not success:
+                    self.json_resp({"error": "Already in training"})
+                    return
                 _persist_session(sid, session)
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 

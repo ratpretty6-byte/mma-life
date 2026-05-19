@@ -269,7 +269,10 @@ def save_promotions(promotions: List[Promotion]):
             wc_json = json.dumps(p.weight_classes)
             champs = {}
             for wc, champ in p.champions.items():
-                champs[wc] = champ.name if champ else None
+                if champ:
+                    champs[wc] = {"name": champ.name, "db_id": getattr(champ, '_db_id', None)}
+                else:
+                    champs[wc] = None
             champion_json = json.dumps(champs)
             all_fighters = []
             for wc_fighters in p.rankings.values():
@@ -278,7 +281,8 @@ def save_promotions(promotions: List[Promotion]):
             rank_data = {}
             for wc, fighters in p.rankings.items():
                 rank_data[wc] = [
-                    {"name": f.name, "rank": f.rank, "rating": f.get_overall_rating()}
+                    {"name": f.name, "rank": f.rank, "rating": f.get_overall_rating(),
+                     "db_id": getattr(f, '_db_id', None), "age": f.age}
                     for f in fighters
                 ]
             ranking_json = json.dumps(rank_data)
@@ -299,7 +303,8 @@ def load_promotions(all_fighters: List[Fighter]) -> List[Promotion]:
             from promotion import create_promotions
             return create_promotions([wc["name"] for wc in utils.WEIGHT_CLASSES])
         columns = [desc[0] for desc in cursor.description]
-        fighter_map = {f.name: f for f in all_fighters}
+        by_id = {getattr(f, '_db_id', None): f for f in all_fighters if getattr(f, '_db_id', None) is not None}
+        by_name_age = {(f.name, f.age): f for f in all_fighters}
         tier_map = {t["name"]: t for t in utils.PRO_TIERS}
         promotions = []
         for row in rows:
@@ -308,17 +313,36 @@ def load_promotions(all_fighters: List[Fighter]) -> List[Promotion]:
             tier = tier_map.get(d["tier_name"], utils.PRO_TIERS[-1])
             p = Promotion(d["name"], tier, wc_list)
             champs = json.loads(d["champions"])
-            for wc, champ_name in champs.items():
-                if champ_name and champ_name in fighter_map:
-                    p.champions[wc] = fighter_map[champ_name]
+            for wc, champ_data in champs.items():
+                if not champ_data:
+                    continue
+                if isinstance(champ_data, dict):
+                    champ_db_id = champ_data.get("db_id")
+                    f = by_id.get(champ_db_id) if champ_db_id else None
+                    if f is None:
+                        f = by_name_age.get((champ_data.get("name"), 0))
+                    if f is None:
+                        champ_name = champ_data.get("name")
+                        f = next((ff for ff in all_fighters if ff.name == champ_name), None)
+                else:
+                    champ_name = champ_data
+                    f = next((ff for ff in all_fighters if ff.name == champ_name), None)
+                if f:
+                    p.champions[wc] = f
             p.rankings = {}
             rank_data = json.loads(d["ranking_data"])
             for wc, fighter_list in rank_data.items():
                 p.rankings[wc] = []
                 for entry in fighter_list:
-                    name = entry["name"]
-                    if name in fighter_map:
-                        p.rankings[wc].append(fighter_map[name])
+                    db_id = entry.get("db_id")
+                    f = by_id.get(db_id) if db_id else None
+                    if f is None:
+                        entry_age = entry.get("age", 0)
+                        f = by_name_age.get((entry["name"], entry_age))
+                    if f is None:
+                        f = next((ff for ff in all_fighters if ff.name == entry["name"]), None)
+                    if f:
+                        p.rankings[wc].append(f)
             promotions.append(p)
         return promotions
 
