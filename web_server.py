@@ -92,6 +92,8 @@ def ensure_initialized():
                 # Set initialized early so server responds while fighters generate
                 with _gs_lock:
                     gs["promotions"] = promotions
+                    gs["all_fighters"] = []
+                    gs["world_sim"] = None
                     gs["initialized"] = True
                 print(f"Promotions created in {time.time()-t0:.1f}s — server ready, generating fighters...")
                 all_fighters = generate_fighter_pool(promotions, 2000)
