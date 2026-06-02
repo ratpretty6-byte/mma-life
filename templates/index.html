@@ -108,8 +108,60 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-base
 .bottom-tab.active .tab-icon { color: var(--accent); }
 
 /* Screen transitions */
-.screen { transition: opacity var(--transition-base) ease, transform var(--transition-base) ease; }
-.screen-exit { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.screen { transition: opacity 350ms ease, transform 350ms ease; }
+.screen-exit { opacity: 0; transform: translateY(12px); pointer-events: none; }
+
+/* Main menu */
+.main-menu-bg { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse at 50% 0%, #1a0a0a 0%, #0a0a0f 60%, #050510 100%); z-index: -1; }
+.main-menu-bg::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='30,5 55,20 55,40 30,55 5,40 5,20' fill='none' stroke='%23e62400' stroke-width='0.3' opacity='0.08'/%3E%3C/svg%3E") repeat; opacity: 0.5; }
+.main-menu-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; padding: 40px 20px; position: relative; z-index: 1; }
+.main-menu-title { font-size: 48px; font-weight: 900; color: var(--accent); letter-spacing: 6px; text-shadow: 0 0 40px var(--accent-glow), 0 0 80px rgba(230,36,0,0.1); line-height: 1; margin-bottom: 4px; animation: titleGlow 3s ease-in-out infinite; }
+@keyframes titleGlow { 0%,100% { text-shadow: 0 0 40px var(--accent-glow), 0 0 80px rgba(230,36,0,0.1); } 50% { text-shadow: 0 0 60px var(--accent-glow), 0 0 120px rgba(230,36,0,0.15); } }
+.main-menu-subtitle { font-size: 16px; color: var(--text-muted); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 8px; }
+.main-menu-badge { display: inline-block; padding: 3px 12px; border: 1px solid var(--border-subtle); border-radius: 20px; font-size: 10px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 40px; }
+.main-menu-buttons { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 320px; }
+.main-menu-status { margin-top: 32px; color: var(--text-dim); font-size: var(--text-xs); text-align: center; min-height: 18px; }
+.main-menu-version { margin-top: 32px; color: var(--text-dim); font-size: 10px; opacity: 0.5; }
+
+/* Wizard rework */
+.wizard-container { max-width: 520px; margin: 0 auto; }
+.wizard-progress { display: flex; justify-content: center; gap: 0; margin-bottom: var(--space-5); position: relative; }
+.wizard-step-dot { display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; flex: 1; }
+.wizard-step-dot::after { content: ''; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--bg-elevated); z-index: 0; }
+.wizard-step-dot:last-child::after { display: none; }
+.wizard-step-dot.done::after { background: var(--success); }
+.wizard-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--bg-elevated); border: 2px solid var(--border-subtle); transition: all var(--transition-fast); position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; font-size: 10px; color: transparent; }
+.wizard-dot.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); color: #fff; }
+.wizard-dot.done { background: var(--success); border-color: var(--success); color: #fff; }
+.wizard-dot-label { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+.wizard-step-dot.active .wizard-dot-label { color: var(--accent); font-weight: 600; }
+.wizard-step-dot.done .wizard-dot-label { color: var(--success); }
+.wizard-step { animation: slideUp 300ms ease; }
+.wizard-card { border: 1px solid var(--border-subtle); }
+.wizard-card-highlight { border-color: var(--accent); }
+.wizard-nav { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+
+/* Creation step specific */
+.create-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.create-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.option-card { padding: 10px 8px; background: var(--bg-elevated); border: 2px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer; text-align: center; transition: all var(--transition-fast); -webkit-tap-highlight-color: transparent; }
+.option-card:hover { border-color: var(--accent); background: #2a1a1a; }
+.option-card.selected { border-color: var(--accent); background: #3a2020; }
+.option-card .opt-name { font-size: var(--text-base); font-weight: 700; color: var(--text-primary); }
+.option-card .opt-desc { font-size: var(--text-xs); color: var(--text-muted); margin-top: 2px; }
+.option-card .opt-icon { font-size: 22px; margin-bottom: 2px; }
+
+/* Preview card */
+.fighter-preview { background: linear-gradient(135deg, var(--bg-elevated), var(--bg-surface)); border: 2px solid var(--accent); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; margin-bottom: var(--space-3); position: relative; overflow: hidden; }
+.fighter-preview::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 50% 0%, var(--accent-glow), transparent 70%); opacity: 0.3; pointer-events: none; }
+.fighter-preview .fp-name { font-size: var(--text-2xl); font-weight: 900; color: var(--text-primary); position: relative; }
+.fighter-preview .fp-record { font-size: var(--text-lg); color: var(--gold); margin: 4px 0; position: relative; }
+.fighter-preview .fp-meta { font-size: var(--text-sm); color: var(--text-muted); position: relative; }
+.fighter-preview .fp-attr-label { font-size: var(--text-xs); color: var(--text-muted); margin-top: 8px; text-align: left; position: relative; }
+.fighter-preview .fp-attr-bar { height: 6px; background: var(--bg-base); border-radius: 3px; overflow: hidden; margin: 2px 0; position: relative; }
+.fighter-preview .fp-detail-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: var(--text-sm); position: relative; }
+.fighter-preview .fp-detail-label { color: var(--text-muted); }
+.fighter-preview .fp-detail-value { color: var(--text-secondary); font-weight: 600; }
 
 /* Titles */
 .screen-title { font-size: var(--text-2xl); font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-3); text-align: center; }
@@ -196,13 +248,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 .modal-content h2 { color: var(--text-primary); margin-bottom: 10px; font-size: var(--text-lg); }
 .modal-content h3 { color: var(--accent); font-size: var(--text-md); margin: 8px 0 4px; }
 
-/* Wizard */
-.wizard-step { animation: fadeIn .25s ease; }
-.wizard-progress { display: flex; justify-content: center; gap: 8px; margin-bottom: var(--space-5); }
-.wizard-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bg-elevated); border: 2px solid var(--border-subtle); transition: background var(--transition-fast), border-color var(--transition-fast); }
-.wizard-dot.active { background: var(--accent); border-color: var(--accent); }
-.wizard-dot.done { background: var(--success); border-color: var(--success); }
-.wizard-nav { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-5); }
+/* Wizard (reworked below) */
 
 /* List items */
 .list-item { padding: 10px; background: var(--bg-elevated); border-radius: var(--radius-md); margin-bottom: 4px; cursor: pointer; font-size: var(--text-base); -webkit-tap-highlight-color: transparent; min-height: 44px; transition: background var(--transition-fast); }
@@ -325,143 +371,176 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 <div class="container" id="app">
   <!-- Main Menu -->
   <div id="screen-main-menu" class="screen">
-    <div style="text-align:center;padding:60px 10px 20px">
-      <div style="font-size:32px;font-weight:900;color:var(--accent);margin-bottom:2px;letter-spacing:3px;text-shadow:0 0 30px var(--accent-glow)">MMA LIFE</div>
-      <div style="font-size:15px;color:var(--text-muted);margin-bottom:50px;letter-spacing:1px">SIMULATOR</div>
-      <button id="btnContinue" class="btn btn-primary btn-mainmenu" style="display:none"><span style="font-size:20px">&#x25B6;</span> CONTINUE</button>
-      <button id="btnNewGame" class="btn btn-gold btn-mainmenu"><span style="font-size:20px">+</span> NEW CAREER</button>
-      <button id="btnLoadGame" class="btn btn-secondary btn-mainmenu" onclick="showSaveLoadModal('load')"><span style="font-size:18px">&#x1F4C2;</span> LOAD GAME</button>
-      <button id="btnOptions" class="btn btn-ghost btn-mainmenu" onclick="showOptionsModal()"><span style="font-size:18px">&#x2699;</span> OPTIONS</button>
-      <div style="margin-top:40px;color:var(--text-dim);font-size:var(--text-xs)" id="mainMenuStatus"></div>
+    <div class="main-menu-bg"></div>
+    <div class="main-menu-inner">
+      <div class="main-menu-title">MMA LIFE</div>
+      <div class="main-menu-subtitle">SIMULATOR</div>
+      <div class="main-menu-badge">&#x1F94A; Fight Career Simulator</div>
+      <div class="main-menu-buttons">
+        <button id="btnContinue" class="btn btn-primary btn-mainmenu slide-up" style="display:none"><span style="font-size:20px;width:28px;text-align:center">&#x25B6;</span> CONTINUE</button>
+        <button id="btnNewGame" class="btn btn-gold btn-mainmenu slide-up"><span style="font-size:22px;width:28px;text-align:center">+</span> NEW CAREER</button>
+        <button id="btnLoadGame" class="btn btn-secondary btn-mainmenu slide-up"><span style="font-size:18px;width:28px;text-align:center">&#x1F4C2;</span> LOAD GAME</button>
+        <button id="btnOptions" class="btn btn-ghost btn-mainmenu slide-up"><span style="font-size:18px;width:28px;text-align:center">&#x2699;</span> OPTIONS</button>
+      </div>
+      <div class="main-menu-status" id="mainMenuStatus"></div>
+      <div class="main-menu-version">v1.0 &mdash; ALPHA</div>
     </div>
   </div>
 
   <div id="screen-create" class="hidden screen">
     <div class="screen-title" style="font-size:var(--text-3xl)">CREATE YOUR FIGHTER</div>
 
-    <div class="wizard-progress" id="wizardProgress">
-      <div class="wizard-dot active" data-step="1"></div>
-      <div class="wizard-dot" data-step="2"></div>
-      <div class="wizard-dot" data-step="3"></div>
-      <div class="wizard-dot" data-step="4"></div>
-      <div class="wizard-dot" data-step="5"></div>
-    </div>
-    <div style="text-align:center;font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-4)" id="wizardStepLabel">Step 1: Identity</div>
-
-    <div class="card">
-      <!-- Step 1: Identity -->
-      <div class="wizard-step" data-step="1">
-        <div class="card-title" style="color:var(--accent)">Who are you?</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="grid-column:1/-1">
-            <label>Fighter Name</label>
-            <input id="fName" name="name" value="">
-          </div>
-          <div>
-            <label>Nationality</label>
-            <select id="fNationality" name="nationality">
-              <option value="American">American</option>
-              <option value="Brazilian">Brazilian</option>
-              <option value="Russian">Russian</option>
-              <option value="Japanese">Japanese</option>
-              <option value="British">British</option>
-              <option value="Canadian">Canadian</option>
-              <option value="French">French</option>
-              <option value="Dutch">Dutch</option>
-              <option value="Australian">Australian</option>
-              <option value="Polish">Polish</option>
-              <option value="Korean">Korean</option>
-              <option value="Mexican">Mexican</option>
-              <option value="German">German</option>
-              <option value="Italian">Italian</option>
-            </select>
-          </div>
-          <div>
-            <label>Home Region</label>
-            <select id="fRegion" name="region">
-            </select>
-          </div>
+    <div class="wizard-container">
+      <div class="wizard-progress" id="wizardProgress">
+        <div class="wizard-step-dot active" data-step="1">
+          <div class="wizard-dot active" data-step="1">1</div>
+          <div class="wizard-dot-label">Identity</div>
+        </div>
+        <div class="wizard-step-dot" data-step="2">
+          <div class="wizard-dot" data-step="2">2</div>
+          <div class="wizard-dot-label">Physical</div>
+        </div>
+        <div class="wizard-step-dot" data-step="3">
+          <div class="wizard-dot" data-step="3">3</div>
+          <div class="wizard-dot-label">Style</div>
+        </div>
+        <div class="wizard-step-dot" data-step="4">
+          <div class="wizard-dot" data-step="4">4</div>
+          <div class="wizard-dot-label">Traits</div>
+        </div>
+        <div class="wizard-step-dot" data-step="5">
+          <div class="wizard-dot" data-step="5">5</div>
+          <div class="wizard-dot-label">Review</div>
         </div>
       </div>
 
-      <!-- Step 2: Physical -->
-      <div class="wizard-step hidden" data-step="2">
-        <div class="card-title" style="color:var(--accent)">Physical Attributes</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-          <div>
-            <label>Age</label>
-            <select id="fAge" name="age" style="width:100%;">
-              <option value="18">18</option><option value="19">19</option><option value="20">20</option>
-              <option value="21">21</option><option value="22">22</option><option value="23">23</option>
-              <option value="24">24</option><option value="25" selected>25</option>
-              <option value="26">26</option><option value="27">27</option><option value="28">28</option>
-              <option value="29">29</option><option value="30">30</option>
-              <option value="31">31</option><option value="32">32</option><option value="33">33</option>
-              <option value="34">34</option><option value="35">35</option>
-            </select>
-          </div>
-          <div>
-            <label>Stance</label>
-            <select id="fStance" name="stance">
-              <option value="orthodox">Orthodox</option>
-              <option value="southpaw">Southpaw</option>
-            </select>
-          </div>
-        </div>
-        <label style="margin-top:var(--space-3)">Weight Class</label>
-        <div id="wcGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px"></div>
-        <input type="hidden" id="fWeightClass" name="weight_class" value="3">
-
-        <div id="heightReachSection" style="margin-top:var(--space-3);display:none">
-          <label>Height (<span id="heightValue">68</span> in)</label>
-          <input type="range" id="fHeight" min="60" max="80" value="68" style="width:100%">
-          <label style="margin-top:8px">Reach (<span id="reachValue">72</span> in)</label>
-          <input type="range" id="fReach" min="62" max="84" value="72" style="width:100%">
-          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px;text-align:center" id="heightReachInfo"></div>
-        </div>
-      </div>
-
-      <!-- Step 3: Background -->
-      <div class="wizard-step hidden" data-step="3">
-        <div class="card-title" style="color:var(--accent)">Fighting Style</div>
-        <label>Background</label>
-        <div id="bgGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px"></div>
-        <input type="hidden" id="fBackground" name="background" value="mma">
-      </div>
-
-      <!-- Step 4: Traits & Personality -->
-      <div class="wizard-step hidden" data-step="4">
-        <div class="card-title" style="color:var(--accent)">Traits &amp; Personality</div>
-        <label>Special Trait (tap to select)</label>
-        <div id="traitGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px"></div>
-        <label style="margin-top:var(--space-3)">Personality</label>
-        <div id="personalityGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px"></div>
-      </div>
-
-      <!-- Step 5: Review -->
-      <div class="wizard-step hidden" data-step="5">
-        <div class="card-title" style="color:var(--accent)">Review Your Fighter</div>
-        <div id="reviewPreview" class="fighter-preview">
-          <div class="fp-name" id="reviewName">--</div>
-          <div class="fp-meta" id="reviewDetails">--</div>
-          <div class="fp-meta" id="reviewHeightReach" style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:2px">--</div>
-          <div style="margin-top:12px">
-            <div class="fp-attr-label">Physical Rating</div>
-            <div class="fp-attr-bar"><div id="reviewPhysBar" style="height:100%;width:50%;background:linear-gradient(90deg,#4a9eff,var(--accent));border-radius:3px;transition:width .3s"></div></div>
-            <div class="fp-attr-label">Mental Rating</div>
-            <div class="fp-attr-bar"><div id="reviewMentBar" style="height:100%;width:50%;background:linear-gradient(90deg,#8a4aff,#ff6a4a);border-radius:3px;transition:width .3s"></div></div>
+      <div class="card wizard-card" id="wizardCard">
+        <!-- Step 1: Identity -->
+        <div class="wizard-step" data-step="1">
+          <div class="card-title" style="color:var(--accent)">&#x1F464; Who are you?</div>
+          <p style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-3)">Choose your fighter's identity — name, nationality, and home region.</p>
+          <div class="create-grid-2">
+            <div style="grid-column:1/-1">
+              <label>Fighter Name</label>
+              <input id="fName" name="name" value="" placeholder="Enter your fighter's name..." autocomplete="off">
+            </div>
+            <div>
+              <label>Nationality</label>
+              <select id="fNationality" name="nationality">
+                <option value="American">American</option>
+                <option value="Brazilian">Brazilian</option>
+                <option value="Russian">Russian</option>
+                <option value="Japanese">Japanese</option>
+                <option value="British">British</option>
+                <option value="Canadian">Canadian</option>
+                <option value="French">French</option>
+                <option value="Dutch">Dutch</option>
+                <option value="Australian">Australian</option>
+                <option value="Polish">Polish</option>
+                <option value="Korean">Korean</option>
+                <option value="Mexican">Mexican</option>
+                <option value="German">German</option>
+                <option value="Italian">Italian</option>
+                <option value="Spanish">Spanish</option>
+              </select>
+            </div>
+            <div>
+              <label>Home Region</label>
+              <select id="fRegion" name="region">
+              </select>
+            </div>
           </div>
         </div>
-        <div style="text-align:center;margin-top:var(--space-3)">
-          <button id="startCareerBtn" class="btn btn-primary btn-lg" style="width:100%">START CAREER</button>
-        </div>
-      </div>
 
-      <!-- Wizard Navigation -->
-      <div class="wizard-nav">
-        <button id="wizardBack" class="btn btn-ghost btn-sm">&larr; Back</button>
-        <span style="font-size:var(--text-xs);color:var(--text-dim)" id="wizardStepNum">1 / 5</span>
-        <button id="wizardNext" class="btn btn-primary btn-sm">Next &rarr;</button>
+        <!-- Step 2: Physical -->
+        <div class="wizard-step hidden" data-step="2">
+          <div class="card-title" style="color:var(--accent)">&#x1F4AA; Physical Attributes</div>
+          <p style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-3)">Set your fighter's age, stance, weight class, height, and reach.</p>
+          <div class="create-grid-2">
+            <div>
+              <label>Age</label>
+              <select id="fAge" name="age">
+                <option value="18">18</option><option value="19">19</option><option value="20">20</option>
+                <option value="21">21</option><option value="22">22</option><option value="23">23</option>
+                <option value="24">24</option><option value="25" selected>25</option>
+                <option value="26">26</option><option value="27">27</option><option value="28">28</option>
+                <option value="29">29</option><option value="30">30</option>
+                <option value="31">31</option><option value="32">32</option><option value="33">33</option>
+                <option value="34">34</option><option value="35">35</option>
+              </select>
+            </div>
+            <div>
+              <label>Stance</label>
+              <select id="fStance" name="stance">
+                <option value="orthodox">Orthodox</option>
+                <option value="southpaw">Southpaw</option>
+              </select>
+            </div>
+          </div>
+          <label style="margin-top:var(--space-3)">Weight Class</label>
+          <div id="wcGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px"></div>
+          <input type="hidden" id="fWeightClass" name="weight_class" value="3">
+
+          <div id="heightReachSection" style="margin-top:var(--space-3)">
+            <label>Height (<span id="heightValue">68</span> in)</label>
+            <input type="range" id="fHeight" min="60" max="80" value="68" style="width:100%">
+            <label style="margin-top:8px">Reach (<span id="reachValue">72</span> in)</label>
+            <input type="range" id="fReach" min="62" max="84" value="72" style="width:100%">
+            <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px;text-align:center" id="heightReachInfo"></div>
+          </div>
+        </div>
+
+        <!-- Step 3: Background -->
+        <div class="wizard-step hidden" data-step="3">
+          <div class="card-title" style="color:var(--accent)">&#x1F3C8; Fighting Style</div>
+          <p style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-3)">Choose your primary fighting background. This shapes your starting attributes.</p>
+          <div id="bgGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px"></div>
+          <input type="hidden" id="fBackground" name="background" value="mma">
+        </div>
+
+        <!-- Step 4: Traits & Personality -->
+        <div class="wizard-step hidden" data-step="4">
+          <div class="card-title" style="color:var(--accent)">&#x2728; Traits &amp; Personality</div>
+          <p style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-3)">Choose a special trait and personality that define your fighter's style.</p>
+          <label>Special Trait</label>
+          <div id="traitGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px"></div>
+          <label style="margin-top:var(--space-3)">Personality</label>
+          <div id="personalityGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px"></div>
+        </div>
+
+        <!-- Step 5: Review -->
+        <div class="wizard-step hidden" data-step="5">
+          <div class="card-title" style="color:var(--accent)">&#x1F3C6; Review Your Fighter</div>
+          <p style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-3)">Confirm your choices and start your career.</p>
+          <div id="reviewPreview" class="fighter-preview">
+            <div class="fp-name" id="reviewName">--</div>
+            <div class="fp-record" id="reviewRecord">0-0-0 (Pro Debut)</div>
+            <div class="fp-meta" id="reviewDetails">--</div>
+            <div class="fp-meta" id="reviewHeightReach" style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:2px">--</div>
+            <div style="margin-top:16px">
+              <div class="fp-detail-row"><span class="fp-detail-label">Background</span><span class="fp-detail-value" id="reviewBg">--</span></div>
+              <div class="fp-detail-row"><span class="fp-detail-label">Trait</span><span class="fp-detail-value" id="reviewTrait">--</span></div>
+              <div class="fp-detail-row"><span class="fp-detail-label">Personality</span><span class="fp-detail-value" id="reviewPers">--</span></div>
+              <div class="fp-detail-row"><span class="fp-detail-label">Stance</span><span class="fp-detail-value" id="reviewStance">--</span></div>
+            </div>
+            <div style="margin-top:12px">
+              <div class="fp-attr-label">Physical Rating</div>
+              <div class="fp-attr-bar"><div id="reviewPhysBar" style="height:100%;width:50%;background:linear-gradient(90deg,#4a9eff,var(--accent));border-radius:3px;transition:width .3s"></div></div>
+              <div class="fp-attr-label">Mental Rating</div>
+              <div class="fp-attr-bar"><div id="reviewMentBar" style="height:100%;width:50%;background:linear-gradient(90deg,#8a4aff,#ff6a4a);border-radius:3px;transition:width .3s"></div></div>
+            </div>
+          </div>
+          <div style="text-align:center;margin-top:var(--space-3)">
+            <button id="startCareerBtn" class="btn btn-primary btn-lg" style="width:100%">&#x1F3C6; START CAREER</button>
+          </div>
+        </div>
+
+        <!-- Wizard Navigation -->
+        <div class="wizard-nav">
+          <button id="wizardBack" class="btn btn-ghost btn-sm">&larr; Back</button>
+          <span style="font-size:var(--text-xs);color:var(--text-dim)" id="wizardStepNum">1 / 5</span>
+          <button id="wizardNext" class="btn btn-primary btn-sm">Next &rarr;</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1080,24 +1159,28 @@ async function initMainMenu() {
   qs("#btnSettings").classList.add("hidden");
   qs("#btnRefresh").classList.add("hidden");
 
+  qs("#btnLoadGame").onclick = () => showSaveLoadModal('load');
+  qs("#btnOptions").onclick = () => showOptionsModal();
+
   const btnContinue = qs("#btnContinue");
   btnContinue.style.display = "none";
-  qs("#mainMenuStatus").textContent = "";
+  qs("#mainMenuStatus").innerHTML = '<span class="spinner"></span> Checking for saves...';
 
   if (sid) {
     try {
       const resp = await api("/api/has_save?sid=" + encodeURIComponent(sid));
       if (resp && resp.has_save) {
         btnContinue.style.display = "inline-block";
+        btnContinue.classList.add("fade-in");
         btnContinue.onclick = () => doContinue(resp.saves);
         const saveCount = resp.saves.length;
-        qs("#mainMenuStatus").textContent = `${saveCount} save(s) found`;
+        qs("#mainMenuStatus").innerHTML = `<span style="color:var(--success)">${saveCount} save(s) found — click Continue</span>`;
       } else {
         qs("#mainMenuStatus").textContent = "No saves found. Start a new career!";
       }
     } catch(e) {
       console.log("Save check failed:", e);
-      qs("#mainMenuStatus").textContent = "No saves found";
+      qs("#mainMenuStatus").textContent = "Could not check saves. Start a new career!";
     }
   } else {
     qs("#mainMenuStatus").textContent = "Start a new career!";
@@ -1139,6 +1222,31 @@ function showGameScreen() {
 
 async function showLoadModal() {
   await showSaveLoadModal("load");
+}
+
+function showOptionsModal() {
+  const html = `
+    <div class="card-title" style="font-size:16px">&#x2699; Options</div>
+    <div style="margin-bottom:var(--space-3)">
+      <div style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-2)">Game Settings</div>
+      <div class="stat-row" style="cursor:pointer" onclick="localStorage.setItem('mma_compact', localStorage.getItem('mma_compact') === '1' ? '0' : '1'); toast('Compact mode ' + (localStorage.getItem('mma_compact') === '1' ? 'ON' : 'OFF'), 'success'); showOptionsModal()">
+        <span class="stat-label">Compact Mode</span>
+        <span class="stat-value" id="optCompact">${localStorage.getItem('mma_compact') === '1' ? 'ON' : 'OFF'}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Version</span>
+        <span class="stat-value">1.0 Alpha</span>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border-subtle);padding-top:var(--space-3);margin-top:var(--space-2)">
+      <div style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-2)">Danger Zone</div>
+      <button class="btn btn-danger btn-sm" onclick="if(confirm('Reset all data? This cannot be undone.')) { localStorage.clear(); fetch('/api/reset', {method:'POST'}).then(() => { sid=''; location.reload(); }); }" style="width:100%">Reset All Data</button>
+    </div>`;
+  showModal(html);
+}
+
+function showSettingsModal() {
+  showOptionsModal();
 }
 
 async function showSaveModal() {
@@ -2475,17 +2583,28 @@ function showWizardStep(step) {
   _currentWizardStep = step;
   document.querySelectorAll('.wizard-step').forEach(el => el.classList.add('hidden'));
   const stepEl = document.querySelector(`.wizard-step[data-step="${step}"]`);
-  if (stepEl) stepEl.classList.remove('hidden');
-  document.querySelectorAll('.wizard-dot').forEach(d => {
+  if (stepEl) {
+    stepEl.classList.remove('hidden');
+    stepEl.style.animation = 'none';
+    stepEl.offsetHeight;
+    stepEl.style.animation = 'slideUp 300ms ease';
+  }
+  document.querySelectorAll('.wizard-step-dot').forEach(d => {
     const ds = parseInt(d.dataset.step);
-    d.className = 'wizard-dot' + (ds === step ? ' active' : ds < step ? ' done' : '');
+    const dot = d.querySelector('.wizard-dot');
+    if (dot) dot.className = 'wizard-dot' + (ds === step ? ' active' : ds < step ? ' done' : '');
+    d.className = 'wizard-step-dot' + (ds === step ? ' active' : ds < step ? ' done' : '');
   });
-  qs("#wizardStepLabel").textContent = `Step ${step}: ${WIZARD_LABELS[step]}`;
   qs("#wizardStepNum").textContent = `${step} / 5`;
   qs("#wizardBack").style.display = step === 1 ? "none" : "";
-  qs("#wizardNext").textContent = step === 5 ? "" : "Next →";
-  qs("#startCareerBtn").parentElement.classList.toggle("hidden", step !== 5);
-  qs("#wizardNext").parentElement.classList.toggle("hidden", step === 5);
+  if (step === 5) {
+    qs("#wizardNext").style.display = "none";
+    qs("#startCareerBtn").parentElement.classList.remove("hidden");
+  } else {
+    qs("#wizardNext").style.display = "";
+    qs("#wizardNext").textContent = "Next →";
+    qs("#startCareerBtn").parentElement.classList.add("hidden");
+  }
   if (step === 5) updateReviewPreview();
 }
 
@@ -2503,10 +2622,13 @@ function initWizard() {
 
 function validateWizardStep(step) {
   if (step === 1) {
-    if (!qs("#fName").value.trim()) { toast("Enter a fighter name", "error"); return false; }
+    const name = qs("#fName").value.trim();
+    if (!name) { toast("Enter your fighter's name to continue", "error"); qs("#fName").focus(); return false; }
+    if (name.length < 2) { toast("Name must be at least 2 characters", "error"); qs("#fName").focus(); return false; }
+    if (name.length > 30) { toast("Name must be under 30 characters", "error"); qs("#fName").focus(); return false; }
   }
   if (step === 2) {
-    if (!qs("#fWeightClass").value && !document.querySelector('.wc-card.selected')) { toast("Select a weight class", "error"); return false; }
+    if (!qs("#fWeightClass").value && !document.querySelector('.wc-card.selected')) { toast("Select a weight class to continue", "error"); return false; }
   }
   return true;
 }
@@ -2520,14 +2642,23 @@ function updateReviewPreview() {
   const wcNames = ["Flyweight","Bantamweight","Featherweight","Lightweight","Welterweight","Middleweight","Lt Heavyweight","Heavyweight"];
   const wcName = wcNames[wcIdx] || "Lightweight";
   const nat = qs("#fNationality").value;
+  const stance = qs("#fStance").value;
   const traitBtn = qs("#traitGrid .selected");
-  const traitName = traitBtn ? traitBtn.dataset.trait : "None";
-  qs("#reviewDetails").textContent = `${age}yo | ${wcName} | ${nat} | ${bg} | Trait: ${traitName}`;
-  const h = qs("#fHeight").value;
-  const r = qs("#fReach").value;
-  qs("#reviewHeightReach").textContent = `${h}" height | ${r}" reach`;
-  qs("#reviewPhysBar").style.width = Math.floor(30 + Math.random() * 30) + "%";
-  qs("#reviewMentBar").style.width = Math.floor(30 + Math.random() * 30) + "%";
+  const traitName = traitBtn ? traitBtn.textContent.trim().split('\n')[0] : "None";
+  const persBtn = qs("#personalityGrid .selected");
+  const persName = persBtn ? persBtn.textContent.trim().split('\n')[0] : "Humble";
+  const BG_LABELS = {"mma":"MMA","wrestling":"Wrestling","bjj":"BJJ","muay_thai":"Muay Thai","boxing":"Boxing","judo":"Judo","taekwondo":"Taekwondo","karate":"Karate","sambo":"Sambo","kickboxing":"Kickboxing","capoeira":"Capoeira"};
+  const bgLabel = BG_LABELS[bg] || bg;
+  qs("#reviewDetails").textContent = `${age} years old | ${wcName} | ${nat}`;
+  qs("#reviewHeightReach").textContent = `${qs("#fHeight").value}" height | ${qs("#fReach").value}" reach`;
+  qs("#reviewBg").textContent = bgLabel;
+  qs("#reviewTrait").textContent = traitName;
+  qs("#reviewPers").textContent = persName;
+  qs("#reviewStance").textContent = stance.charAt(0).toUpperCase() + stance.slice(1);
+  const basePhys = 45 + Math.floor(parseInt(age) / 5) * 2 + (wcIdx < 4 ? 5 : 0);
+  const baseMent = 40 + Math.floor(parseInt(age) / 3) * 2;
+  qs("#reviewPhysBar").style.width = Math.min(95, basePhys + Math.floor(Math.random() * 15)) + "%";
+  qs("#reviewMentBar").style.width = Math.min(95, baseMent + Math.floor(Math.random() * 15)) + "%";
 }
 
 let _roundScores = [];
