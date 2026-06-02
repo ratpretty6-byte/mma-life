@@ -59,6 +59,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-base
 .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border-subtle); }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
 .btn-sm { padding: 5px 12px; font-size: var(--text-sm); min-height: 32px; }
+.btn-small { padding: 5px 12px; font-size: var(--text-sm); min-height: 32px; }
 .btn-lg { padding: 14px 28px; font-size: var(--text-lg); min-height: 52px; }
 .btn-mainmenu { width: 90%; max-width: 320px; margin-bottom: var(--space-3); padding: 14px 20px; font-size: var(--text-lg); justify-content: flex-start; border-radius: var(--radius-lg); gap: 12px; }
 
@@ -316,7 +317,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       <div style="font-size:15px;color:var(--text-muted);margin-bottom:50px;letter-spacing:1px">SIMULATOR</div>
       <button id="btnContinue" class="btn btn-primary btn-mainmenu" style="display:none"><span style="font-size:20px">&#x25B6;</span> CONTINUE</button>
       <button id="btnNewGame" class="btn btn-gold btn-mainmenu"><span style="font-size:20px">+</span> NEW CAREER</button>
-      <button id="btnLoadGame" class="btn btn-secondary btn-mainmenu"><span style="font-size:18px">&#x1F4C2;</span> LOAD GAME</button>
+      <button id="btnLoadGame" class="btn btn-secondary btn-mainmenu" onclick="showSaveLoadModal('load')"><span style="font-size:18px">&#x1F4C2;</span> LOAD GAME</button>
       <button id="btnOptions" class="btn btn-ghost btn-mainmenu" onclick="showOptionsModal()"><span style="font-size:18px">&#x2699;</span> OPTIONS</button>
       <div style="margin-top:40px;color:var(--text-dim);font-size:var(--text-xs)" id="mainMenuStatus"></div>
     </div>
@@ -1026,7 +1027,7 @@ async function showSaveLoadModal(mode) {
   try {
     const resp = await api("/api/list_saves?sid=" + encodeURIComponent(sid));
     if (resp && resp.saves) saves = resp.saves;
-  } catch(e) {}
+  } catch(e) { console.warn("list_saves failed:", e); }
   for (let i = 0; i < 3; i++) {
     const slot = saves.find(s => s.slot_index === i);
     const slotName = i === 0 ? "Auto-Save" : `Slot ${i}`;
@@ -1615,7 +1616,7 @@ async function refreshHomeTab() {
   try {
     const nr = await api("/api/news");
     if (nr && nr.news) newsCache = nr.news;
-  } catch(e) {}
+  } catch(e) { console.warn("list_saves failed:", e); }
   updateAllUI();
 }
 
@@ -1636,7 +1637,7 @@ async function advanceDay() {
       try {
         const nr = await api("/api/news");
         if (nr && nr.news) newsCache = nr.news;
-      } catch(e) {}
+      } catch(e) { console.warn("list_saves failed:", e); }
       updateAllUI();
       const r = resp.day_result;
       const div = qs("#dayResult");
@@ -1687,7 +1688,7 @@ async function advanceSkip(days) {
       try {
         const nr = await api("/api/news");
         if (nr && nr.news) newsCache = nr.news;
-      } catch(e) {}
+      } catch(e) { console.warn("list_saves failed:", e); }
       updateAllUI();
       if (resp.fight_today) {
         const div = qs("#dayResult");
@@ -2262,8 +2263,15 @@ async function loadFightOffers() {
         <span>Purse: <strong style="color:#4aff6a">$${o.base_purse.toLocaleString()}</strong></span>
         <span>Win Bonus: <strong style="color:#ffd700">$${o.win_bonus.toLocaleString()}</strong></span>
         <span>Pop: <strong style="color:${popColors[risk] || '#aaa'}">+${o.popularity_gain}</strong></span>
-        <button class="btn btn-ghost btn-small" style="margin-left:auto;font-size:10px;padding:2px 6px;min-height:0" onclick="event.stopPropagation();showComparison(o.opponent)">📊 Compare</button>
+        <button class="btn btn-ghost btn-small btn-compare" style="margin-left:auto;font-size:10px;padding:2px 6px;min-height:0">📊 Compare</button>
       </div>`;
+    const compareBtn = div.querySelector(".btn-compare");
+    if (compareBtn) {
+      compareBtn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        showComparison(opp);
+      });
+    }
     div.onclick = () => {
       // Show opponent comparison + accept/decline
       showOfferModal(o, resp.relationship);
@@ -2348,6 +2356,15 @@ async function declineOffer() {
     loadFightOffers();
   } else {
     toast(resp.error || "Error", "error");
+  }
+}
+
+function showComparisonFromData(jsonStr) {
+  try {
+    const opp = JSON.parse(jsonStr);
+    showComparison(opp);
+  } catch(e) {
+    toast("Error showing comparison", "error");
   }
 }
 
@@ -2500,7 +2517,7 @@ async function loadFightOfferDetails(o, baseHtml) {
         </div>`;
       }
     }
-  } catch(e) {}
+  } catch(e) { console.warn("list_saves failed:", e); }
 
   html += `</div>
   <div style="margin-top:12px">

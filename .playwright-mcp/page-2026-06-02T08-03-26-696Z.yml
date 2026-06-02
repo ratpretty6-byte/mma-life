@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - heading "MMA LIFE SIMULATOR" [level=1] [ref=e4]
+    - generic [ref=e6]: World ready!
+  - generic [ref=e19]:
+    - generic [ref=e20]: CREATE YOUR FIGHTER
+    - generic [ref=e27]: "Step 5: Review"
+    - generic [ref=e157]:
+      - generic [ref=e158]: Review Your Fighter
+      - generic [ref=e159]:
+        - generic [ref=e160]: Ross "Gladiator" Harris
+        - generic [ref=e161]: "25yo | Lightweight | American | mma | Trait: None"
+        - generic [ref=e162]: 69" height | 71" reach
+        - generic [ref=e163]:
+          - generic [ref=e164]: Physical Rating
+          - generic [ref=e167]: Mental Rating
+      - button "START CAREER" [ref=e171] [cursor=pointer]

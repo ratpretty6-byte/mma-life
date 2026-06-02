@@ -1,0 +1,73 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - heading "MMA LIFE SIMULATOR" [level=1] [ref=e4]
+    - generic [ref=e6]: World ready!
+  - generic [ref=e19]:
+    - generic [ref=e20]: CREATE YOUR FIGHTER
+    - generic [ref=e27]: "Step 2: Physical"
+    - generic [ref=e28]:
+      - generic [ref=e44]:
+        - generic [ref=e45]: Physical Attributes
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - generic [ref=e48]: Age
+            - combobox [ref=e49]:
+              - option "18"
+              - option "19"
+              - option "20"
+              - option "21"
+              - option "22"
+              - option "23"
+              - option "24"
+              - option "25" [selected]
+              - option "26"
+              - option "27"
+              - option "28"
+              - option "29"
+              - option "30"
+              - option "31"
+              - option "32"
+              - option "33"
+              - option "34"
+              - option "35"
+          - generic [ref=e50]:
+            - generic [ref=e51]: Stance
+            - combobox [ref=e52]:
+              - option "Orthodox" [selected]
+              - option "Southpaw"
+        - generic [ref=e53]: Weight Class
+        - generic [ref=e54]:
+          - generic [ref=e55] [cursor=pointer]:
+            - generic [ref=e56]: Flyweight
+            - generic [ref=e57]: 125 lbs
+          - generic [ref=e58] [cursor=pointer]:
+            - generic [ref=e59]: Bantamweight
+            - generic [ref=e60]: 135 lbs
+          - generic [ref=e61] [cursor=pointer]:
+            - generic [ref=e62]: Featherweight
+            - generic [ref=e63]: 145 lbs
+          - generic [ref=e64] [cursor=pointer]:
+            - generic [ref=e65]: Lightweight
+            - generic [ref=e66]: 155 lbs
+          - generic [ref=e67] [cursor=pointer]:
+            - generic [ref=e68]: Welterweight
+            - generic [ref=e69]: 170 lbs
+          - generic [ref=e70] [cursor=pointer]:
+            - generic [ref=e71]: Middleweight
+            - generic [ref=e72]: 185 lbs
+          - generic [ref=e73] [cursor=pointer]:
+            - generic [ref=e74]: Lt Heavyweight
+            - generic [ref=e75]: 205 lbs
+          - generic [ref=e76] [cursor=pointer]:
+            - generic [ref=e77]: Heavyweight
+            - generic [ref=e78]: 265 lbs
+        - generic [ref=e79]:
+          - generic [ref=e80]: Height (69 in)
+          - slider [ref=e81]: "69"
+          - generic [ref=e82]: Reach (71 in)
+          - slider [ref=e83]: "71"
+          - generic [ref=e84]: 69" tall, 71" reach — proportional
+      - generic [ref=e41]:
+        - button "← Back" [ref=e85] [cursor=pointer]
+        - generic [ref=e42]: 2 / 5
+        - button "Next →" [active] [ref=e43] [cursor=pointer]

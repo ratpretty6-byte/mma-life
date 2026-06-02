@@ -1,0 +1,58 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - heading "MMA LIFE SIMULATOR" [level=1] [ref=e4]
+    - generic [ref=e5]:
+      - generic [ref=e6]: "Test Fighter | 0-0-0 | #1000 | Ultimate Fighting Alliance"
+      - generic [ref=e172]:
+        - button "⚙" [ref=e173] [cursor=pointer]
+        - button "↻" [ref=e174] [cursor=pointer]
+  - generic [ref=e175]:
+    - generic [ref=e176]:
+      - generic [ref=e177] [cursor=pointer]: Home
+      - generic [ref=e178] [cursor=pointer]: Gym
+      - generic [ref=e179] [cursor=pointer]: Fight
+      - generic [ref=e180] [cursor=pointer]: Career
+      - generic [ref=e181] [cursor=pointer]: Finance
+    - generic [ref=e1055]:
+      - generic [ref=e1056]: Available Opponents
+      - generic [ref=e1057]:
+        - generic [ref=e1058] [cursor=pointer]:
+          - generic [ref=e1059]:
+            - generic [ref=e1060]:
+              - strong [ref=e1061]: 🔥 SACRIFICE
+              - text: main_event
+            - generic [ref=e1062]: SACRIFICE
+          - generic [ref=e1063]:
+            - strong [ref=e1064]: Brian Drake
+            - text: "9-3-0 | #1 | American | 43.8"
+          - generic [ref=e1065]:
+            - generic [ref=e1066]:
+              - text: "Purse:"
+              - strong [ref=e1067]: $3,000
+            - generic [ref=e1068]:
+              - text: "Win Bonus:"
+              - strong [ref=e1069]: $3,000
+            - generic [ref=e1070]:
+              - text: "Pop:"
+              - strong [ref=e1071]: "+15"
+            - button "📊 Compare" [ref=e1072]
+        - generic [ref=e1073] [cursor=pointer]:
+          - generic [ref=e1074]:
+            - generic [ref=e1075]:
+              - strong [ref=e1076]: 💪 TOUGH
+              - text: prelim
+            - generic [ref=e1077]: TOUGH
+          - generic [ref=e1078]:
+            - strong [ref=e1079]: E2E Test Fighter
+            - text: "0-0-0 | #29 | American | 47.5"
+          - generic [ref=e1080]:
+            - generic [ref=e1081]:
+              - text: "Purse:"
+              - strong [ref=e1082]: $2,400
+            - generic [ref=e1083]:
+              - text: "Win Bonus:"
+              - strong [ref=e1084]: $2,400
+            - generic [ref=e1085]:
+              - text: "Pop:"
+              - strong [ref=e1086]: "+8"
+            - button "📊 Compare" [ref=e1087]

@@ -561,6 +561,26 @@ def _trigger_fight_week_event(session, days_until):
         fb.advance_phase()
     return result
 
+def _get_days_until_fight(session):
+    fb = session.get("current_fight_booking")
+    if not fb:
+        return None
+    game_date = session.get("game_date", datetime.now())
+    return max(0, (fb.date - game_date).days) if fb.date else 0
+
+EVENT_DAY_MAP = {"press_conference": 5, "open_workout": 4, "weigh_in": 3, "faceoff": 2, "rest_day": 1}
+
+def _ensure_fight_week_phase(session, event_key):
+    days = _get_days_until_fight(session)
+    expected = EVENT_DAY_MAP.get(event_key)
+    if days is None:
+        return "No fight booked"
+    if not (0 < days <= 5):
+        return "Fight week is not active"
+    if days != expected:
+        return f"Wrong phase: {event_key} expected at T-{expected}, currently T-{days}"
+    return None
+
 def _get_fight_booking_state(session):
     fb = session.get("current_fight_booking")
     if not fb:
@@ -1323,7 +1343,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 if fight_week_event:
                     result = {
-                        "day": DAYS_OF_WEEK[datetime.now().weekday()],
+                        "day": DAYS_OF_WEEK[game_date.weekday()] if game_date else "Monday",
                         "is_rest": True,
                         "fight_week_event": fight_week_event,
                         "status": "fight_week",
@@ -1672,20 +1692,24 @@ class Handler(BaseHTTPRequestHandler):
                 # Wait for fight stream to finish if active
                 fs = get_fight_stream(sid)
                 if fs and not fs.done:
-                    fs.pause_event.set()  # Unpause if waiting
+                    fs.pause_event.set()
                     for _ in range(100):
                         if fs.done:
                             break
                         time.sleep(0.1)
                     clear_fight_stream(sid)
+                # Use live FightStream reference (DiskCache copy is disconnected)
+                live_fight = fs.fight if fs else fight
                 opponent = fb.fighter2 if fb.fighter1 == f else fb.fighter1
-                winner = fight.winner
+                winner = live_fight.winner
                 won = winner == f if winner else False
                 is_draw = winner is None
-                method = fight.win_method or "Decision"
-                fb.complete(winner, method, fight.win_round)
-                original_opp = session.get("_opponent_original")
-                if original_opp:
+                method = live_fight.win_method or "Decision"
+                win_round = live_fight.win_round
+                fb.complete(winner, method, win_round)
+                # Sync opponent record from deep copy back to original in promotion
+                original_opp = session.get("_opponent_original_ref")
+                if original_opp and opponent:
                     original_opp.wins = opponent.wins
                     original_opp.losses = opponent.losses
                     original_opp.draws = opponent.draws
@@ -1736,7 +1760,7 @@ class Handler(BaseHTTPRequestHandler):
                 # Apply popularity changes
                 pop_gain = 0
                 fb_state = session.get("current_fight_booking")
-                if fb_state:
+                if fb_state and not is_draw:
                     pos = fb_state.fight_position
                     pop_by_pos = {"prelim": 2 if won else -1, "main_card": 5 if won else -2,
                                   "co_main": 10 if won else -5, "main_event": 15 if won else -8}
@@ -1745,6 +1769,8 @@ class Handler(BaseHTTPRequestHandler):
                         pop_gain += 5
                     if fb_state.is_title_fight:
                         pop_gain += 10 if won else -3
+                elif is_draw:
+                    pop_gain = 1  # draw is neutral, slight positive for show
                 f.popularity = utils.clamp(getattr(f, "popularity", 10) + pop_gain, 0, 100)
 
                 # Record career damage after fight
@@ -1937,6 +1963,8 @@ class Handler(BaseHTTPRequestHandler):
                 # Reset declined counter on accept
                 f.declined_offers_count = getattr(f, "declined_offers_count", 0)
                 f.declined_offers_count = max(0, f.declined_offers_count - 1)
+                # Save original opponent reference before deep copy
+                session["_opponent_original_ref"] = target
                 # Deep copy opponent for booking
                 import copy
                 target = copy.deepcopy(target)
@@ -2043,6 +2071,10 @@ class Handler(BaseHTTPRequestHandler):
                 choice = body.get("choice", "staredown")
                 if not f or not fb:
                     self.json_resp({"error": "No fight booked"})
+                    return
+                err = _ensure_fight_week_phase(session, "press_conference")
+                if err:
+                    self.json_resp({"error": err})
                     return
                 if choice not in ("respectful", "trash_talk", "staredown"):
                     choice = "staredown"
