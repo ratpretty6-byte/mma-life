@@ -1,7 +1,7 @@
 {
   "_comment": "MMA Life Simulator — World Generation Config",
   "generation": {
-    "initial_fighter_count": 3000,
+    "initial_fighter_count": 2000,
     "prospect_generation_months": 4,
     "prospect_count_per_cycle": 30,
     "division_min_fighters": 15,

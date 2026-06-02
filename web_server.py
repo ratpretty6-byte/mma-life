@@ -77,11 +77,13 @@ def ensure_initialized():
                 print(f"Loaded existing world: {len(all_fighters)} fighters, {len(promotions)} promotions")
             else:
                 print("Generating new game world...")
+                t0 = time.time()
                 weight_classes = [wc["name"] for wc in utils.WEIGHT_CLASSES]
                 promotions = create_promotions(weight_classes)
-                all_fighters = generate_fighter_pool(promotions, 8000)
+                all_fighters = generate_fighter_pool(promotions, 2000)
                 world_news = []
                 save_world_state(promotions, all_fighters)
+                print(f"World generated in {time.time()-t0:.1f}s ({len(all_fighters)} fighters)")
                 world_sim = WorldSimulator(promotions, all_fighters)
             with _gs_lock:
                 gs["promotions"] = promotions
