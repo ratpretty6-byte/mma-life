@@ -2749,10 +2749,37 @@ async function replayStreamedEvents(events) {
     }
 
     const speed = fightSpeed || 1;
-    if (speed > 0) {
-      await sleep(speed === 0.5 ? 400 : speed === 1 ? 200 : speed === 2 ? 80 : 30);
+
+    let delay = 400; // default base delay at 1x
+    if (ev.type === "action") {
+      const subtype = ev.subtype || "";
+      if (subtype === "knockdown" || /CRITICAL|Devastating/.test(ev.severity || "")) {
+        delay = 2000; // big moments linger
+      } else if (subtype === "submission" || subtype === "takedown" || subtype === "clinch" || subtype === "ground") {
+        delay = 1500;
+      } else if (subtype === "strike" || subtype === "exchange" || subtype === "combo" || subtype === "counter") {
+        delay = 1200;
+      } else if (subtype === "movement" || subtype === "feint") {
+        delay = 600; // filler passes quickly
+      } else {
+        delay = 800;
+      }
+    } else if (ev.type === "round_start" || ev.type === "round_end") {
+      delay = 1500;
+    } else if (ev.type === "round_summary") {
+      delay = 3000;
+    } else if (ev.type === "between_round") {
+      delay = 2000;
+    } else if (ev.type === "knockout" || ev.type === "submission" || ev.type === "decision") {
+      delay = 3000;
     } else {
-      await sleep(10);
+      delay = 600;
+    }
+
+    if (speed > 0) {
+      await sleep(delay / speed);
+    } else {
+      await sleep(1);
     }
   }
   return true;
@@ -3003,13 +3030,23 @@ async function replayFightEvents(fightResult) {
     }
 
     if (fightSpeed > 0) {
-      const delays = {
-        action: 800, round_start: 1200, round_end: 1200, round_summary: 1000,
-        knockout: 2500, submission: 2500, decision: 2000, post_fight: 1500,
-        pre_fight: 1500, walkout: 1500, between_round: 2000, carryover: 1500,
-        damage: 1000, score_update: 600, post_fight_reaction: 1200,
-      };
-      await sleep((delays[ev.type] || 800) / fightSpeed);
+      let delay = 800;
+      if (ev.type === "action") {
+        const sev = ev.severity || "";
+        const sub = ev.subtype || "";
+        if (sub === "knockdown" || /CRITICAL|Devastating/.test(sev)) delay = 2000;
+        else if (sub === "submission" || sub === "takedown" || sub === "clinch" || sub === "ground") delay = 1500;
+        else if (sub === "strike" || sub === "exchange" || sub === "combo" || sub === "counter") delay = 1200;
+        else if (sub === "movement" || sub === "feint") delay = 600;
+        else delay = 800;
+      } else if (ev.type === "round_start" || ev.type === "round_end") delay = 1500;
+      else if (ev.type === "round_summary") delay = 3000;
+      else if (ev.type === "between_round") delay = 2000;
+      else if (ev.type === "knockout" || ev.type === "submission" || ev.type === "decision") delay = 3000;
+      else if (ev.type === "pre_fight" || ev.type === "walkout") delay = 1500;
+      else if (ev.type === "carryover") delay = 1500;
+      else if (ev.type === "score_update") delay = 600;
+      await sleep(delay / fightSpeed);
     }
   }
 
