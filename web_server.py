@@ -51,7 +51,10 @@ gs = {"initialized": False}
 _gs_lock = Lock()
 
 _session_cache = Cache(os.path.join(APP_DIR, ".session_cache"), size_limit=2**30, cull_limit=0)
-_session_cache.clear()  # Clear stale session cache on startup; world state persists via SQLite
+try:
+    _session_cache.clear()
+except Exception:
+    pass  # Best-effort clear
 _fight_streams = {}
 _fight_streams_lock = Lock()
 
@@ -75,33 +78,39 @@ def ensure_initialized():
             if existing:
                 promotions, all_fighters, world_sim, world_news = existing
                 print(f"Loaded existing world: {len(all_fighters)} fighters, {len(promotions)} promotions")
+                with _gs_lock:
+                    gs["promotions"] = promotions
+                    gs["all_fighters"] = all_fighters
+                    gs["world_sim"] = world_sim or WorldSimulator(promotions, gs.get("all_fighters"))
+                    gs["world_news"] = world_news or []
+                    gs["initialized"] = True
             else:
                 print("Generating new game world...")
                 t0 = time.time()
                 weight_classes = [wc["name"] for wc in utils.WEIGHT_CLASSES]
                 promotions = create_promotions(weight_classes)
+                # Set initialized early so server responds while fighters generate
+                with _gs_lock:
+                    gs["promotions"] = promotions
+                    gs["initialized"] = True
+                print(f"Promotions created in {time.time()-t0:.1f}s — server ready, generating fighters...")
                 all_fighters = generate_fighter_pool(promotions, 2000)
                 world_news = []
                 save_world_state(promotions, all_fighters)
-                print(f"World generated in {time.time()-t0:.1f}s ({len(all_fighters)} fighters)")
-                world_sim = WorldSimulator(promotions, all_fighters)
-            with _gs_lock:
-                gs["promotions"] = promotions
-                gs["all_fighters"] = all_fighters
-                gs["world_sim"] = world_sim or WorldSimulator(promotions, gs.get("all_fighters"))
-                gs["world_news"] = world_news or []
-                gs["initialized"] = True
+                print(f"World fully generated in {time.time()-t0:.1f}s ({len(all_fighters)} fighters)")
+                with _gs_lock:
+                    gs["all_fighters"] = all_fighters
+                    gs["world_sim"] = WorldSimulator(promotions, all_fighters)
+                    gs["world_news"] = world_news or []
+                    gs["fighters_ready"] = True
             print("Game world ready!")
+
         except Exception as e:
             print(f"INIT FAILED: {e}")
             import traceback
             traceback.print_exc()
-            print("Server will start without full world — some features may be limited.")
+            print("Server starting with minimal world — some features may be limited.")
             with _gs_lock:
-                gs["promotions"] = gs.get("promotions", [])
-                gs["all_fighters"] = gs.get("all_fighters", [])
-                gs["world_sim"] = gs.get("world_sim", None)
-                gs["world_news"] = gs.get("world_news", [])
                 gs["initialized"] = True
 
 def get_promotions_by_tier(tier_name=None):
@@ -910,7 +919,8 @@ class Handler(BaseHTTPRequestHandler):
 
             elif path == "/api/init":
                 initialized = gs.get("initialized", False)
-                if not initialized:
+                if not initialized and not gs.get("_init_started", False):
+                    _gs_set("_init_started", True)
                     Thread(target=ensure_initialized, daemon=True).start()
                 self.json_resp({"ready": True, "initialized": initialized})
 
@@ -1154,6 +1164,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_resp({
                     "status": "ok",
                     "initialized": gs.get("initialized", False),
+                    "fighters_ready": gs.get("fighters_ready", False) or gs.get("initialized", False),
                     "uptime": time.time() - gs.get("start_time", time.time()),
                     "sessions": len(gs.get("sessions", {})),
                 })
