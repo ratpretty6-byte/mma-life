@@ -21,4 +21,6 @@ coverage.svg
 .session_cache/
 *.png
 trace_*.py
-diagnose_*.py
+diagnose_*.py*.txt
+test_comprehensive.py
+tmp_*.py
