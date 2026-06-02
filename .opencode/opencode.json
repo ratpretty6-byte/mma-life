@@ -68,6 +68,11 @@
       "mode": "subagent",
       "model": "opencode-go/deepseek-v4-flash",
       "description": "Traces the full player journey through the game, finds broken flows, missing feedback, stale state, and UX dead ends"
+    },
+    "game-tester": {
+      "mode": "subagent",
+      "model": "opencode-go/kimi-k2.6",
+      "description": "Full gameplay testing: plays through complete careers (10+ fights), tests all subsystems, finds bugs and balance issues"
     }
   },
   "command": {
@@ -82,6 +87,10 @@
     "test-all": {
       "description": "Run the full testing suite: reviewer + unittest + fight-engine-tuner + frontend-debugger + e2e-tester + save-validator + performance-profiler",
       "template": "Run the complete testing infrastructure. 1) reviewer on recent git diff for code quality. 2) python3 -m unittest discover -s tests -v. 3) fight-engine-tuner for 500 sim balance check. 4) Start server, run frontend-debugger for UI smoke test. 5) Run e2e-tester for full fight week flow. 6) Run save-validator on database. 7) Run performance-profiler baseline. Produce a comprehensive report."
+    },
+    "gametest": {
+      "description": "Run the game-tester agent for comprehensive gameplay testing (careers, balance, edge cases)",
+      "template": "Start the web server, then run the game-tester agent to play through 5+ full fight careers, testing all subsystems (training, finance, promotions, titles, injuries, retirement). Report every bug and balance issue found."
     }
   },
   "mcp": {

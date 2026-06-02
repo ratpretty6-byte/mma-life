@@ -12,24 +12,7 @@ You are a playtester for the MMA Life Simulator. Your job is to verify game bala
 
 ## How to Test
 
-### Method A: API Bulk Simulation
-1. Start the server:
-   ```
-   python3 /workspace/mma-life/web_server.py &>/tmp/mma_server.log &
-   sleep 2
-   ```
-
-2. Create a test session:
-   ```
-   SID=$(curl -s 'http://localhost:8080/api/start' | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('sid',''))")
-   ```
-
-3. Run bulk simulations:
-   ```
-   curl -s 'http://localhost:8080/api/bulk_simulate?count=200&seed=42'
-   ```
-
-### Method B: Direct Python (faster, no server needed)
+### Method A: Direct Python (fastest, no server needed)
 ```python
 import os, sys, random, numpy as np
 sys.path.insert(0, '/workspace/mma-life')
@@ -45,7 +28,12 @@ def run_bulk(n=200, seed=42):
     for i in range(n):
         f1 = Fighter(f"A_{i}", 28, 170, "mma", "balanced")
         f2 = Fighter(f"B_{i}", 28, 170, "mma", "balanced")
+        for f in [f1, f2]:
+            for attr in f.PHYSICAL_ATTRS + f.MENTAL_ATTRS:
+                f.attributes[attr] = 70
         fight = Fight(f1, f2, rounds=3)
+        fight.strategy1.set_pre_fight_strategy("balanced")
+        fight.strategy2.set_pre_fight_strategy("aggressive_striking")
         for event in fight.simulate_fight_gen():
             if event["type"] == "complete":
                 break
@@ -55,50 +43,39 @@ def run_bulk(n=200, seed=42):
         print(f"{k}: {results[k]/total*100:.1f}%")
 ```
 
-### Method C: Fight Week Flow (E2E via API)
-```bash
-# Create fighter
-curl -s -X POST -d "name=Tester&sid=$SID" 'http://localhost:8080/api/create_fighter'
-
-# Book fight
-OPP=$(curl -s "http://localhost:8080/api/state?sid=$SID" | python3 -c "import json,sys; print(json.load(sys.stdin)['opponents'][0]['name'])")
-curl -s -X POST -d "opponent=$OPP&sid=$SID" 'http://localhost:8080/api/book_fight'
-
-# Advance through fight week events
-for event in press_conference open_workout weigh_in faceoff rest_day; do
-  curl -s -X POST -d "sid=$SID" 'http://localhost:8080/api/advance_day'
-  curl -s -X POST -d "sid=$SID&choice=standard" "http://localhost:8080/api/$event" 2>/dev/null
-done
-
-# Start and complete fight
-curl -s -X POST -d "sid=$SID" 'http://localhost:8080/api/start_fight'
-curl -s -X POST -d "sid=$SID&strategy=balanced" 'http://localhost:8080/api/fight_action'
-curl -s -X POST -d "sid=$SID&strategy=balanced" 'http://localhost:8080/api/fight_action'
-curl -s -X POST -d "sid=$SID&strategy=balanced" 'http://localhost:8080/api/fight_action'
-curl -s -X POST -d "sid=$SID" 'http://localhost:8080/api/complete_fight'
-```
-
-4. Analyze results:
-   - Check KO rate (should be ~30-40% of finishes)
-   - Check submission rate (should be ~15-25% of finishes)
-   - Check decision rate (~30-50%)
-   - Check round 1 finish rare (currently hardcoded to prevent)
-   - Verify no crashes or infinite loops
-   - **Fight week flow**: verify all events complete without error
-   - **Training**: verify `/api/start_training` can be called and returns drills
-
-5. Stop the server when done:
+### Method B: API Bulk Simulation (server needed)
+1. Start the server:
    ```
-   kill %1 2>/dev/null; pkill -f web_server.py 2>/dev/null; true
+   python3 /workspace/mma-life/web_server.py &>/tmp/mma_server.log &
+   sleep 5
    ```
+2. Create a test session, then run simulations.
 
-## Testing Checklist
-- [ ] Run 200+ fights with seed (via API or direct Python)
-- [ ] Check KO/SUB/DEC distribution within expected ranges
-- [ ] Verify no round goes beyond round 5
-- [ ] Check that stamina varies across rounds
-- [ ] Verify submissions happen in appropriate positions
-- [ ] **Fight week e2e**: press conference → open workout → weigh-in → faceoff → rest day → fight
-- [ ] **Weight cut**: test safe/standard/aggressive intensity → verify effects
-- [ ] **Training**: call start_training → verify drills available → complete session
-- [ ] **Regression**: compare KO rates before and after fight.py changes
+## What to Check
+
+### Balance Targets (from combat.json balance_targets_3r_even)
+- KO/TKO: **31.3%** (acceptable range: 25-38%)
+- Submission: **18.0%** (acceptable range: 12-24%)
+- Decision: **49.4%** (acceptable range: 40-58%)
+
+### Archetype Matchups
+Test specific archetype vs archetype to find broken matchups:
+- Balanced vs BJJ specialist (should BJJ win more on ground?)
+- Wrestler vs Striker (should wrestler control range?)
+- Boxer vs Kickboxer (should kickboxer have range advantage?)
+
+### Known Balance Issues to Verify
+- **Fighter.py: __hash__** uses `getattr` fallback — verify deepcopy works in all contexts
+- **fight.py:1891** "legs" target unreachable (uses lead_leg/rear_leg) — verify leg kicks actually land
+- **fight.py:993-997** always-zero takedown tracking — verify takedowns are counted
+- **career.py:163-166** season awards date window can be skipped — verify awards fire
+- **promotion.py** title shots for 0-0 fighters — verify debut fighters aren't offered title fights
+
+### Crash Tests
+- Fight with identical fighters (same name, same stats)
+- Fight with minimum/maximum attribute values (all 15 or all 95)
+- Fight with different round counts (1, 3, 5, 7 round fights)
+- Fight where one fighter is significantly older (45 vs 18)
+
+## Reporting
+For each issue found, include: bug title, reproduction code, expected vs actual, severity.
