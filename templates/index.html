@@ -98,7 +98,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-base
 .desktop-tabs { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 10px; }
 .tab { padding: 8px 14px; background: var(--bg-elevated); border-radius: 6px 6px 0 0; cursor: pointer; font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); border: 1px solid var(--border-subtle); border-bottom: none; -webkit-tap-highlight-color: transparent; user-select: none; transition: color var(--transition-fast), background var(--transition-fast); }
 .tab:hover { color: var(--text-primary); background: var(--bg-hover); }
-.tab.active { background: var(--bg-surface); color: var(--accent); border-color: var(--accent); }
+.tab.active { background: var(--bg-surface); color: var(--accent); border-color: var(--accent); border-bottom: 2px solid var(--accent); }
 
 /* Bottom tabs */
 .bottom-tabs { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface-elevated); border-top: 2px solid var(--accent); z-index: 200; padding: 4px 0 env(safe-area-inset-bottom, 4px); }
@@ -576,9 +576,9 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
         <div class="card-title">&#x2696; Weight Management</div>
         <div id="weightInfo" style="font-size:var(--text-sm);color:var(--text-muted)"></div>
         <div class="flex-row" id="weightCutButtons" style="gap:4px;margin-top:4px">
-          <button class="btn btn-ghost btn-small" onclick="doWeightCut('safe')">Safe Cut</button>
-          <button class="btn btn-ghost btn-small" onclick="doWeightCut('standard')">Standard</button>
-          <button class="btn btn-ghost btn-small" onclick="doWeightCut('aggressive')">Aggressive</button>
+          <button class="btn btn-ghost btn-small" onclick="doWeightCut('safe', this)">Safe Cut</button>
+          <button class="btn btn-ghost btn-small" onclick="doWeightCut('standard', this)">Standard</button>
+          <button class="btn btn-ghost btn-small" onclick="doWeightCut('aggressive', this)">Aggressive</button>
         </div>
       </div>
 
@@ -612,9 +612,9 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
           <div class="card-title" style="font-size:12px">⚖️ Weight Cut</div>
           <div id="weightCutInfo" style="font-size:11px;color:#aaa"></div>
           <div class="flex-row" style="margin-top:4px;gap:4px">
-            <button class="btn btn-ghost btn-small" onclick="doWeightCut('safe')" style="font-size:10px">Safe Cut</button>
-            <button class="btn btn-ghost btn-small" onclick="doWeightCut('standard')" style="font-size:10px">Standard</button>
-            <button class="btn btn-ghost btn-small" onclick="doWeightCut('aggressive')" style="font-size:10px">Aggressive</button>
+            <button class="btn btn-ghost btn-small" onclick="doWeightCut('safe', this)" style="font-size:10px">Safe Cut</button>
+            <button class="btn btn-ghost btn-small" onclick="doWeightCut('standard', this)" style="font-size:10px">Standard</button>
+            <button class="btn btn-ghost btn-small" onclick="doWeightCut('aggressive', this)" style="font-size:10px">Aggressive</button>
           </div>
         </div>
         <div style="margin-top:8px">
@@ -898,11 +898,20 @@ async function signFreeAgent(tier, name) {
 }
 
 function switchTab(tab) {
+  const current = qs(".tab-content:not(.hidden)");
+  if (current) {
+    current.classList.add("screen-exit");
+    setTimeout(() => current.classList.remove("screen-exit"), 300);
+  }
   qsa(".tab-content").forEach(e => e.classList.add("hidden"));
   qsa(".tab").forEach(e => e.classList.remove("active"));
   qsa(".bottom-tab").forEach(e => e.classList.remove("active"));
   const tc = qs(`#tab-${tab}`);
-  if (tc) tc.classList.remove("hidden");
+  if (tc) {
+    tc.classList.remove("hidden");
+    tc.classList.add("screen-exit");
+    requestAnimationFrame(() => requestAnimationFrame(() => tc.classList.remove("screen-exit")));
+  }
   const tb = qs(`[data-tab="${tab}"]`);
   if (tb) tb.classList.add("active");
   const bt = qs(`.bottom-tab[data-tab="${tab}"]`);
@@ -1058,586 +1067,7 @@ async function showSaveLoadModal(mode) {
   try {
     const resp = await api("/api/list_saves?sid=" + encodeURIComponent(sid));
     if (resp && resp.saves) saves = resp.saves;
-  } catch(e) { console.warn("list_saves failed:", e); }
-  for (let i = 0; i < 3; i++) {
-    const slot = saves.find(s => s.slot_index === i);
-    const slotName = i === 0 ? "Auto-Save" : `Slot ${i}`;
-    if (slot) {
-      const timeAgo = timeSince(slot.updated_at);
-      const isFight = slot.in_fight ? ' <span style="color:#ffd700;font-size:11px">(in fight)</span>' : '';
-      html += `<div style="margin-bottom:8px;padding:10px;background:#1a1a2a;border-radius:6px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <strong style="color:#e62400;font-size:13px">${slotName}</strong>
-            <span style="font-size:12px;color:#ffd700;margin-left:6px">${slot.display_name || slot.fighter_name}</span>
-            <div style="font-size:12px;color:#ccc">${slot.fighter_name} — ${slot.record}</div>
-            <div style="font-size:11px;color:#888">${slot.promotion_name} | ${slot.game_date}${isFight}</div>
-            <div style="font-size:10px;color:#555">Saved ${timeAgo}</div>
-          </div>
-          <div style="text-align:right">
-            <button class="btn btn-primary btn-small" onclick="${mode === 'save' ? `overwriteSave(${i})` : `loadGame(${i})`}" style="min-width:60px;margin-bottom:4px">${mode === 'save' ? 'OVERWRITE' : 'LOAD'}</button>
-            <br>
-            <button class="btn btn-ghost btn-small" onclick="exportSave(${i})" style="min-width:60px;margin-bottom:4px;font-size:10px">EXPORT</button>
-            <br>
-            <button class="btn btn-danger btn-small" onclick="deleteSave(${i})" style="min-width:60px;font-size:10px">DELETE</button>
-          </div>
-        </div>
-      </div>`;
-    } else {
-      html += `<div style="margin-bottom:8px;padding:10px;background:#1a1a2a;border-radius:6px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <strong style="color:#888;font-size:13px">${slotName}</strong>
-            <div style="font-size:12px;color:#555">Empty</div>
-          </div>
-          <button class="btn btn-secondary btn-small" onclick="${mode === 'save' ? `overwriteSave(${i})` : ''}" style="min-width:80px">${mode === 'save' ? 'SAVE HERE' : 'EMPTY'}</button>
-        </div>
-      </div>`;
-    }
-  }
-  html += `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-    <button class="btn btn-ghost btn-small" onclick="showImportModal()">IMPORT</button>
-    <button class="btn btn-secondary btn-small" onclick="closeModal(null)">CLOSE</button>
-  </div>`;
-  showModal(html);
-}
-
-async function overwriteSave(slotIndex) {
-  if (state && state.fighter && state.has_fight) {
-    toast("Cannot save during an active fight", "error");
-    return;
-  }
-  const slotName = slotIndex === 0 ? "Auto-Save" : `Slot ${slotIndex}`;
-  if (!confirm(`Save current career to ${slotName}?`)) return;
-  const btn = document.querySelector("#modalContent .btn-primary, #modalContent .btn-secondary");
-  if (btn) { btn.textContent = "Saving..."; btn.disabled = true; }
-  try {
-    const resp = await api("/api/save_game", { sid, slot: slotIndex, name: state && state.fighter ? state.fighter.name : "Career" });
-    if (resp.success) {
-      toast("Game saved!", "success");
-      closeModal(null);
-    } else {
-      toast(resp.error || "Save failed", "error");
-      if (btn) { btn.textContent = "OVERWRITE"; btn.disabled = false; }
-    }
-  } catch(e) {
-    toast("Save failed: " + e.message, "error");
-    if (btn) { btn.textContent = "OVERWRITE"; btn.disabled = false; }
-  }
-}
-
-async function loadGame(slotIndex) {
-  ensureSid();
-  const btn = document.querySelector("#modalContent .btn-primary") || document.querySelector("#modalContent .btn-secondary");
-  if (btn) { btn.textContent = "Loading..."; btn.disabled = true; }
-  try {
-    const resp = await api("/api/load_game", { sid, slot: slotIndex });
-    if (resp.success) {
-      state = resp.state;
-      if (state && state.strategies) STRATS = state.strategies;
-      closeModal(null);
-      showGameScreen();
-      updateAllUI();
-      toast("Game loaded!", "success");
-    } else {
-      toast(resp.error || "Load failed", "error");
-      if (btn) { btn.textContent = "LOAD"; btn.disabled = false; }
-    }
-  } catch(e) {
-    toast("Load failed: " + e.message, "error");
-    if (btn) { btn.textContent = "LOAD"; btn.disabled = false; }
-  }
-}
-
-async function deleteSave(slotIndex) {
-  if (!confirm("Delete this save? This cannot be undone.")) return;
-  try {
-    await api("/api/delete_save", { sid, slot: slotIndex });
-    toast("Save deleted", "success");
-    showSaveLoadModal(document.querySelector("#modalContent .btn-primary") ? "load" : "save");
-  } catch(e) {
-    toast("Delete failed: " + e.message, "error");
-  }
-}
-
-async function exportSave(slotIndex) {
-  try {
-    const resp = await api("/api/export_save", { sid, slot: slotIndex });
-    if (resp.success && resp.export) {
-      const blob = new Blob([JSON.stringify(resp.export, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `mma_save_slot${slotIndex}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast("Exported!", "success");
-    } else {
-      toast("Export failed", "error");
-    }
-  } catch(e) {
-    toast("Export failed: " + e.message, "error");
-  }
-}
-
-function showImportModal() {
-  let html = '<div class="card-title" style="font-size:16px">Import Save</div>';
-  html += '<div style="font-size:12px;color:#888;margin-bottom:8px">Select a previously exported .json save file.</div>';
-  html += '<input type="file" id="importFileInput" accept=".json" style="margin-bottom:8px">';
-  html += '<div style="margin-top:8px;display:flex;gap:6px">';
-  html += '<button class="btn btn-primary btn-small" onclick="doImport()">IMPORT</button>';
-  html += '<button class="btn btn-secondary btn-small" onclick="closeModal(null)">CANCEL</button>';
-  html += '</div>';
-  showModal(html);
-}
-
-async function doImport() {
-  const input = qs("#importFileInput");
-  if (!input || !input.files || !input.files[0]) {
-    toast("Select a file first", "error");
-    return;
-  }
-  try {
-    const text = await input.files[0].text();
-    const data = JSON.parse(text);
-    ensureSid();
-    const resp = await api("/api/import_save", { sid, slot: 1, data });
-    if (resp.success) {
-      toast("Save imported to Slot 1!", "success");
-      closeModal(null);
-    } else {
-      toast(resp.error || "Import failed", "error");
-    }
-  } catch(e) {
-    toast("Import failed: " + e.message, "error");
-  }
-}
-
-function showOptionsModal() {
-  let html = '<div style="text-align:center">';
-  html += '<div style="font-size:24px;font-weight:900;color:#e62400;margin-bottom:20px">OPTIONS</div>';
-  html += '<div style="color:#888;font-size:12px;margin-bottom:20px">MMA Life Simulator v1.0</div>';
-  html += '<button class="btn btn-secondary" style="margin-bottom:8px;width:80%;max-width:250px" onclick="closeModal(null)">CLOSE</button>';
-  html += '</div>';
-  showModal(html);
-}
-
-function showSettingsModal() {
-  let html = '<div style="text-align:center">';
-  html += '<div style="font-size:24px;font-weight:900;color:#e62400;margin-bottom:20px">SETTINGS</div>';
-  if (state && state.fighter && !state.has_fight) {
-    html += `<button class="btn btn-gold" style="margin-bottom:8px;width:80%;max-width:250px" onclick="showSaveModal()">SAVE GAME</button><br>`;
-  }
-  html += `<button class="btn btn-secondary" style="margin-bottom:8px;width:80%;max-width:250px" onclick="showLoadModal()">LOAD GAME</button><br>`;
-  html += `<button class="btn btn-danger" style="width:80%;max-width:250px" onclick="returnToMenu()">MAIN MENU</button><br><br>`;
-  html += `<button class="btn btn-ghost btn-small" onclick="closeModal(null)">CLOSE</button>`;
-  html += '</div>';
-  showModal(html);
-}
-
-function returnToMenu() {
-  if (!confirm("Return to main menu? Unsaved progress will be lost.")) return;
-  closeModal(null);
-  state = null;
-  hasActiveGame = false;
-  qs("#screen-game").classList.add("hidden");
-  qs("#bottomTabs").classList.add("hidden");
-  qs("#btnSettings").classList.add("hidden");
-  qs("#btnRefresh").classList.add("hidden");
-  initMainMenu();
-}
-
-function timeSince(julianDay) {
-  if (!julianDay || typeof julianDay !== "number") return "recently";
-  // Julian day to JS date: JD - 2440587.5 = Unix days
-  const unixDays = julianDay - 2440587.5;
-  const unixMs = unixDays * 86400000;
-  const now = Date.now();
-  const diffMs = now - unixMs;
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
-function initCreateForm() {
-  const natSel = qs("#fNationality");
-  natSel.innerHTML = "";
-  const NATIONALITIES = ["American","Brazilian","Russian","Japanese","British","Canadian","French","Dutch","Australian","Polish","Korean","Mexican","Chinese","Swedish","Irish","Nigerian","New Zealander","German","Italian","Spanish","Ukrainian","Cuban","Jamaican","South African","Swiss","Belgian","Norwegian","Finnish","Danish","Icelandic"];
-  NATIONALITIES.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; natSel.appendChild(o); });
-  natSel.value = "American";
-  updateRegions();
-  natSel.addEventListener('change', updateRegions);
-  natSel.addEventListener('input', updateRegions);
-
-  // Weight class grid (Step 2)
-  const wcGrid = qs("#wcGrid");
-  const WC_DATA = [
-    {idx:0, name:"Flyweight", weight:"125 lbs"},
-    {idx:1, name:"Bantamweight", weight:"135 lbs"},
-    {idx:2, name:"Featherweight", weight:"145 lbs"},
-    {idx:3, name:"Lightweight", weight:"155 lbs"},
-    {idx:4, name:"Welterweight", weight:"170 lbs"},
-    {idx:5, name:"Middleweight", weight:"185 lbs"},
-    {idx:6, name:"Lt Heavyweight", weight:"205 lbs"},
-    {idx:7, name:"Heavyweight", weight:"265 lbs"},
-  ];
-  wcGrid.innerHTML = "";
-  WC_DATA.forEach(w => {
-    const card = document.createElement("div");
-    card.className = "wc-card" + (w.idx === 3 ? " selected" : "");
-    card.innerHTML = `<div class="wc-name">${w.name}</div><div class="wc-weight">${w.weight}</div>`;
-    card.onclick = () => {
-      wcGrid.querySelectorAll(".wc-card").forEach(c => c.classList.remove("selected"));
-      card.classList.add("selected");
-      qs("#fWeightClass").value = w.idx;
-      updateHeightReachForWC(w.idx);
-    };
-    wcGrid.appendChild(card);
-  });
-
-  // Height & Reach sliders
-  const heightSlider = qs("#fHeight");
-  const reachSlider = qs("#fReach");
-  heightSlider.addEventListener("input", () => {
-    qs("#heightValue").textContent = heightSlider.value;
-    updateHeightReachInfo();
-  });
-  reachSlider.addEventListener("input", () => {
-    qs("#reachValue").textContent = reachSlider.value;
-    updateHeightReachInfo();
-  });
-
-  function updateHeightReachForWC(wcIdx) {
-    const wcName = WC_DATA[wcIdx].name;
-    // Fetch weight class height/reach ranges from server
-    api("/api/weight_classes").then(data => {
-      if (!data || !data.weight_classes) return;
-      const wcInfo = data.weight_classes.find(w => w.name === wcName);
-      if (!wcInfo) return;
-      qs("#heightReachSection").style.display = "block";
-      heightSlider.min = wcInfo.height_min;
-      heightSlider.max = wcInfo.height_max;
-      heightSlider.value = Math.round((wcInfo.height_min + wcInfo.height_max) / 2);
-      reachSlider.min = wcInfo.reach_min;
-      reachSlider.max = wcInfo.reach_max;
-      reachSlider.value = Math.round((wcInfo.reach_min + wcInfo.reach_max) / 2);
-      qs("#heightValue").textContent = heightSlider.value;
-      qs("#reachValue").textContent = reachSlider.value;
-      updateHeightReachInfo();
-    }).catch(() => {});
-  }
-
-  function updateHeightReachInfo() {
-    const h = parseInt(heightSlider.value);
-    const r = parseInt(reachSlider.value);
-    const diff = r - h;
-    let desc = `${h}" tall, ${r}" reach`;
-    if (diff > 4) desc += " — long arms for height";
-    else if (diff < 0) desc += " — short reach for height";
-    else desc += " — proportional";
-    qs("#heightReachInfo").textContent = desc;
-  }
-
-  // Init height/reach for default weight class (Lightweight)
-  updateHeightReachForWC(3);
-
-  // Background grid (Step 3)
-  const bgGrid = qs("#bgGrid");
-  const BG_DATA = [
-    {id:"mma", short:"MMA", desc:"All-Rounder"},
-    {id:"wrestling", short:"Wrestling", desc:"Takedowns & Control"},
-    {id:"bjj", short:"BJJ", desc:"Submissions"},
-    {id:"muay_thai", short:"Muay Thai", desc:"Clinch & Strikes"},
-    {id:"boxing", short:"Boxing", desc:"Striking & Footwork"},
-    {id:"judo", short:"Judo", desc:"Throws & Clinch"},
-    {id:"taekwondo", short:"Taekwondo", desc:"Kicks & Range"},
-    {id:"karate", short:"Karate", desc:"Speed & Precision"},
-    {id:"sambo", short:"Sambo", desc:"Mixing it up"},
-    {id:"kickboxing", short:"Kickboxing", desc:"Stand-up Striker"},
-    {id:"capoeira", short:"Capoeira", desc:"Unorthodox"},
-  ];
-  bgGrid.innerHTML = "";
-  BG_DATA.forEach(b => {
-    const card = document.createElement("div");
-    card.className = "wc-card" + (b.id === "mma" ? " selected" : "");
-    card.innerHTML = `<div class="wc-name">${b.short}</div><div class="wc-weight">${b.desc}</div>`;
-    card.onclick = () => {
-      bgGrid.querySelectorAll(".wc-card").forEach(c => c.classList.remove("selected"));
-      card.classList.add("selected");
-      qs("#fBackground").value = b.id;
-    };
-    bgGrid.appendChild(card);
-  });
-
-  // Trait grid (Step 4)
-  const tGrid = qs("#traitGrid");
-  const TRAITS = [
-    {id:"heavy_hands",name:"Heavy Hands",desc:"+5 striking power"},
-    {id:"iron_chin",name:"Iron Chin",desc:"+5 durability"},
-    {id:"cardio_king",name:"Cardio King",desc:"+5 cardio"},
-    {id:"mat_wizard",name:"Mat Wizard",desc:"+5 wrestling defense"},
-    {id:"sniper",name:"Sniper",desc:"+5 accuracy"},
-    {id:"natural_athlete",name:"Natural Athlete",desc:"+3 all physical"},
-    {id:"iron_will",name:"Iron Will",desc:"+5 mental toughness"},
-    {id:"fast_hands",name:"Fast Hands",desc:"+5 hand speed"},
-  ];
-  tGrid.innerHTML = "";
-  TRAITS.forEach(t => {
-    const btn = document.createElement("div");
-    btn.className = "strategy-btn";
-    btn.innerHTML = `<strong>${t.name}</strong><br><small>${t.desc}</small>`;
-    btn.onclick = () => {
-      tGrid.querySelectorAll(".strategy-btn").forEach(b => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      btn.dataset.trait = t.id;
-    };
-    btn.dataset.trait = t.id;
-    tGrid.appendChild(btn);
-  });
-
-  // Personality grid (Step 4)
-  const pGrid = qs("#personalityGrid");
-  const PERSONALITIES = [
-    {id:"charismatic",name:"Charismatic",desc:"Natural charisma"},
-    {id:"intimidating",name:"Intimidating",desc:"Strikes fear"},
-    {id:"humble",name:"Humble",desc:"Respected"},
-    {id:"cocky",name:"Cocky",desc:"Loves spotlight"},
-    {id:"quiet",name:"Quiet",desc:"Lets fighting talk"},
-    {id:"savage",name:"Savage",desc:"No mercy"},
-  ];
-  pGrid.innerHTML = "";
-  PERSONALITIES.forEach(p => {
-    const btn = document.createElement("div");
-    btn.className = "strategy-btn";
-    btn.innerHTML = `<strong>${p.name}</strong><br><small>${p.desc}</small>`;
-    btn.dataset.pers = p.id;
-    btn.onclick = () => {
-      pGrid.querySelectorAll(".strategy-btn").forEach(b => b.classList.remove("selected"));
-      btn.classList.add("selected");
-    };
-    pGrid.appendChild(btn);
-  });
-  pGrid.firstChild && (pGrid.firstChild.className += " selected");
-
-  const firsts = ["James","John","Mike","Chris","Dave","Alex","Max","Ray","Jake","Cole","Kai","Zion","Rex","Ash","Blake","Drew","Kurt","Ross","Sean","Wade","Marcus","Adrian","Erik","Andre","Tyler"];
-  const lasts = ["Smith","Jones","Miller","Garcia","Lee","Kim","Brown","Davis","Wilson","Taylor","Anderson","Thomas","Jackson","White","Harris","Martin","Thompson","Moore","Allen","King","Walker","Wright","Hill","Green","Adams"];
-  const nicks = ["The Viper","Iron","Destroyer","Phoenix","Nightmare","Predator","Beast","Dragon","Renegade","Warrior","Samurai","Gladiator","Hurricane","Avalanche","Titan","Fury","Hammer","Blitz","Storm","Shadow"];
-  qs("#fName").value = firsts[Math.floor(Math.random()*firsts.length)] + ' "' + nicks[Math.floor(Math.random()*nicks.length)] + '" ' + lasts[Math.floor(Math.random()*lasts.length)];
-
-  // Initialize wizard
-  initWizard();
-}
-
-function updateRegions() {
-  const nat = qs("#fNationality").value;
-  const REGIONS = {
-    "American":["California","Texas","New York","Florida","Ohio","Colorado","Nevada","Arizona"],
-    "Brazilian":["Rio de Janeiro","Sao Paulo","Bahia","Minas Gerais","Ceara"],
-    "Russian":["Moscow","St. Petersburg","Dagestan","Chechnya","Siberia"],
-    "Japanese":["Tokyo","Osaka","Yokohama","Nagoya","Okinawa"],
-    "British":["London","Manchester","Liverpool","Birmingham","Scotland"],
-    "Canadian":["Ontario","Quebec","British Columbia","Alberta","Nova Scotia"],
-    "French":["Paris","Lyon","Marseille","Bordeaux","Toulouse"],
-    "Dutch":["Amsterdam","Rotterdam","Utrecht","The Hague","Eindhoven"],
-    "Australian":["Sydney","Melbourne","Brisbane","Perth","Gold Coast"],
-    "Polish":["Warsaw","Krakow","Gdansk","Wroclaw","Poznan"],
-    "Korean":["Seoul","Busan","Incheon","Daegu","Ulsan"],
-    "Mexican":["Mexico City","Guadalajara","Monterrey","Tijuana","Puebla"],
-    "Chinese":["Beijing","Shanghai","Shenzhen","Guangzhou","Chengdu"],
-    "Swedish":["Stockholm","Gothenburg","Malmo","Uppsala","Linkoping"],
-    "Irish":["Dublin","Cork","Galway","Limerick","Belfast"],
-    "Nigerian":["Lagos","Abuja","Port Harcourt","Ibadan","Kano"],
-    "New Zealander":["Auckland","Wellington","Christchurch","Hamilton","Tauranga"],
-    "German":["Berlin","Munich","Hamburg","Cologne","Frankfurt"],
-    "Italian":["Rome","Milan","Naples","Turin","Florence"],
-    "Spanish":["Madrid","Barcelona","Valencia","Seville","Bilbao"],
-    "Ukrainian":["Kyiv","Kharkiv","Odessa","Dnipro","Lviv"],
-    "Cuban":["Havana","Santiago","Camaguey","Holguin","Santa Clara"],
-    "Jamaican":["Kingston","Montego Bay","Ocho Rios","Negril","Spanish Town"],
-    "South African":["Johannesburg","Cape Town","Durban","Pretoria","Port Elizabeth"],
-    "Swiss":["Zurich","Geneva","Basel","Bern","Lausanne"],
-    "Belgian":["Brussels","Antwerp","Ghent","Bruges","Liege"],
-    "Norwegian":["Oslo","Bergen","Trondheim","Stavanger","Tromso"],
-    "Finnish":["Helsinki","Espoo","Tampere","Turku","Oulu"],
-    "Danish":["Copenhagen","Aarhus","Odense","Aalborg","Esbjerg"],
-    "Icelandic":["Reykjavik","Kopavogur","Hafnarfjordur","Akureyri","Gardabaer"]
-  };
-  const rSel = qs("#fRegion");
-  rSel.innerHTML = "";
-  const regions = REGIONS[nat] || ["Capital"];
-  regions.forEach(r => { const o = document.createElement("option"); o.value = r; o.textContent = r; rSel.appendChild(o); });
-  // Auto-select first region
-  if (regions.length > 0) rSel.value = regions[0];
-}
-
-document.getElementById('startCareerBtn').addEventListener('click', async function() {
-  createFighter();
-});
-
-document.getElementById('btnNewGame').addEventListener('click', function() {
-  qs("#screen-main-menu").classList.add("hidden");
-  qs("#screen-create").classList.remove("hidden");
-  initCreateForm();
-});
-
-document.getElementById('btnLoadGame').addEventListener('click', showLoadModal);
-
-init();
-
-async function createFighter() {
-  const btn = qs("#startCareerBtn");
-  btn.textContent = "Creating...";
-  btn.disabled = true;
-  try {
-    ensureSid();
-    const name = qs("#fName").value.trim() || "";
-    const age = parseInt(qs("#fAge").value);
-    const bg = qs("#fBackground").value;
-    const wc = parseInt(qs("#fWeightClass").value);
-    const nationality = qs("#fNationality").value;
-    const region = qs("#fRegion").value;
-    const traitBtn = qs("#traitGrid .selected");
-    const trait_id = traitBtn ? traitBtn.dataset.trait : null;
-    const persBtn = qs("#personalityGrid .selected");
-    const personality_id = persBtn ? persBtn.dataset.pers || "humble" : "humble";
-    const stance = qs("#fStance").value;
-
-    const height = parseInt(qs("#fHeight").value);
-    const reach = parseInt(qs("#fReach").value);
-
-    const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id, stance, height, reach });
-    if (resp.success) {
-      state = resp.state;
-      if (state.strategies) STRATS = state.strategies;
-      if (resp.sid) {
-        sid = resp.sid;
-        localStorage.setItem("mma_sid", sid);
-      }
-      showGameScreen();
-      updateAllUI();
-      toast("Fighter created! Welcome to the pros.", "success");
-    } else {
-      toast("Error: " + (resp.error || "Unknown"), "error");
-    }
-  } catch(e) {
-    console.error("Create fighter error:", e);
-    toast("Error creating fighter: " + (e.message || "Unknown"), "error");
-  } finally {
-    btn.textContent = "START CAREER";
-    btn.disabled = false;
-  }
-}
-
-function updateAllUI() {
-  if (!state || !state.fighter) return;
-  const f = state.fighter;
-  const p = state.promotion;
-  const t = state.training;
-  const fin = state.finance;
-  const car = state.career;
-  const fb = state.fight_booking;
-  const gd = state.game_date;
-  const isFA = state.free_agent || !p;
-  qs("#freeAgentBanner").classList.toggle("hidden", !isFA);
-  qs("#advanceCard").style.display = isFA ? "none" : "";
-  qs("#headerStatus").textContent = `${f.name} | ${f.record} | #${f.rank} | ${isFA ? "Free Agent" : p.name}`;
-
-  qs("#hRecord").textContent = f.record;
-  qs("#hRank").textContent = `#${f.rank}`;
-  qs("#hPromoTag").textContent = p ? p.tier : "FA";
-  qs("#hPromoTag").style.background = p && p.tier === "World" ? "#4a4a1a" : (p && p.tier === "National" ? "#2a2a4a" : "#2a3a2a");
-  qs("#hNet").textContent = `$${(f.net_worth || 0).toLocaleString()}`;
-  qs("#hRating").textContent = f.rating;
-  const streak = f.win_streak > 0 ? `W${f.win_streak}` : (f.loss_streak > 0 ? `L${f.loss_streak}` : "0");
-  qs("#hStreak").textContent = streak;
-  qs("#hStance").textContent = f.stance ? (f.stance.charAt(0).toUpperCase() + f.stance.slice(1)) : "--";
-  qs("#hInjuries").textContent = (f.injuries&&f.injuries.length) ? f.injuries.map(i=>i.type).join(", ") : "None";
-  qs("#hGym").textContent = fin ? fin.gym : "None";
-  qs("#hDate").textContent = gd || "--";
-
-  const fightDayBtn = qs("#btnFightDay");
-  if (fb && fb.days_until <= 0) {
-    fightDayBtn.classList.remove("hidden");
-  } else {
-    fightDayBtn.classList.add("hidden");
-  }
-
-  qs("#hFatigueRow").style.display = "";
-  const ft = t ? (t.fatigue || 0) : 0;
-  const ftColor = ft > 70 ? "#ff4a4a" : (ft > 40 ? "#ffd700" : "#4aff6a");
-  qs("#hFatigue").innerHTML = ft > 0
-    ? `<span style="color:${ftColor};font-weight:600">${ft}%</span>`
-    : `<span style="color:#888">Rested</span>`;
-
-  if (fb) {
-    qs("#hNextFight").textContent = `vs ${fb.opponent.name} (${fb.days_until}d)`;
-    const fwd = fb.fight_week_day;
-    const fwHtml = fwd ? `<br><span style="color:#ffd700;font-size:10px">&#x1F4C5; Fight Week: ${escHtml(fwd)}</span>` : "";
-    if (fwHtml) qs("#hNextFight").innerHTML = qs("#hNextFight").textContent + fwHtml;
-  } else {
-    qs("#hNextFight").textContent = "Not booked";
-  }
-
-  if (t && t.schedule) {
-    qs("#todayDay").textContent = t.schedule.current_day || "Monday";
-    const drill = t.schedule.schedule ? t.schedule.schedule[t.schedule.current_day] : null;
-    if (drill && drill !== "Rest") {
-      qs("#todayPreview").textContent = "Training: " + drill;
-    } else if (t.schedule.schedule && Object.values(t.schedule.schedule).some(d => d && d !== "Rest")) {
-      qs("#todayPreview").textContent = "Rest day (fatigue recovery)";
-    } else if (t.in_camp) {
-      qs("#todayPreview").textContent = "Rest day (fatigue recovery)";
-    } else {
-      qs("#todayPreview").textContent = "Set up training in the Gym tab.";
-    }
-  } else {
-    qs("#todayPreview").textContent = "Set up training in the Gym tab.";
-  }
-
-  updateNextAction();
-  updatePromoOffer();
-  updateGymTab();
-  updateScheduleGrid();
-  updateNewsFeed();
-}
-
-async function forceRefresh() {
-  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
-  if (resp && resp.fighter) state = resp;
-  if (state && state.strategies) STRATS = state.strategies;
-  updateAllUI();
-  toast("Refreshed", "success");
-}
-
-function updateNextAction() {
-  const card = qs("#nextActionCard");
-  const f = state.fighter;
-  const t = state.training;
-  const fb = state.fight_booking;
-  let html = "";
-
-  if (fb && fb.days_until <= 0 && !state.fight_completed) {
-    html = '<div class="action-label">Next Action</div><div class="action-text">FIGHT DAY!</div><div style="margin-top:6px"><button class="btn btn-gold" onclick="switchTab(\'fight\')" style="font-size:14px">GO TO FIGHT</button></div>';
-  } else if (fb && fb.days_until > 0) {
-    html = `<div class="action-label">Next Action</div><div class="action-text">Fight in ${fb.days_until} days — keep training!</div>`;
-  } else if (t && t.in_camp) {
-    html = '<div class="action-label">Next Action</div><div class="action-text">Training camp active — advance days to train</div>';
-  } else if (t && t.in_training) {
-    html = '<div class="action-label">Next Action</div><div class="action-text">Base training active — advance days to train</div>';
-  } else {
-    html = '<div class="action-label">Next Action</div><div class="action-text">Start training, join a camp, or book a fight</div>';
-  }
-
-  if (html) {
-    card.innerHTML = html;
-    card.classList.remove("hidden");
-  } else {
-    card.classList.add("hidden");
-  }
+  } catch(e) { console.warn("news API failed:", e); }
 }
 
 let newsCache = [];
@@ -1668,7 +1098,7 @@ async function advanceDay() {
       try {
         const nr = await api("/api/news");
         if (nr && nr.news) newsCache = nr.news;
-      } catch(e) { console.warn("list_saves failed:", e); }
+      } catch(e) { console.warn("news API failed:", e); }
       updateAllUI();
       const r = resp.day_result;
       const div = qs("#dayResult");
@@ -1719,7 +1149,7 @@ async function advanceSkip(days) {
       try {
         const nr = await api("/api/news");
         if (nr && nr.news) newsCache = nr.news;
-      } catch(e) { console.warn("list_saves failed:", e); }
+      } catch(e) { console.warn("news API failed:", e); }
       updateAllUI();
       if (resp.fight_today) {
         const div = qs("#dayResult");
@@ -2007,8 +1437,10 @@ async function endCamp() {
   if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Camp ended — base training continues", "success"); }
 }
 
-async function doWeightCut(intensity) {
+async function doWeightCut(intensity, btn) {
+  if (btn) setLoading(btn, true);
   const resp = await api("/api/cut_weight", { sid, intensity });
+  if (btn) setLoading(btn, false);
   if (resp.success) {
     state = resp.state;
     if (state && state.strategies) STRATS = state.strategies;
@@ -2038,26 +1470,32 @@ async function showStartTraining() {
   html += '<select id="trainIntSel" style="margin-bottom:6px;width:auto;display:inline-block">';
   html += '<option value="light">Light</option><option value="moderate" selected>Moderate</option><option value="intense">Intense</option>';
   html += '</select> ';
-  html += `<button class="btn btn-primary btn-small" onclick="startTraining()">Start Training</button>`;
+  html += `<button class="btn btn-primary btn-small" onclick="startTraining(this)">Start Training</button>`;
   showModal(html);
 }
 
-async function startTraining() {
+async function startTraining(btn) {
+  if (btn) setLoading(btn, true);
   const drillIdx = parseInt(qs("#trainDrillSel").value);
   const intensity = qs("#trainIntSel").value;
   const resp = await api("/api/start_training", { sid, drill_idx: drillIdx, intensity });
+  if (btn) setLoading(btn, false);
   closeModal(null);
   if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Training started!", "success"); }
   else toast(resp.error || "Failed", "error");
 }
 
-async function stopTraining() {
+async function stopTraining(btn) {
+  if (btn) setLoading(btn, true);
   const resp = await api("/api/stop_training", { sid });
+  if (btn) setLoading(btn, false);
   if (resp.success) { state = resp.state; if (state && state.strategies) STRATS = state.strategies; updateAllUI(); toast("Training stopped", "success"); }
 }
 
-async function doPressConf(choice) {
+async function doPressConf(choice, btn) {
+  if (btn) setLoading(btn, true);
   const resp = await api("/api/press_conference", { sid, choice });
+  if (btn) setLoading(btn, false);
   if (resp.success) {
     state = resp.state;
     if (state && state.strategies) STRATS = state.strategies;
@@ -2069,8 +1507,10 @@ async function doPressConf(choice) {
   }
 }
 
-async function doOpenWorkout(choice) {
+async function doOpenWorkout(choice, btn) {
+  if (btn) setLoading(btn, true);
   const resp = await api("/api/open_workout", { sid, choice });
+  if (btn) setLoading(btn, false);
   if (resp.success) {
     state = resp.state;
     if (state && state.strategies) STRATS = state.strategies;
@@ -2082,8 +1522,10 @@ async function doOpenWorkout(choice) {
   }
 }
 
-async function doFaceoff(choice) {
+async function doFaceoff(choice, btn) {
+  if (btn) setLoading(btn, true);
   const resp = await api("/api/faceoff", { sid, choice });
+  if (btn) setLoading(btn, false);
   if (resp.success) {
     state = resp.state;
     if (state && state.strategies) STRATS = state.strategies;
@@ -2095,8 +1537,10 @@ async function doFaceoff(choice) {
   }
 }
 
-async function doRestDay(choice) {
+async function doRestDay(choice, btn) {
+  if (btn) setLoading(btn, true);
   const resp = await api("/api/rest_day", { sid, choice });
+  if (btn) setLoading(btn, false);
   if (resp.success) {
     state = resp.state;
     if (state && state.strategies) STRATS = state.strategies;
@@ -2150,9 +1594,9 @@ async function refreshFightTab() {
           '<div class="card-title" style="font-size:12px">🎤 Press Conference</div>' +
           '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Choose your approach:</div>' +
           '<div class="flex-row" style="gap:4px">' +
-          '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'respectful\')">Respectful</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'trash_talk\')">Trash Talk</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'staredown\')">Staredown</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'respectful\', this)">Respectful</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'trash_talk\', this)">Trash Talk</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'staredown\', this)">Staredown</button>' +
           '</div></div>';
       } else if (fwp.press_conference) {
         const r = fwp.press_conference;
@@ -2165,9 +1609,9 @@ async function refreshFightTab() {
           '<div class="card-title" style="font-size:12px">🏋️ Open Workout</div>' +
           '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Showcase your skills:</div>' +
           '<div class="flex-row" style="gap:4px">' +
-          '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'technical\')">Technical</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'power\')">Power</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'showboat\')">Showboat</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'technical\', this)">Technical</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'power\', this)">Power</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'showboat\', this)">Showboat</button>' +
           '</div></div>';
       } else if (fwp.open_workout) {
         const r = fwp.open_workout;
@@ -2183,9 +1627,9 @@ async function refreshFightTab() {
           '<div class="card-title" style="font-size:12px">⚖️ Weigh-In</div>' +
           '<div style="font-size:11px;color:#aaa">Current: ' + w + ' lbs | Target: ' + maxWeight + ' lbs | Cut: ' + Math.max(0, w - maxWeight) + ' lbs</div>' +
           '<div class="flex-row" style="margin-top:4px;gap:4px">' +
-          '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'safe\')" style="font-size:10px">Safe Cut</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'standard\')" style="font-size:10px">Standard</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'aggressive\')" style="font-size:10px">Aggressive</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'safe\', this)" style="font-size:10px">Safe Cut</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'standard\', this)" style="font-size:10px">Standard</button>' +
+          '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'aggressive\', this)" style="font-size:10px">Aggressive</button>' +
           '</div></div>';
       } else if (fwp.weigh_in) {
         const r = fwp.weigh_in;
@@ -2199,9 +1643,9 @@ async function refreshFightTab() {
           '<div class="card-title" style="font-size:12px">👀 Faceoff</div>' +
           '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Choose your demeanor:</div>' +
           '<div class="flex-row" style="gap:4px">' +
-          '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'intense\')">Intense Stare</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'calm\')">Calm & Collected</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'dismissive\')">Dismissive</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'intense\', this)">Intense Stare</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'calm\', this)">Calm &amp; Collected</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'dismissive\', this)">Dismissive</button>' +
           '</div></div>';
       } else if (fwp.faceoff) {
         const r = fwp.faceoff;
@@ -2214,10 +1658,10 @@ async function refreshFightTab() {
           '<div class="card-title" style="font-size:12px">🧘 Rest Day</div>' +
           '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Choose recovery:</div>' +
           '<div class="flex-row" style="gap:4px">' +
-          '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'ice_bath\')">Ice Bath</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'massage\')">Massage</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'meditation\')">Meditation</button>' +
-          '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'light_spar\')">Light Spar</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'ice_bath\', this)">Ice Bath</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'massage\', this)">Massage</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'meditation\', this)">Meditation</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'light_spar\', this)">Light Spar</button>' +
           '</div></div>';
       } else if (fwp.rest_day) {
         const r = fwp.rest_day;
@@ -2362,17 +1806,22 @@ function showOfferModal(o, relationship) {
   // Accept/Decline buttons
   html += `<div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
     <button class="btn btn-primary" id="btnAcceptOfferModal">Accept Offer</button>
-    <button class="btn btn-ghost" onclick="closeModal(null);declineOffer()">Decline</button>
+    <button class="btn btn-ghost" onclick="closeModal(null);declineOffer(this)">Decline</button>
   </div>`;
   showModal(html);
   qs("#btnAcceptOfferModal").onclick = async () => {
+    const btn = qs("#btnAcceptOfferModal");
+    setLoading(btn, true);
     closeModal(null);
     await acceptOffer(opp.name);
+    setLoading(btn, false);
   };
 }
 
-async function acceptOffer(oppName) {
+async function acceptOffer(oppName, btn) {
+  if (btn) setLoading(btn, true);
   const resp = await api("/api/accept_offer", { sid, opponent: oppName, weeks: 8 });
+  if (btn) setLoading(btn, false);
   if (resp.success) {
     state = resp.state;
     if (state && state.strategies) STRATS = state.strategies;
@@ -2384,8 +1833,10 @@ async function acceptOffer(oppName) {
   }
 }
 
-async function declineOffer() {
+async function declineOffer(btn) {
+  if (btn) setLoading(btn, true);
   const resp = await api("/api/decline_offer", { sid });
+  if (btn) setLoading(btn, false);
   if (resp.success) {
     toast("Offer declined", "info");
     loadFightOffers();
@@ -2552,7 +2003,7 @@ async function loadFightOfferDetails(o, baseHtml) {
         </div>`;
       }
     }
-  } catch(e) { console.warn("list_saves failed:", e); }
+  } catch(e) { console.warn("fight_offer API failed:", e); }
 
   html += `</div>
   <div style="margin-top:12px">
@@ -2569,8 +2020,11 @@ async function loadFightOfferDetails(o, baseHtml) {
     <button class="btn btn-secondary" onclick="closeModal(null)" style="margin-left:6px">Cancel</button></div>`;
   showModal(html);
   qs("#btnBookFightModal").onclick = async () => {
+    const btn = qs("#btnBookFightModal");
+    setLoading(btn, true);
     closeModal(null);
     await bookFight(o.name);
+    setLoading(btn, false);
   };
 }
 
@@ -2607,10 +2061,12 @@ async function scoutOpponent() {
   }
 }
 
-async function bookFight(opponentName) {
+async function bookFight(opponentName, btn) {
+  if (btn) setLoading(btn, true);
   const weeksSel = qs("#bookWeeks");
   const weeks = weeksSel ? parseInt(weeksSel.value) : 8;
   const resp = await api("/api/book_fight", { sid, opponent: opponentName, weeks });
+  if (btn) setLoading(btn, false);
   if (resp.success) {
     state = resp.state;
     if (state && state.strategies) STRATS = state.strategies;
