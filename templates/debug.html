@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game State Inspector</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f0f1a; color: #ccc; font-family: monospace; padding: 20px; }
+  h1 { color: #ffa54a; margin-bottom: 16px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  input, select, button {
+    background: #1a1a2a; color: #ccc; border: 1px solid #333; padding: 6px 12px; border-radius: 4px;
+  }
+  button { background: #ffa54a; color: #000; cursor: pointer; font-weight: bold; }
+  button:hover { background: #ffb96a; }
+  .tree { background: #1a1a2a; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+  .key { color: #4a9eff; }
+  .string { color: #4aff6a; }
+  .number { color: #ffa54a; }
+  .bool { color: #e62400; }
+  .null { color: #888; }
+  .collapse { cursor: pointer; user-select: none; }
+  .collapse::before { content: "▶ "; color: #888; }
+  .collapsed::before { content: "▼ "; color: #888; }
+  .hidden { display: none; }
+  .highlight { background: #2a2a3a; }
+  .stats { color: #888; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<h1>Game State Inspector</h1>
+<div class="toolbar">
+  <input type="text" id="sid" placeholder="Session ID (leave empty for auto)" style="width:300px">
+  <input type="text" id="filter" placeholder="Filter (key name or path)" style="width:300px">
+  <button id="refresh">Refresh</button>
+  <button id="collapse-all">Collapse All</button>
+  <button id="expand-all">Expand All</button>
+</div>
+<div class="stats" id="stats"></div>
+<div class="tree" id="tree"></div>
+
+<script>
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const sidInput = document.getElementById("sid");
+const filterInput = document.getElementById("filter");
+const treeEl = document.getElementById("tree");
+const statsEl = document.getElementById("stats");
+
+async function fetchState() {
+  let sid = sidInput.value.trim();
+  if (!sid) sid = "debug";
+  try {
+    const resp = await fetch("/api/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ sid }),
+    });
+    return await resp.json();
+  } catch {
+    return { error: "Failed to fetch state. Is the server running?" };
+  }
+}
+
+function renderValue(val, path = "", depth = 0) {
+  const filter = filterInput.value.toLowerCase().trim();
+  if (val === null || val === undefined) return `<span class="null">null</span>`;
+  if (typeof val === "boolean") return `<span class="bool">${val}</span>`;
+  if (typeof val === "number") return `<span class="number">${val}</span>`;
+  if (typeof val === "string") return `<span class="string">"${esc(val)}"</span>`;
+  if (Array.isArray(val)) {
+    if (val.length === 0) return `<span class="null">[]</span>`;
+    let id = `c${path.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    let html = `<span class="collapse" onclick="toggle('${id}')"></span>[${val.length}]<div class="hidden" id="${id}">`;
+    val.forEach((v, i) => {
+      let childPath = `${path}[${i}]`;
+      let shouldShow = !filter || childPath.toLowerCase().includes(filter) || JSON.stringify(v).toLowerCase().includes(filter);
+      if (shouldShow) {
+        html += `<div style="padding-left:20px"><span class="key">${i}</span>: ${renderValue(v, childPath, depth + 1)}</div>`;
+      }
+    });
+    html += `</div>`;
+    return html;
+  }
+  if (typeof val === "object") {
+    let keys = Object.keys(val);
+    if (keys.length === 0) return `<span class="null">{}</span>`;
+    let id = `c${path.replace(/[^a-zA-Z0-9]/g, "_") || "root"}`;
+    let html = `<span class="collapse" onclick="toggle('${id}')"></span>{${keys.length}}<div class="hidden" id="${id}">`;
+    keys.forEach(k => {
+      let childPath = path ? `${path}.${k}` : k;
+      let shouldShow = !filter || childPath.toLowerCase().includes(filter) || JSON.stringify(val[k]).toLowerCase().includes(filter);
+      if (shouldShow) {
+        html += `<div style="padding-left:20px"><span class="key">${esc(k)}</span>: ${renderValue(val[k], childPath, depth + 1)}</div>`;
+      }
+    });
+    html += `</div>`;
+    return html;
+  }
+  return esc(String(val));
+}
+
+function toggle(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle("hidden");
+  const span = el.previousSibling;
+  if (span && span.classList) span.classList.toggle("collapsed");
+}
+
+window.toggle = toggle;
+
+function collapseAll() {
+  document.querySelectorAll(".tree .hidden").forEach(el => el.classList.add("hidden"));
+  document.querySelectorAll(".tree .collapse").forEach(el => el.classList.remove("collapsed"));
+}
+
+function expandAll() {
+  document.querySelectorAll(".tree .hidden").forEach(el => el.classList.remove("hidden"));
+  document.querySelectorAll(".tree .collapse").forEach(el => el.classList.add("collapsed"));
+}
+
+async function refresh() {
+  const state = await fetchState();
+  if (state.error) {
+    treeEl.innerHTML = `<span style="color:#e62400">${esc(state.error)}</span>`;
+    statsEl.textContent = "";
+    return;
+  }
+  const json = JSON.stringify(state);
+  statsEl.textContent = `Size: ${(json.length / 1024).toFixed(1)} KB | Keys: ${Object.keys(state).length}`;
+  treeEl.innerHTML = renderValue(state, "");
+}
+
+document.getElementById("refresh").addEventListener("click", refresh);
+document.getElementById("collapse-all").addEventListener("click", collapseAll);
+document.getElementById("expand-all").addEventListener("click", expandAll);
+filterInput.addEventListener("input", refresh);
+
+refresh();
+</script>
+</body>
+</html>

@@ -32,7 +32,7 @@
     "e2e-tester": {
       "mode": "subagent",
       "model": "opencode-go/kimi-k2.6",
-      "description": "Runs end-to-end API flows: create fighter → book → fight week → full multi-round fight → results"
+      "description": "Runs end-to-end API flows: create fighter -> book -> fight week -> full multi-round fight -> results"
     },
     "fight-engine-tuner": {
       "mode": "subagent",
@@ -48,6 +48,16 @@
       "mode": "subagent",
       "model": "opencode-go/deepseek-v4-flash",
       "description": "Profiles CPU time and memory of fight sim, day advance, and world sim. Detects slow paths and memory leaks"
+    },
+    "config-designer": {
+      "mode": "subagent",
+      "model": "opencode-go/kimi-k2.6",
+      "description": "Analyzes combat.json balance vs real UFC target rates, suggests parameter changes with predicted outcome shifts"
+    },
+    "seed-fuzzer": {
+      "mode": "subagent",
+      "model": "opencode-go/kimi-k2.6",
+      "description": "Tests game determinism: same seed x3 -> identical outcomes. Tests N seeds to validate distribution expectations"
     }
   },
   "command": {
@@ -80,6 +90,26 @@
       "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
       "enabled": true,
       "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
+    },
+    "memory": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "enabled": true
+    },
+    "filesystem": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/workspace/mma-life"],
+      "enabled": true
+    },
+    "game-api": {
+      "type": "local",
+      "command": ["node", ".opencode/mcp/game-api.js"],
+      "enabled": true
     }
   }
 }

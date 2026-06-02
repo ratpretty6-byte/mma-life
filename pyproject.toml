@@ -38,3 +38,17 @@ exclude_lines = [
     "def __repr__",
     "raise NotImplementedError",
 ]
+
+[tool.bandit]
+exclude_dirs = ["/.opencode/", "/templates/", "/tests/", "/node_modules/", "/.venv/", "/config/"]
+
+[tool.vulture]
+exclude = [".opencode", "node_modules", "templates", "config"]
+min_confidence = 80
+
+[tool.pytest-randomly]
+reset_seed = true
+
+[tool.hypothesis]
+max_examples = 50
+derandomize = false

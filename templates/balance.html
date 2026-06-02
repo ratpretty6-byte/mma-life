@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Combat Balance Tuner</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f0f1a; color: #ccc; font-family: system-ui, sans-serif; padding: 20px; }
+  h1 { color: #ffa54a; margin-bottom: 24px; }
+  h2 { color: #4a9eff; margin: 20px 0 12px; font-size: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .card { background: #1a1a2a; padding: 16px; border-radius: 6px; }
+  .card label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+  .card input[type="range"] { width: 100%; margin: 4px 0; }
+  .card .value { color: #ffa54a; font-weight: bold; font-size: 14px; }
+  .card .default { color: #666; font-size: 11px; }
+  .targets { display: flex; gap: 24px; margin: 16px 0; }
+  .target { background: #1a1a2a; padding: 12px 20px; border-radius: 6px; text-align: center; }
+  .target .label { font-size: 12px; color: #888; }
+  .target .value { font-size: 24px; font-weight: bold; }
+  .target.ok { border-left: 3px solid #4aff6a; }
+  .target.warn { border-left: 3px solid #ffa54a; }
+  .target.bad { border-left: 3px solid #e62400; }
+  .actions { display: flex; gap: 8px; margin: 16px 0; }
+  button { background: #ffa54a; color: #000; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+  button:hover { background: #ffb96a; }
+  .export { background: #333; color: #fff; font-family: monospace; padding: 16px; border-radius: 6px; white-space: pre; overflow-x: auto; max-height: 400px; }
+  .subsection { margin-top: 12px; padding-top: 12px; border-top: 1px solid #333; }
+</style>
+</head>
+<body>
+<h1>Combat Balance Tuner</h1>
+<div class="targets" id="targets"></div>
+<div class="actions">
+  <button id="reset">Reset to Defaults</button>
+  <button id="export">Export JSON</button>
+</div>
+<div class="grid" id="controls"></div>
+<div class="export" id="export-view"></div>
+
+<script>
+const DEFAULTS = {
+  "stamina_costs.jab": 1, "stamina_costs.cross": 2, "stamina_costs.hook": 3,
+  "stamina_costs.uppercut": 3, "stamina_costs.kick": 5, "stamina_costs.knee": 4,
+  "stamina_costs.elbow": 3, "stamina_costs.takedown_attempt": 6, "stamina_costs.clinch_attempt": 3,
+  "stamina_costs.submission_attempt": 4,
+  "strike_profiles.jab.base_damage": 5, "strike_profiles.cross.base_damage": 8,
+  "strike_profiles.hook.base_damage": 11, "strike_profiles.uppercut.base_damage": 9,
+  "strike_profiles.kick.base_damage": 13, "strike_profiles.knee.base_damage": 10,
+  "strike_profiles.elbow.base_damage": 11,
+  "target_damage_modifiers.body": 0.8, "target_damage_modifiers.liver": 1.1,
+  "target_damage_modifiers.legs": 0.55, "target_damage_modifiers.jaw": 1.2,
+  "target_damage_modifiers.temple": 1.2,
+  "critical_hit.base_chance": 0.03, "critical_hit.damage_multiplier": 1.8,
+  "ko_system.chin_resistance_multiplier": 2.0,
+  "submission.base_defense_factor": 0.30,
+  "recovery.stamina_between_rounds_base": 15,
+};
+
+const TARGETS = { ko_tko: 31.3, submission: 18.0, decision: 49.4 };
+const CONTROL_SPECS = [
+  { section: "Stamina Costs", keys: ["stamina_costs.jab", "stamina_costs.cross", "stamina_costs.hook",
+    "stamina_costs.uppercut", "stamina_costs.kick", "stamina_costs.knee", "stamina_costs.elbow",
+    "stamina_costs.takedown_attempt", "stamina_costs.clinch_attempt", "stamina_costs.submission_attempt"] },
+  { section: "Base Damage", keys: ["strike_profiles.jab.base_damage", "strike_profiles.cross.base_damage",
+    "strike_profiles.hook.base_damage", "strike_profiles.uppercut.base_damage",
+    "strike_profiles.kick.base_damage", "strike_profiles.knee.base_damage", "strike_profiles.elbow.base_damage"] },
+  { section: "Damage Modifiers", keys: ["target_damage_modifiers.body", "target_damage_modifiers.liver",
+    "target_damage_modifiers.legs", "target_damage_modifiers.jaw", "target_damage_modifiers.temple"] },
+  { section: "Critical Hits", keys: ["critical_hit.base_chance", "critical_hit.damage_multiplier"] },
+  { section: "KO System", keys: ["ko_system.chin_resistance_multiplier"] },
+  { section: "Submission", keys: ["submission.base_defense_factor"] },
+  { section: "Recovery", keys: ["recovery.stamina_between_rounds_base"] },
+];
+
+const SLIDER_SPECS = {
+  "stamina_costs.jab": { min: 0, max: 5, step: 0.5 },
+  "stamina_costs.cross": { min: 0, max: 5, step: 0.5 },
+  "stamina_costs.hook": { min: 0, max: 6, step: 0.5 },
+  "stamina_costs.uppercut": { min: 0, max: 6, step: 0.5 },
+  "stamina_costs.kick": { min: 1, max: 10, step: 0.5 },
+  "stamina_costs.knee": { min: 1, max: 8, step: 0.5 },
+  "stamina_costs.elbow": { min: 1, max: 6, step: 0.5 },
+  "stamina_costs.takedown_attempt": { min: 2, max: 12, step: 0.5 },
+  "stamina_costs.clinch_attempt": { min: 1, max: 6, step: 0.5 },
+  "stamina_costs.submission_attempt": { min: 1, max: 8, step: 0.5 },
+  "strike_profiles.jab.base_damage": { min: 1, max: 12, step: 0.5 },
+  "strike_profiles.cross.base_damage": { min: 2, max: 16, step: 0.5 },
+  "strike_profiles.hook.base_damage": { min: 3, max: 20, step: 0.5 },
+  "strike_profiles.uppercut.base_damage": { min: 3, max: 18, step: 0.5 },
+  "strike_profiles.kick.base_damage": { min: 5, max: 25, step: 0.5 },
+  "strike_profiles.knee.base_damage": { min: 3, max: 18, step: 0.5 },
+  "strike_profiles.elbow.base_damage": { min: 3, max: 20, step: 0.5 },
+  "target_damage_modifiers.body": { min: 0.1, max: 1.5, step: 0.05 },
+  "target_damage_modifiers.liver": { min: 0.1, max: 2.0, step: 0.05 },
+  "target_damage_modifiers.legs": { min: 0.1, max: 1.0, step: 0.05 },
+  "target_damage_modifiers.jaw": { min: 0.1, max: 2.0, step: 0.05 },
+  "target_damage_modifiers.temple": { min: 0.1, max: 2.0, step: 0.05 },
+  "critical_hit.base_chance": { min: 0, max: 0.15, step: 0.005 },
+  "critical_hit.damage_multiplier": { min: 1, max: 3, step: 0.1 },
+  "ko_system.chin_resistance_multiplier": { min: 0.5, max: 4, step: 0.1 },
+  "submission.base_defense_factor": { min: 0.1, max: 0.6, step: 0.01 },
+  "recovery.stamina_between_rounds_base": { min: 5, max: 30, step: 1 },
+};
+
+const values = { ...DEFAULTS };
+
+function computeRates() {
+  const totalDamageWeight =
+    values["strike_profiles.jab.base_damage"] * 0.15 +
+    values["strike_profiles.cross.base_damage"] * 0.15 +
+    values["strike_profiles.hook.base_damage"] * 0.20 +
+    values["strike_profiles.uppercut.base_damage"] * 0.10 +
+    values["strike_profiles.kick.base_damage"] * 0.10 +
+    values["strike_profiles.knee.base_damage"] * 0.10 +
+    values["strike_profiles.elbow.base_damage"] * 0.10;
+  const critMult = values["critical_hit.damage_multiplier"] * values["critical_hit.base_chance"] * 10;
+  const koPower = values["ko_system.chin_resistance_multiplier"];
+  const subDef = values["submission.base_defense_factor"];
+  const staminaBase = values["recovery.stamina_between_rounds_base"];
+  const legMod = values["target_damage_modifiers.legs"];
+  const jawMod = values["target_damage_modifiers.jaw"];
+  const bodyMod = values["target_damage_modifiers.body"];
+
+  const offenseScore = totalDamageWeight * (1 + critMult) * bodyMod / legMod;
+  const defenseScore = koPower * subDef * (staminaBase / 15);
+  const koRate = 50 * offenseScore / (offenseScore + defenseScore);
+  const subRate = 18 * (1 - subDef) / 0.7;
+  const decRate = 100 - koRate - subRate;
+
+  return {
+    ko_tko: Math.max(0, Math.min(100, koRate)),
+    submission: Math.max(0, Math.min(100, subRate)),
+    decision: Math.max(0, Math.min(100, decRate)),
+  };
+}
+
+function renderControls() {
+  const container = document.getElementById("controls");
+  container.innerHTML = "";
+  for (const group of CONTROL_SPECS) {
+    const sectionDiv = document.createElement("div");
+    sectionDiv.className = "subsection";
+    const title = document.createElement("h2");
+    title.textContent = group.section;
+    sectionDiv.appendChild(title);
+    const cardGrid = document.createElement("div");
+    cardGrid.className = "grid";
+    for (const key of group.keys) {
+      if (!(key in DEFAULTS)) continue;
+      const spec = SLIDER_SPECS[key];
+      const card = document.createElement("div");
+      card.className = "card";
+      const label = document.createElement("label");
+      label.textContent = key.split(".").slice(1).join(".");
+      card.appendChild(label);
+      const slider = document.createElement("input");
+      slider.type = "range";
+      slider.min = spec.min;
+      slider.max = spec.max;
+      slider.step = spec.step;
+      slider.value = values[key];
+      slider.oninput = () => {
+        values[key] = parseFloat(slider.value);
+        valSpan.textContent = values[key];
+        updateTargets();
+        updateExport();
+      };
+      card.appendChild(slider);
+      const valSpan = document.createElement("span");
+      valSpan.className = "value";
+      valSpan.textContent = values[key];
+      card.appendChild(valSpan);
+      const defSpan = document.createElement("span");
+      defSpan.className = "default";
+      defSpan.textContent = ` (default: ${DEFAULTS[key]})`;
+      card.appendChild(defSpan);
+      cardGrid.appendChild(card);
+    }
+    sectionDiv.appendChild(cardGrid);
+    container.appendChild(sectionDiv);
+  }
+}
+
+function updateTargets() {
+  const rates = computeRates();
+  const targetsEl = document.getElementById("targets");
+  const items = [
+    { key: "ko_tko", label: "KO/TKO", target: TARGETS.ko_tko, actual: rates.ko_tko },
+    { key: "submission", label: "Submission", target: TARGETS.submission, actual: rates.submission },
+    { key: "decision", label: "Decision", target: TARGETS.decision, actual: rates.decision },
+  ];
+  targetsEl.innerHTML = items.map(item => {
+    const diff = Math.abs(item.actual - item.target);
+    const cls = diff < 5 ? "ok" : diff < 15 ? "warn" : "bad";
+    return `<div class="target ${cls}">
+      <div class="label">${item.label}</div>
+      <div class="value">${item.actual.toFixed(1)}%</div>
+      <div class="label">target: ${item.target}% (${diff > 0 ? (item.actual > item.target ? "+" : "") : ""}${(item.actual - item.target).toFixed(1)})</div>
+    </div>`;
+  }).join("");
+}
+
+function updateExport() {
+  const el = document.getElementById("export-view");
+  el.textContent = JSON.stringify(values, null, 2);
+}
+
+document.getElementById("reset").addEventListener("click", () => {
+  Object.assign(values, DEFAULTS);
+  renderControls();
+  updateTargets();
+  updateExport();
+});
+
+document.getElementById("export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(values, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "combat_custom.json";
+  a.click();
+});
+
+renderControls();
+updateTargets();
+updateExport();
+</script>
+</body>
+</html>
