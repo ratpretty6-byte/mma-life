@@ -901,7 +901,12 @@ function switchTab(tab) {
   else if (tab === "finance") refreshFinanceTab();
 }
 
-function showModal(html) { qs("#modalContent").innerHTML = html; qs("#modalOverlay").classList.remove("hidden"); }
+function showModal(html) {
+  const overlay = qs("#modalOverlay");
+  const content = qs("#modalContent");
+  content.innerHTML = '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-ghost btn-small" onclick="closeModal(null)" style="font-size:11px;min-height:28px;padding:2px 8px">✕ CLOSE</button></div>' + html;
+  overlay.classList.remove("hidden");
+}
 function closeModal(e) { if (!e || e.target === qs("#modalOverlay")) qs("#modalOverlay").classList.add("hidden"); }
 
 async function init() {
@@ -2330,10 +2335,14 @@ function showOfferModal(o, relationship) {
     </div>`;
   // Accept/Decline buttons
   html += `<div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
-    <button class="btn btn-primary" onclick="closeModal(null);acceptOffer('${escHtml(opp.name)}')">Accept Offer</button>
+    <button class="btn btn-primary" id="btnAcceptOfferModal">Accept Offer</button>
     <button class="btn btn-ghost" onclick="closeModal(null);declineOffer()">Decline</button>
   </div>`;
   showModal(html);
+  qs("#btnAcceptOfferModal").onclick = async () => {
+    closeModal(null);
+    await acceptOffer(opp.name);
+  };
 }
 
 async function acceptOffer(oppName) {
@@ -2530,9 +2539,13 @@ async function loadFightOfferDetails(o, baseHtml) {
     </select>
   </div>
   <div style="text-align:center">
-    <button class="btn btn-primary" onclick="closeModal(null);bookFight('${escHtml(o.name)}')">Book This Fight</button>
+    <button class="btn btn-primary" id="btnBookFightModal">Book This Fight</button>
     <button class="btn btn-secondary" onclick="closeModal(null)" style="margin-left:6px">Cancel</button></div>`;
   showModal(html);
+  qs("#btnBookFightModal").onclick = async () => {
+    closeModal(null);
+    await bookFight(o.name);
+  };
 }
 
 async function scoutOpponent() {
@@ -2605,7 +2618,10 @@ function setSpeed(s) {
 }
 
 async function startFight() {
+  const btn = qs("#btnStartFight");
+  setLoading(btn, true);
   const resp = await api("/api/start_fight", { sid, strategy: selectedStrategy });
+  setLoading(btn, false);
   if (!resp.success) { toast(resp.error || "Failed", "error"); return; }
   qs("#fightReady").classList.add("hidden");
   qs("#fightPre").classList.add("hidden");
@@ -2947,126 +2963,7 @@ let _roundScores = [];
 
 async function replayFightEvents(fightResult) {
   if (!fightResult || !fightResult.events || !fightResult.events.length) return;
-  const log = qs("#fightLog");
-  const events = fightResult.events || [];
-  for (let i = 0; i < events.length; i++) {
-    if (!fightReplaying) break;
-    const ev = events[i];
-
-    const el = document.createElement("div");
-    el.className = "ev fade-in";
-    let cls = "ev-action";
-    if (ev.type === "knockout" || ev.type === "submission" || ev.type === "decision" || ev.type === "post_fight") cls = "ev-big";
-    else if (ev.type === "pre_fight" || ev.type === "walkout" || ev.type === "score_update" || ev.type === "between_round") cls = "ev-info";
-    else if (ev.type === "round_start" || ev.type === "round_end") cls = "ev-round";
-    else if (ev.type === "round_summary") cls = "ev-summary";
-    el.className += " " + cls;
-
-    if (ev.type === "round_start") {
-      el.innerHTML = '--- ' + escHtml(ev.text) + ' ---';
-    } else if (ev.type === "round_end" || ev.type === "round_summary") {
-      if (ev.scores) {
-        _roundScores = ev.scores;
-        const f1r = _roundScores.reduce((s, r) => s + r[0], 0);
-        const f2r = _roundScores.reduce((s, r) => s + r[1], 0);
-        updateScoreBars(f1r, f2r);
-      }
-      el.innerHTML = escHtml(ev.text || "");
-    } else if (ev.type === "score_update") {
-      el.innerHTML = "Score: " + escHtml(ev.score);
-    } else if (ev.type === "between_round") {
-      el.innerHTML = escHtml(ev.text || "").replace(/\n/g, "<br>");
-    } else if (ev.type === "carryover") {
-      el.innerHTML = escHtml(ev.text || "");
-      el.className += " ev-carryover";
-    } else if (ev.type === "strategy_prompt") {
-      if (ev.f1_health) {
-        updateHealthBars(ev.f1_health, ev.f2_health);
-        updateFighterState(qs("#f1NameBar"), qs("#f1StateBar"), ev.f1_state);
-        updateFighterState(qs("#f2NameBar"), qs("#f2StateBar"), ev.f2_state);
-        if (ev.f1_total_score != null) updateScoreBars(ev.f1_total_score, ev.f2_total_score);
-      }
-      if (fightSpeed === 0) { showStrategyPrompt(ev); return; }
-      fightPaused = true;
-      showStrategyPrompt(ev);
-      return;
-    } else {
-      el.innerHTML = escHtml(ev.text || "");
-    }
-
-    if (ev.type === "action") {
-      const t = ev.text || "";
-      const sev = ev.severity || "";
-      const subtype = ev.subtype || "";
-      const landed = ev.landed;
-      let actCls = "ev-strike";
-
-      // Use structured subtype first, fall back to text patterns for legacy
-      if (t.startsWith("!!!")) actCls = "ev-knockdown";
-      else if (subtype === "knockdown") actCls = "ev-knockdown";
-      else if (subtype === "exchange" || t.startsWith("Both fighters trade")) actCls = "ev-exchange";
-      else if (subtype === "combo" || /throws a .+! Landed \d+\/\d+:/.test(t)) actCls = "ev-combo";
-      else if (subtype === "counter" || /slips.*and fires back|parries.*and creates|blocks.*and answers/.test(t)) actCls = "ev-counter";
-      else if (subtype === "reaction" || /shells up|circles away|swings wildly|is frozen|ties up to recover/.test(t)) actCls = "ev-reaction";
-      else if (subtype === "movement" || /circles|steps into the pocket|switches stance|finding range/.test(t)) actCls = "ev-movement";
-      else if (subtype === "feint" || /feints.*draws|sells the jab.*flinches|fakes the takedown.*eats/.test(t)) actCls = "ev-feint";
-      else if (subtype === "miss" || subtype === "block" || subtype === "slip" || subtype === "parry") actCls = "ev-defensive";
-      else if (subtype === "takedown" || /takedown|slam|takes .+ down|puts .+ on the canvas|sprawl/i.test(t)) actCls = "ev-takedown";
-      else if (subtype === "clinch" || /clinch|knee|elbow|tie up|dirty box/i.test(t)) actCls = "ev-clinch";
-      else if (subtype === "ground" || /hammerfist|ground|mount|side control|guard|pass/i.test(t)) actCls = "ev-ground";
-      else if (subtype === "submission" || /submission|kimura|choke|armbar|triangle|tap/i.test(t)) actCls = "ev-sub-attempt";
-      else if (subtype === "strike" && landed === false) actCls = "ev-defensive";
-      else if (/CRITICAL/.test(sev)) actCls = "ev-critical";
-      else if (sev === "Devastating") actCls = "ev-critical";
-      else if (sev === "Flush") actCls = "ev-heavy";
-      else if (sev === "Solid" || sev === "Clean") actCls = "ev-strike";
-      else if (sev === "Glancing" || sev === "Blocked") actCls = "ev-defensive";
-      else if (/too gassed|can't/i.test(t)) actCls = "ev-defensive";
-      else if (/HURT|ROCKED|is hurt|is rocked/i.test(t)) actCls = "ev-hurt";
-      else if (/STUNNED|stunned/i.test(t)) actCls = "ev-stunned";
-      el.className += " " + actCls;
-      const f1N = state && state.fighter ? state.fighter.name : "";
-      const f2N = qs("#f2NameBar") ? qs("#f2NameBar").textContent : "";
-      if (f1N && t.startsWith(f1N)) el.className += " ev-f1";
-      else if (f2N && t.startsWith(f2N)) el.className += " ev-f2";
-
-      el.innerHTML = (ev.time ? "[" + escHtml(ev.time) + "] " : "") + escHtml(t);
-    }
-
-    if (el.textContent || el.innerHTML) {
-      log.appendChild(el);
-      log.scrollTop = log.scrollHeight;
-    }
-
-    if (ev.f1_health && ev.type === "action") {
-      updateHealthBars(ev.f1_health, ev.f2_health);
-      if (ev.f1_state) updateFighterState(qs("#f1NameBar"), qs("#f1StateBar"), ev.f1_state);
-      if (ev.f2_state) updateFighterState(qs("#f2NameBar"), qs("#f2StateBar"), ev.f2_state);
-      if (ev.f1_total_score != null) updateScoreBars(ev.f1_total_score, ev.f2_total_score);
-      if (ev.f1_momentum != null) updateMomentumBars(ev.f1_momentum, ev.f2_momentum, ev.crowd_excitement);
-    }
-
-    if (fightSpeed > 0) {
-      let delay = 800;
-      if (ev.type === "action") {
-        const sev = ev.severity || "";
-        const sub = ev.subtype || "";
-        if (sub === "knockdown" || /CRITICAL|Devastating/.test(sev)) delay = 2000;
-        else if (sub === "submission" || sub === "takedown" || sub === "clinch" || sub === "ground") delay = 1500;
-        else if (sub === "strike" || sub === "exchange" || sub === "combo" || sub === "counter") delay = 1200;
-        else if (sub === "movement" || sub === "feint") delay = 600;
-        else delay = 800;
-      } else if (ev.type === "round_start" || ev.type === "round_end") delay = 1500;
-      else if (ev.type === "round_summary") delay = 3000;
-      else if (ev.type === "between_round") delay = 2000;
-      else if (ev.type === "knockout" || ev.type === "submission" || ev.type === "decision") delay = 3000;
-      else if (ev.type === "pre_fight" || ev.type === "walkout") delay = 1500;
-      else if (ev.type === "carryover") delay = 1500;
-      else if (ev.type === "score_update") delay = 600;
-      await sleep(delay / fightSpeed);
-    }
-  }
-
+  await replayStreamedEvents(fightResult.events);
   if (fightResult.f1_health) updateHealthBars(fightResult.f1_health, fightResult.f2_health);
   if (fightResult.total_scores) {
     const scores = fightResult.total_scores;
@@ -3075,7 +2972,6 @@ async function replayFightEvents(fightResult) {
       updateScoreBars(scores[names[0]] || 0, scores[names[1]] || 0);
     }
   }
-
   if (fightResult.status === "complete" && fightReplaying) {
     qs("#fightStratPrompt").classList.add("hidden");
     await completeFight();
