@@ -1641,7 +1641,13 @@ async function advanceDay() {
       const r = resp.day_result;
       const div = qs("#dayResult");
       div.classList.remove("hidden");
-      if ((r.status === "training" || r.status === "in_camp") && r.gains) {
+      if (r.status === "fight_week" && r.fight_week_event) {
+        const fwe = r.fight_week_event;
+        const evName = (fwe.event || "rest").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        div.innerHTML = `<span style="color:#ffd700">&#x1F4C5; Fight Week — ${evName}</span><br><span style="color:#aaa;font-size:12px">${escHtml(fwe.text || "")}</span>`;
+        state = resp.state;
+        refreshFightTab();
+      } else if ((r.status === "training" || r.status === "in_camp") && r.gains) {
         let g = Object.entries(r.gains).filter(([k,v]) => v > 0).map(([k,v]) => k.replace(/_/g," ")+" +"+v.toFixed(1));
         div.innerHTML = `<span style="color:#4aff6a">${r.day}</span>: ${g.join(", ") || "No gains"}`;
         if (r.injury) div.innerHTML += ` <span style="color:#e62400">| INJURY: ${r.injury.type}</span>`;

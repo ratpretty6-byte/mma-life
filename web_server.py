@@ -812,10 +812,7 @@ class FightStream:
 
     def submit_strategy(self, strategy):
         if strategy is not None:
-            from strategy import find_strategy_by_id
-            strat = find_strategy_by_id(strategy)
-            if strat:
-                self.fight.strategy1.set_mid_fight_strategy(strat)
+            self.fight.strategy1.adjust_strategy(strategy)
         self.pause_event.set()
 
     def get_new_events(self, from_index=0):
@@ -1143,6 +1140,24 @@ class Handler(BaseHTTPRequestHandler):
                         "reach_max": hr["reach_max"],
                     })
                 self.json_resp({"weight_classes": data})
+
+            elif path == "/api/fight_events":
+                ensure_initialized()
+                sid = params.get("sid", [""])[0]
+                from_index = int(params.get("from", ["0"])[0])
+                session = get_or_create_session(sid)
+                fs = get_fight_stream(sid)
+                if not fs:
+                    self.json_resp({"success": False, "error": "No active fight stream"})
+                    return
+                new_events = fs.get_new_events(from_index)
+                self.json_resp({
+                    "success": True,
+                    "events": new_events,
+                    "done": fs.done,
+                    "total": fs.event_count,
+                    "waiting": fs.waiting_for_input,
+                })
 
             else:
                 self.send_error(404)
@@ -1897,7 +1912,7 @@ class Handler(BaseHTTPRequestHandler):
                     "fight_today": fight_today,
                 })
 
-            elif path == "/api/accept_offer":
+            elif path in ("/api/accept_offer", "/api/book_fight"):
                 sid = body.get("sid", "")
                 opp_name = body.get("opponent", "")
                 session = get_or_create_session(sid)
