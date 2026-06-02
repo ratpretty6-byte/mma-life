@@ -58,6 +58,16 @@
       "mode": "subagent",
       "model": "opencode-go/kimi-k2.6",
       "description": "Tests game determinism: same seed x3 -> identical outcomes. Tests N seeds to validate distribution expectations"
+    },
+    "ui-designer": {
+      "mode": "subagent",
+      "model": "opencode-go/deepseek-v4-flash",
+      "description": "Analyzes and improves the MMA Life frontend UI — layout, CSS, responsive design, component structure, and gameflow UX"
+    },
+    "gameflow-analyzer": {
+      "mode": "subagent",
+      "model": "opencode-go/deepseek-v4-flash",
+      "description": "Traces the full player journey through the game, finds broken flows, missing feedback, stale state, and UX dead ends"
     }
   },
   "command": {
