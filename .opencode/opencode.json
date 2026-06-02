@@ -91,6 +91,10 @@
     "gametest": {
       "description": "Run the game-tester agent for comprehensive gameplay testing (careers, balance, edge cases)",
       "template": "Start the web server, then run the game-tester agent to play through 5+ full fight careers, testing all subsystems (training, finance, promotions, titles, injuries, retirement). Report every bug and balance issue found."
+    },
+    "uidesign": {
+      "description": "Run the UI designer to overhaul the frontend (modals, CSS, tabs, loading states, animations, mobile)",
+      "template": "Read .opencode/agents/ui-designer.md for the full checklist. Then open templates/index.html and implement ALL remaining items: loading states on every button, error handling (replace empty catch blocks), tab navigation transitions, mobile responsive fixes, and health bar animations. Verify with Playwright screenshots."
     }
   },
   "mcp": {
