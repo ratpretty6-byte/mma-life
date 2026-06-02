@@ -181,6 +181,7 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
     fighter.attributes["danger_recognition"] = max(fighter.attributes.get("danger_recognition", 0), 20)
 
     profile = ARCHETYPE_PROFILES.get(archetype, {})
+    applied_attrs = set()
     for group_or_attr, adjustments in profile.items():
         if group_or_attr in ATTRIBUTE_GROUPS:
             for adj_attr, delta in adjustments.items():
@@ -188,12 +189,16 @@ def generate_single_fighter(weight_lbs: float, skill_mean: float = 50.0, skill_s
                 if full_attr in fighter.attributes:
                     fighter.attributes[full_attr] = utils.clamp(
                         fighter.attributes[full_attr] + delta, utils.ATTR_MIN, utils.ATTR_MAX)
+                    applied_attrs.add(full_attr)
         elif "_" in group_or_attr:
             if group_or_attr in fighter.attributes:
                 fighter.attributes[group_or_attr] = utils.clamp(
                     fighter.attributes[group_or_attr] + adjustments, utils.ATTR_MIN, utils.ATTR_MAX)
+                applied_attrs.add(group_or_attr)
 
     for attr_spec, val in profile.items():
+        if attr_spec in applied_attrs:
+            continue
         if isinstance(val, int) and attr_spec in fighter.attributes:
             fighter.attributes[attr_spec] = utils.clamp(
                 fighter.attributes[attr_spec] + val, utils.ATTR_MIN, utils.ATTR_MAX)

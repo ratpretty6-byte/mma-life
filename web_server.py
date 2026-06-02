@@ -511,7 +511,6 @@ def _trigger_fight_week_event(session, days_until):
     f = session.get("fighter")
     media = session.get("media")
     fb = session.get("current_fight_booking")
-    training = session.get("training")
     event_name = FIGHT_WEEK_EVENTS.get(days_until, "rest")
     if not f or not fb:
         return {"event": "rest", "text": "Rest day."}
@@ -579,7 +578,7 @@ def _get_fight_booking_state(session):
     fight_week_day = None
     if 0 <= days_until <= 5:
         fight_week_events = ["Press Conference", "Open Workout", "Weigh-In", "Faceoff", "Rest Day", "Fight Night"]
-        fight_week_day = fight_week_events[days_until] if days_until < 6 else None
+        fight_week_day = fight_week_events[5 - days_until] if 0 <= days_until <= 5 else None
     return {
         "opponent": {
             "name": opponent.name,
@@ -868,6 +867,20 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-type", "text/html; charset=utf-8")
                 self.end_headers()
                 with open(os.path.join(APP_DIR, "templates", "index.html"), "rb") as f:
+                    self.wfile.write(f.read())
+
+            elif path == "/debug.html":
+                self.send_response(200)
+                self.send_header("Content-type", "text/html; charset=utf-8")
+                self.end_headers()
+                with open(os.path.join(APP_DIR, "templates", "debug.html"), "rb") as f:
+                    self.wfile.write(f.read())
+
+            elif path == "/balance.html":
+                self.send_response(200)
+                self.send_header("Content-type", "text/html; charset=utf-8")
+                self.end_headers()
+                with open(os.path.join(APP_DIR, "templates", "balance.html"), "rb") as f:
                     self.wfile.write(f.read())
 
             elif path == "/api/state":
@@ -1357,7 +1370,7 @@ class Handler(BaseHTTPRequestHandler):
 
             elif path == "/api/set_schedule":
                 sid = body.get("sid", "")
-                day_idx = body.get("day_idx", 0)
+                day_idx = int(body.get("day_idx", 0))
                 drill_name = body.get("drill_name", None)
                 session = get_or_create_session(sid)
                 training = session.get("training")
@@ -1401,7 +1414,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_resp({"success": True, "state": get_state_dict(session)})
 
             elif path == "/api/event_card":
-                sid = params.get("sid", [""])[0]
+                sid = body.get("sid", "")
                 session = get_or_create_session(sid)
                 event = session.get("current_event")
                 if not event:
@@ -1469,11 +1482,12 @@ class Handler(BaseHTTPRequestHandler):
                 fs = FightStream(sid, fight, strat_id, opponent.name)
                 set_fight_stream(sid, fs)
                 fs.start()
+                _persist_session(sid, session)
                 self.json_resp({"success": True, "fight_streaming": True, "opponent": opponent.name})
 
             elif path == "/api/fight_events":
-                sid = params.get("sid", [""])[0]
-                from_index = int(params.get("from", ["0"])[0])
+                sid = body.get("sid", "")
+                from_index = int(body.get("from", 0))
                 session = get_or_create_session(sid)
                 fs = get_fight_stream(sid)
                 if not fs:
@@ -1835,7 +1849,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/advance_time":
                 ensure_initialized()
                 sid = body.get("sid", "")
-                days = body.get("days", 7)
+                days = int(body.get("days", 7))
                 session = get_or_create_session(sid)
                 training = session.get("training")
                 f = session.get("fighter")
@@ -1923,7 +1937,7 @@ class Handler(BaseHTTPRequestHandler):
                 target = copy.deepcopy(target)
                 session["_opponent_original"] = target
                 # Create event and booking
-                weeks_out = body.get("weeks", 8)
+                weeks_out = int(body.get("weeks", 8))
                 fight_date = (game_date or datetime.now()) + timedelta(weeks=weeks_out)
                 is_title = (promo.champions.get(f.weight_class) is not None
                             and target.name == promo.champions[f.weight_class].name)
@@ -2233,7 +2247,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 from generator import generate_single_fighter
                 sid = body.get("sid", "")
-                iterations = body.get("iterations", 100)
+                iterations = int(body.get("iterations", 100))
                 session = get_or_create_session(sid)
                 f = session.get("fighter")
                 if not f:
@@ -2288,12 +2302,12 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/bulk_simulate":
                 """Advanced bulk simulation with configurable fighters."""
                 from generator import generate_single_fighter
-                iterations = body.get("iterations", 100)
-                f1_mean = body.get("f1_mean", 50)
-                f1_std = body.get("f1_std", 8)
-                f2_mean = body.get("f2_mean", 50)
-                f2_std = body.get("f2_std", 8)
-                wc_idx = body.get("weight_class", 3)
+                iterations = int(body.get("iterations", 100))
+                f1_mean = int(body.get("f1_mean", 50))
+                f1_std = int(body.get("f1_std", 8))
+                f2_mean = int(body.get("f2_mean", 50))
+                f2_std = int(body.get("f2_std", 8))
+                wc_idx = int(body.get("weight_class", 3))
                 wc_data = utils.WEIGHT_CLASSES[wc_idx]
 
                 detailed = body.get("detailed", False)
