@@ -51,11 +51,7 @@ async function fetchState() {
   let sid = sidInput.value.trim();
   if (!sid) sid = "debug";
   try {
-    const resp = await fetch("/api/state", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ sid }),
-    });
+    const resp = await fetch(`/api/state?sid=${encodeURIComponent(sid)}`);
     return await resp.json();
   } catch {
     return { error: "Failed to fetch state. Is the server running?" };

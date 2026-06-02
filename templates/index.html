@@ -2423,7 +2423,7 @@ function showComparison(o) {
     ["Rating", f.rating, o.rating],
     ["Height", `${f.height}"`, `${o.height}"`],
     ["Reach", `${f.reach}"`, `${o.reach}"`],
-    ["Age", f.age, o.age],
+    ["Age", Math.floor(f.age), Math.floor(o.age)],
     ["KOs", f.knockouts||0, o.knockouts],
     ["Subs", f.submissions||0, o.submissions],
     ["Style", (f.archetype||"").replace(/_/g," "), (o.archetype||"").replace(/_/g," ")],

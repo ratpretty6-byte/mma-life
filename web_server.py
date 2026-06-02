@@ -578,6 +578,10 @@ def _ensure_fight_week_phase(session, event_key):
     if not (0 < days <= 5):
         return "Fight week is not active"
     if days != expected:
+        # Allow if auto-triggered (event stored in progress from advance_day)
+        progress = session.get("fight_week_progress", {})
+        if event_key in progress:
+            return None
         return f"Wrong phase: {event_key} expected at T-{expected}, currently T-{days}"
     return None
 
@@ -1161,6 +1165,10 @@ class Handler(BaseHTTPRequestHandler):
                     })
                 self.json_resp({"weight_classes": data})
 
+            elif path == "/favicon.ico":
+                self.send_response(204)
+                self.end_headers()
+
             elif path == "/api/fight_events":
                 ensure_initialized()
                 sid = params.get("sid", [""])[0]
@@ -1356,6 +1364,15 @@ class Handler(BaseHTTPRequestHandler):
                     progress = session.setdefault("fight_week_progress", {})
                     if fight_week_event.get("event"):
                         progress[fight_week_event["event"]] = fight_week_event
+                    # Don't advance game date — let player interact with event first
+                    _persist_session(sid, session)
+                    self.json_resp({
+                        "success": True,
+                        "state": get_state_dict(session),
+                        "day_result": result,
+                        "fight_today": False,
+                    })
+                    return
                 else:
                     result = training.advance_day(game_date)
 
@@ -1425,9 +1442,9 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_resp({"error": "Not initialized"})
                     return
                 from training import DRILLS
-                drill_idx = body.get("drill_idx", 0)
+                drill_idx = int(body.get("drill_idx", 0))
                 intensity = body.get("intensity", "moderate")
-                if not isinstance(drill_idx, int) or drill_idx < 0 or drill_idx >= len(DRILLS):
+                if drill_idx < 0 or drill_idx >= len(DRILLS):
                     self.json_resp({"error": "Invalid drill index"})
                     return
                 drill = DRILLS[drill_idx]
@@ -1709,14 +1726,13 @@ class Handler(BaseHTTPRequestHandler):
                 fb.complete(winner, method, win_round)
                 # Sync opponent record from deep copy back to original in promotion
                 original_opp = session.get("_opponent_original_ref")
-                if original_opp and opponent:
-                    original_opp.wins = opponent.wins
-                    original_opp.losses = opponent.losses
-                    original_opp.draws = opponent.draws
-                    original_opp.knockouts = opponent.knockouts
-                    original_opp.submissions = opponent.submissions
-                    original_opp.win_streak = opponent.win_streak
-                    original_opp.loss_streak = opponent.loss_streak
+                if original_opp and opponent and original_opp is not opponent:
+                    for attr in ["wins", "losses", "draws", "knockouts", "submissions", "win_streak", "loss_streak"]:
+                        setattr(original_opp, attr, getattr(opponent, attr))
+                # Update player fighter record directly (DiskCache deserialization may disconnect)
+                f.wins = fb.fighter1.wins if fb.fighter1 == f else (fb.fighter2.wins if fb.fighter2 == f else f.wins)
+                f.losses = fb.fighter1.losses if fb.fighter1 == f else (fb.fighter2.losses if fb.fighter2 == f else f.losses)
+                f.draws = fb.fighter1.draws if fb.fighter1 == f else (fb.fighter2.draws if fb.fighter2 == f else f.draws)
                 if winner:
                     f.shake_ring_rust()
                     opponent.shake_ring_rust()
@@ -2178,6 +2194,12 @@ class Handler(BaseHTTPRequestHandler):
                 if not f:
                     self.json_resp({"error": "Not initialized"})
                     return
+                fb = session.get("current_fight_booking")
+                if fb:
+                    err = _ensure_fight_week_phase(session, "rest_day")
+                    if err:
+                        self.json_resp({"error": err})
+                        return
                 result = {"text": f"{f.name} takes it easy on rest day.", "fatigue_recovery": 0.15}
                 if choice == "massage":
                     result["text"] = f"{f.name} gets a deep tissue massage. Muscles feel loose and ready."

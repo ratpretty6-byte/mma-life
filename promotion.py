@@ -359,7 +359,11 @@ class Promotion:
             if c["risk"] in offered_risks:
                 continue
             offered_risks.add(c["risk"])
-            diff = idx - ranked.index(c["opponent"]) if ranked.index(c["opponent"]) < idx else ranked.index(c["opponent"]) - idx
+            try:
+                opp_idx = ranked.index(c["opponent"])
+            except ValueError:
+                opp_idx = next((i for i, f in enumerate(ranked) if f.name == c["opponent"].name), idx)
+            diff = idx - opp_idx if opp_idx < idx else opp_idx - idx
             purse_mult = {"sacrifice": 1.5, "tough": 1.2, "50-50": 1.0, "gimme": 0.8}.get(c["risk"], 1.0)
             pop_gain = {"sacrifice": 15, "tough": 8, "50-50": 5, "gimme": 2}.get(c["risk"], 5)
             card_slot = self._get_card_position(player, c["opponent"], c["risk"])
