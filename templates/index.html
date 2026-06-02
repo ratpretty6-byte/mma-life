@@ -954,10 +954,8 @@ async function init() {
         initMainMenu();
         return;
       }
-      // Show menu immediately — world generates in background
       qs("#headerStatus").textContent = "Generating fight world...";
       initMainMenu();
-      // Try to load world in background (ignore failure)
       for (let i = 0; i < 30; i++) {
         await sleep(2000);
         try {
@@ -971,13 +969,10 @@ async function init() {
     } else {
       qs("#headerStatus").textContent = "Server taking long. Try refreshing.";
       initMainMenu();
-    } else {
-      qs("#headerStatus").textContent = "Error: " + (resp ? resp.error : "Unknown");
     }
   } catch(e) {
     console.error("Init error:", e);
     qs("#headerStatus").textContent = "Connecting...";
-    // Still show the menu even if init fails
     setTimeout(initMainMenu, 1000);
   }
 }
