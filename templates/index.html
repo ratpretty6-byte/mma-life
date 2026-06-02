@@ -2778,6 +2778,185 @@ function formatCommentary(text) {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// === EVENT LISTENERS: Create Fighter flow ===
+async function createFighter() {
+  const btn = qs("#startCareerBtn");
+  setLoading(btn, true);
+  try {
+    ensureSid();
+    const name = qs("#fName").value.trim() || "";
+    const age = parseInt(qs("#fAge").value);
+    const bg = qs("#fBackground").value;
+    const wc = parseInt(qs("#fWeightClass").value);
+    const nationality = qs("#fNationality").value;
+    const region = qs("#fRegion").value;
+    const traitBtn = qs("#traitGrid .selected");
+    const trait_id = traitBtn ? traitBtn.dataset.trait : null;
+    const persBtn = qs("#personalityGrid .selected");
+    const personality_id = persBtn ? persBtn.dataset.pers || "humble" : "humble";
+    const stance = qs("#fStance").value;
+    const height = parseInt(qs("#fHeight").value);
+    const reach = parseInt(qs("#fReach").value);
+    const resp = await api("/api/create_fighter", { name, age, background: bg, weight_class: wc, sid, nationality, region, trait_id, personality_id, stance, height, reach });
+    if (resp.success) {
+      state = resp.state;
+      if (state.strategies) STRATS = state.strategies;
+      qs("#screen-create").classList.add("hidden");
+      qs("#screen-main-menu").classList.add("hidden");
+      qs("#screen-game").classList.remove("hidden");
+      qs("#bottomTabs").classList.remove("hidden");
+      hasActiveGame = true;
+      updateAllUI();
+      toast("Career started! Welcome to MMA Life.", "success");
+    } else {
+      toast(resp.error || "Failed to create fighter", "error");
+    }
+  } catch(e) {
+    console.error("createFighter error:", e);
+    toast("Error creating fighter: " + e.message, "error");
+  }
+  setLoading(btn, false);
+}
+
+document.getElementById("btnNewGame").addEventListener("click", function() {
+  ensureSid();
+  qs("#screen-main-menu").classList.add("hidden");
+  qs("#screen-create").classList.remove("hidden");
+  showWizardStep(1);
+  initWizard();
+
+  // Populate weight classes (Step 2)
+  const wcGrid = qs("#wcGrid");
+  const WC_DATA = [
+    {idx:0, name:"Strawweight", min:100, max:115},
+    {idx:1, name:"Flyweight", min:115, max:125},
+    {idx:2, name:"Bantamweight", min:125, max:135},
+    {idx:3, name:"Featherweight", min:135, max:145},
+    {idx:4, name:"Lightweight", min:145, max:155},
+    {idx:5, name:"Welterweight", min:155, max:170},
+    {idx:6, name:"Middleweight", min:170, max:185},
+    {idx:7, name:"Light Heavyweight", min:185, max:205},
+    {idx:8, name:"Heavyweight", min:205, max:265},
+  ];
+  wcGrid.innerHTML = "";
+  WC_DATA.forEach(w => {
+    const card = document.createElement("div");
+    card.className = "wc-card" + (w.idx === 3 ? " selected" : "");
+    card.innerHTML = `<div class="wc-name">${w.name}</div><div class="wc-weight">${w.min}-${w.max} lbs</div>`;
+    card.onclick = () => {
+      wcGrid.querySelectorAll(".wc-card").forEach(c => c.classList.remove("selected"));
+      card.classList.add("selected");
+      qs("#fWeightClass").value = w.idx;
+      updateHeightReachForWC(w.idx);
+    };
+    wcGrid.appendChild(card);
+  });
+  updateHeightReachForWC(3);
+
+  const heightSlider = qs("#fHeight");
+  const reachSlider = qs("#fReach");
+  heightSlider.oninput = () => { qs("#heightValue").textContent = heightSlider.value; updateHeightReachInfo(); };
+  reachSlider.oninput = () => { qs("#reachValue").textContent = reachSlider.value; updateHeightReachInfo(); };
+  function updateHeightReachInfo() {
+    const h = parseInt(heightSlider.value);
+    const r = parseInt(reachSlider.value);
+    let diff = r - h;
+    let desc = h + '" tall, ' + r + '" reach';
+    if (diff > 4) desc += " — long arms for height";
+    else if (diff < 0) desc += " — short reach for height";
+    else desc += " — proportional";
+    qs("#heightReachInfo").textContent = desc;
+  }
+  function updateHeightReachForWC(wcIdx) {
+    const heights = [60,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80];
+    const reaches = [62,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,82,84];
+    const h = heights[wcIdx] || 68;
+    const r = reaches[wcIdx] || 72;
+    qs("#fHeight").value = h; qs("#heightValue").textContent = h;
+    qs("#fReach").value = r; qs("#reachValue").textContent = r;
+    updateHeightReachInfo();
+  }
+
+  // Populate backgrounds (Step 3)
+  const bgGrid = qs("#bgGrid");
+  const BG_DATA = [
+    {id:"mma", short:"MMA", desc:"All-Rounder"},
+    {id:"wrestling", short:"Wrestling", desc:"Takedowns & Control"},
+    {id:"bjj", short:"BJJ", desc:"Submissions"},
+    {id:"muay_thai", short:"Muay Thai", desc:"Clinch & Strikes"},
+    {id:"boxing", short:"Boxing", desc:"Striking & Footwork"},
+    {id:"judo", short:"Judo", desc:"Throws & Clinch"},
+    {id:"taekwondo", short:"Taekwondo", desc:"Kicks & Range"},
+    {id:"karate", short:"Karate", desc:"Speed & Precision"},
+    {id:"sambo", short:"Sambo", desc:"Mixing it up"},
+    {id:"kickboxing", short:"Kickboxing", desc:"Stand-up Striker"},
+    {id:"capoeira", short:"Capoeira", desc:"Unorthodox"},
+  ];
+  bgGrid.innerHTML = "";
+  BG_DATA.forEach(b => {
+    const card = document.createElement("div");
+    card.className = "wc-card" + (b.id === "mma" ? " selected" : "");
+    card.innerHTML = '<div class="wc-name">' + b.short + '</div><div class="wc-weight">' + b.desc + '</div>';
+    card.onclick = () => {
+      bgGrid.querySelectorAll(".wc-card").forEach(c => c.classList.remove("selected"));
+      card.classList.add("selected");
+      qs("#fBackground").value = b.id;
+    };
+    bgGrid.appendChild(card);
+  });
+
+  // Populate traits (Step 4)
+  const tGrid = qs("#traitGrid");
+  const TRAITS = [
+    {id:"heavy_hands",name:"Heavy Hands",desc:"+5 striking power"},
+    {id:"iron_chin",name:"Iron Chin",desc:"+5 durability"},
+    {id:"cardio_king",name:"Cardio King",desc:"+5 cardio"},
+    {id:"mat_wizard",name:"Mat Wizard",desc:"+5 wrestling defense"},
+    {id:"sniper",name:"Sniper",desc:"+5 accuracy"},
+    {id:"natural_athlete",name:"Natural Athlete",desc:"+3 all physical"},
+    {id:"iron_will",name:"Iron Will",desc:"+5 mental toughness"},
+    {id:"fast_hands",name:"Fast Hands",desc:"+5 hand speed"},
+  ];
+  tGrid.innerHTML = "";
+  TRAITS.forEach(t => {
+    const btn = document.createElement("div");
+    btn.className = "strategy-btn";
+    btn.innerHTML = '<strong>' + t.name + '</strong><br><small>' + t.desc + '</small>';
+    btn.dataset.trait = t.id;
+    btn.onclick = () => {
+      tGrid.querySelectorAll(".strategy-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+    };
+    tGrid.appendChild(btn);
+  });
+
+  // Populate personalities (Step 4)
+  const pGrid = qs("#personalityGrid");
+  const PERSONALITIES = [
+    {id:"charismatic",name:"Charismatic",desc:"Natural charisma"},
+    {id:"intimidating",name:"Intimidating",desc:"Strikes fear"},
+    {id:"humble",name:"Humble",desc:"Respected"},
+    {id:"cocky",name:"Cocky",desc:"Loves spotlight"},
+    {id:"quiet",name:"Quiet",desc:"Lets fighting talk"},
+    {id:"savage",name:"Savage",desc:"No mercy"},
+  ];
+  pGrid.innerHTML = "";
+  PERSONALITIES.forEach(p => {
+    const btn = document.createElement("div");
+    btn.className = "strategy-btn";
+    btn.innerHTML = '<strong>' + p.name + '</strong><br><small>' + p.desc + '</small>';
+    btn.dataset.pers = p.id;
+    btn.onclick = () => {
+      pGrid.querySelectorAll(".strategy-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+    };
+    pGrid.appendChild(btn);
+  });
+  if (pGrid.firstChild) pGrid.firstChild.className += " selected";
+});
+
+document.getElementById("startCareerBtn").addEventListener("click", createFighter);
 </script>
 </body>
 </html>
