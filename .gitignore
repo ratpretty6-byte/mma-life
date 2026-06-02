@@ -17,3 +17,8 @@ temp_*
 .opencode/node_modules/
 .vscode/
 coverage.svg
+.playwright-mcp/
+.session_cache/
+*.png
+trace_*.py
+diagnose_*.py
