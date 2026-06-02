@@ -393,7 +393,6 @@ def get_state_dict(session):
             "regions": utils.REGIONS,
         }
     promo = get_session_promotion(session)
-    training = session.get("training")
     game_date = session.get("game_date", datetime.now())
     return {
         "free_agent": promo is None,
@@ -454,7 +453,6 @@ def get_state_dict(session):
             "career_fights": f.career_total_fights,
             "ko_losses": f.career_ko_losses,
             "prime_status": "prime" if f.PRIME_START <= f.age <= f.PRIME_END else ("developing" if f.age < f.PRIME_START else "declining"),
-            "peak_rank": f.peak_rank,
             "scouting_level": getattr(f, 'times_scouted', 0),
             "signature_strikes": f.signature_strikes,
             "popularity": round(getattr(f, "popularity", 10), 1),
@@ -750,15 +748,7 @@ def _get_career_state(session, game_date=None):
         "yearly_subs": getattr(c, '_yearly_subs', 0),
     }
 
-def get_available_camps_data():
-    camps = TrainingCamp.get_available_camps()
-    result = []
-    for c in camps:
-        drills = []
-        for d in c.available_drills:
-            drills.append({"name": d.name, "duration": d.duration_days, "type": d.drill_type, "attrs": d.affected_attrs})
-        result.append({"name": c.name, "type": c.camp_type, "weeks": c.duration_weeks, "cost": c.cost, "drills": drills})
-    return result
+
 
 # ============================================================
 # FIGHT STREAMING — background thread with event polling
@@ -1329,7 +1319,7 @@ class Handler(BaseHTTPRequestHandler):
                     }
                     session["_last_fight_week_event"] = fight_week_event
                     progress = session.setdefault("fight_week_progress", {})
-                    if fight_week_event.get("event") and fight_week_event["event"] not in ("weigh_in",):
+                    if fight_week_event.get("event"):
                         progress[fight_week_event["event"]] = fight_week_event
                 else:
                     result = training.advance_day(game_date)

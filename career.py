@@ -171,15 +171,16 @@ class CareerSystem:
 
     def advance_season(self, game_date: datetime) -> Optional[Dict]:
         self.season_months += 1
-        if game_date:
-            if not getattr(self, '_awards_this_year', False):
-                late_dec = game_date.month == 12 and game_date.day >= 25
-                early_jan = game_date.month == 1 and game_date.day <= 5
-                if late_dec or early_jan:
-                    self._awards_this_year = True
-                    return self._calculate_year_end_awards()
-            if game_date.month == 1 and game_date.day > 5:
-                self._awards_this_year = False
+        if not game_date:
+            return None
+        awarded = getattr(self, '_awards_this_year', False)
+        late_dec = game_date.month == 12 and game_date.day >= 25
+        early_jan = game_date.month == 1 and game_date.day <= 5
+        if not awarded and (late_dec or early_jan):
+            self._awards_this_year = True
+            return self._calculate_year_end_awards()
+        if game_date.month == 1 and game_date.day > 5:
+            self._awards_this_year = False
         return None
 
     def record_season_fight(self, won: bool, method: str, round_num: int, opponent: Fighter, is_title: bool = False):

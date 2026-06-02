@@ -282,11 +282,6 @@ class Referee:
             return
 
         # Track unanswered strikes per fighter
-        if fighter == self.fighter_ref:
-            other_unanswered = self.f2_unanswered_strikes
-        else:
-            other_unanswered = self.f1_unanswered_strikes
-
         # When a fighter lands, reset the attacker's unanswered count
         # and increment the defender's
         if attacker:
@@ -320,13 +315,11 @@ class FighterState:
         self.recovery_rate = 0.3  # per action
 
     def transition(self, head_health_pct: float, is_struck: bool, strike_severity: str):
-        prev = self.state
-
         if self.state == "NORMAL":
             if head_health_pct < 55:
                 self.state = "HURT"
                 self.hurt_timer = 0
-            elif is_struck and strike_severity in ("Flush", "Devastating"):
+            elif is_struck and ("Flush" in strike_severity or "Devastating" in strike_severity):
                 self.state = "ROCKED"
                 self.rocked_timer = 2
 
@@ -659,7 +652,6 @@ class Fight:
         """
         base = 1.0
         f_state = self.f1_state if fighter_num == 1 else self.f2_state
-        f_obj = self.fighter1 if fighter_num == 1 else self.fighter2
 
         # Being hurt increases adrenaline
         if f_state["hurt"]:
@@ -910,7 +902,6 @@ class Fight:
                 if self.round_time_elapsed >= ROUND_DURATION:
                     break
 
-                phase_progress = action_idx / max(1, total_actions)
                 phase = self._get_round_phase(action_idx, total_actions)
 
                 # Check referee standup (MMA-specific)
@@ -992,8 +983,8 @@ class Fight:
                         sound = "impact"
                     if self.crowd_excitement > 80:
                         reaction = reaction or "cheer"
-                    elif self.crowd_excitement < 25:
-                        reaction = reaction or "silence"
+                    elif self.crowd_excitement < 25 and not reaction:
+                        reaction = "silence"
 
                     event = {"type": "action", "text": last, "round": round_num,
                              "f1_health": self._get_display_health(self.fighter1),
@@ -1148,8 +1139,8 @@ class Fight:
                 f1_strikes_thrown = self.f1_state.get("strikes_thrown", 0) - self.f1_round_snap_sig
                 f2_strikes_thrown = self.f2_state.get("strikes_thrown", 0) - self.f2_round_snap_sig
                 yield {"type": "strategy_prompt", "round": round_num,
-                       "f1_stats": {"sig_strikes": f1_sig, "strikes_thrown": max(f1_sig, f1_strikes_thrown), "strikes_attempted": f1_att, "takedowns": f1_td, "takedowns_attempted": max(f1_td, f1_td_att), "fatigue": round(f1_fat), "sub_attempts": f1_sub, "grapple_points": round(f1_gp, 1)},
-                       "f2_stats": {"sig_strikes": f2_sig, "strikes_thrown": max(f2_sig, f2_strikes_thrown), "strikes_attempted": f2_att, "takedowns": f2_td, "takedowns_attempted": max(f2_td, f2_td_att), "fatigue": round(f2_fat), "sub_attempts": f2_sub, "grapple_points": round(f2_gp, 1)},
+                       "f1_stats": {"sig_strikes": f1_sig, "strikes_thrown": max(f1_sig, f1_strikes_thrown), "strikes_attempted": f1_att,                         "takedowns": f1_td, "takedowns_attempted": max(f1_td_att, f1_td), "fatigue": round(f1_fat), "sub_attempts": f1_sub, "grapple_points": round(f1_gp, 1)},
+                       "f2_stats": {"sig_strikes": f2_sig, "strikes_thrown": max(f2_sig, f2_strikes_thrown), "strikes_attempted": f2_att, "takedowns": f2_td, "takedowns_attempted": max(f2_td_att, f2_td), "fatigue": round(f2_fat), "sub_attempts": f2_sub, "grapple_points": round(f2_gp, 1)},
                        "f1_total_score": self._get_total_score_for(1),
                        "f2_total_score": self._get_total_score_for(2),
                        "f1_health": self._get_display_health(self.fighter1),
@@ -1724,8 +1715,6 @@ class Fight:
         combo_power_bonus = base_bonus * combo_feint_bonus
 
         # Scale stamina cost per strike in combo
-        stamina_cost_mult = 1.0
-
         results = []
         landed = 0
         for i, strike_type in enumerate(strikes):
@@ -1741,9 +1730,6 @@ class Fight:
             accuracy_penalty = 1.0 - (i * 0.07)
             mod_copy = state_mods.copy()
             mod_copy["accuracy"] *= accuracy_penalty
-
-            group = "HEAD" if target in ("head", "jaw", "temple", "nose", "left_eye", "right_eye") else (
-                    "BODY" if target in ("body", "chest", "solar_plexus", "liver", "ribs") else "LEGS")
 
             # Scale stamina cost: 1st strike ×1.0, 2nd ×1.15, 3rd ×1.35, 4th+ ×1.55
             strike_scale = [1.0, 1.15, 1.35, 1.55]
@@ -1872,7 +1858,11 @@ class Fight:
                     types.remove("kick")
             return random.choice(types)
         elif pos == Position.POCKET:
-            return random.choice(["jab", "cross", "hook", "uppercut", "knee", "elbow"])
+            types = ["jab", "cross", "hook", "uppercut", "knee", "elbow"]
+            if body_bias > 0:
+                types.extend(["body_shot"] * int(body_bias * 10))
+                types.extend(["uppercut"] * int(body_bias * 5))
+            return random.choice(types)
         elif pos in (Position.CLINCH,):
             return random.choice(["knee", "elbow"])
         elif Position.is_ground(pos):
@@ -1885,24 +1875,20 @@ class Fight:
         is_ground = Position.is_ground(pos)
 
         # Strategy-dependent target bias
-        body_bias = 0.0
-        leg_bias = 0.0
-        head_bias = 0.0
         if strategy:
             mods = strategy.get_modifiers()
             body_bias = mods.get("body_damage_bonus", 0.0) - 1.0 if mods.get("body_damage_bonus") else 0.0
-            kick_bonus = mods.get("kick_power", 1.0)
+        else:
+            body_bias = 0.0
+        leg_bias = 0.0
+        sid = strategy.current_strategy.get("id") if strategy and strategy.current_strategy else None
 
         if is_kick:
             r = random.random()
             # Leg kick focus increases leg target chance
-            if strategy and strategy.current_strategy and strategy.current_strategy.get("id") == "leg_kick_focus":
-                if r < 0.65:
-                    return "legs"
-                elif r < 0.85:
-                    return "body"
-                else:
-                    return "head"
+            if sid == "leg_kick_focus":
+                leg_bias = 0.25
+            r -= leg_bias
             if r < 0.40:
                 return "legs"
             elif r < 0.75:
@@ -1913,8 +1899,11 @@ class Fight:
         if is_ground:
             return random.choice(["head", "head", "body", "body", "jaw"])
 
+        r = random.random()
+        body_mod = body_bias * 0.3
+        r -= body_mod
+
         if strike_type == "jab":
-            r = random.random()
             if r < 0.40:
                 return "nose"
             elif r < 0.65:
@@ -1924,7 +1913,6 @@ class Fight:
             else:
                 return "body"
         elif strike_type == "cross":
-            r = random.random()
             if r < 0.35:
                 return "jaw"
             elif r < 0.55:
@@ -1936,7 +1924,6 @@ class Fight:
             else:
                 return "body"
         elif strike_type == "hook":
-            r = random.random()
             if r < 0.40:
                 return "temple"
             elif r < 0.70:
@@ -1946,7 +1933,6 @@ class Fight:
             else:
                 return "body"
         elif strike_type == "uppercut":
-            r = random.random()
             if r < 0.50:
                 return "jaw"
             elif r < 0.75:
@@ -1954,7 +1940,6 @@ class Fight:
             else:
                 return "head"
         elif strike_type in ("knee", "elbow"):
-            r = random.random()
             if r < 0.50:
                 return "head"
             elif r < 0.80:
@@ -1962,7 +1947,6 @@ class Fight:
             else:
                 return "jaw"
         elif strike_type == "body_shot":
-            r = random.random()
             if r < 0.40:
                 return "solar_plexus"
             elif r < 0.75:
@@ -1970,7 +1954,6 @@ class Fight:
             else:
                 return "ribs"
         elif strike_type == "superman_punch":
-            r = random.random()
             if r < 0.35:
                 return "jaw"
             elif r < 0.55:
@@ -1978,15 +1961,7 @@ class Fight:
             else:
                 return "body"
 
-        # Default with body/head bias from strategy
-        r = random.random() * 1.0
-        r -= body_bias * 0.3  # body_bias shifts probability toward body
-        if r < 0.50:
-            return random.choice(["head", "head", "jaw", "temple"])
-        elif r < 0.75:
-            return "body"
-        else:
-            return random.choice(["jaw", "temple", "nose"])
+        return random.choice(["head", "body", "jaw"])
 
     def _perform_strike(self, attacker, defender, atk_state, def_state,
                         strike_type, target, strategy, phase, state_mods,
@@ -2005,7 +1980,6 @@ class Fight:
 
         # Base stats
         fight_iq = attacker.get_effective_attribute("fight_iq", atk_state["fatigue_level"])
-        discipline = attacker.get_effective_attribute("discipline", atk_state["fatigue_level"])
         composure = attacker.get_effective_attribute("composure", atk_state["fatigue_level"])
 
         # Strategy modifiers
@@ -2047,7 +2021,6 @@ class Fight:
         feint_stack = atk_state.get("feint_count", 0)
         feint_acc_bonus = 1.0 + feint_stack * 0.08
         feint_power_bonus = 1.0 + feint_stack * 0.05
-        feint_crit_bonus = 1.0 + feint_stack * 0.10
 
         # State modifiers from fighter state machine
         # Leg damage effects: kick power reduced by rear leg damage, movement by both
@@ -2217,7 +2190,6 @@ class Fight:
         # Momentum updates
         attacker_num = 1 if attacker == self.fighter1 else 2
         tier_name = tier["name"]
-        kd_chance = tier.get("knockdown_chance", 0)
         if is_critical:
             self._update_momentum(attacker_num, 8)
             self._update_momentum(3 - attacker_num, -5)
@@ -2774,10 +2746,6 @@ class Fight:
         pt = self.position_system.position_time
 
         # Strategy influences ground action choices
-        strats = [top_strategy, bottom_strategy]
-        top_mod = top_strategy.get_modifiers()
-        bottom_mod = bottom_strategy.get_modifiers()
-
         # Weighted decision based on position dominance
         # Higher top_control = top fighter dictates more; higher bottom_control = bottom dictates more
         top_control = top.get_effective_attribute("top_control", fatigue)
@@ -2992,8 +2960,6 @@ class Fight:
         # === CRUCIFIX: escape to turtle (only option) ===
         if pos == Position.GROUND_CRUCIFIX and pt > 3:
             if random.random() < 0.08 * escape_mod:
-                top_state = self.f1_state if top == self.fighter1 else self.f2_state
-                # Set ground to turtle as bottom escapes partially
                 self.position_system.current_position = Position.GROUND_TURTLE
                 self.fight_log.append(f"{bottom.name} fights the hands and gets to turtle position!")
                 self._apply_stamina_cost(bottom_state, "sweep", fatigue, bottom_cardio)
@@ -3043,7 +3009,6 @@ class Fight:
         power = attacker.get_effective_attribute("striking_power", fatigue) * sp_mod
         gsd = defender.get_effective_attribute("ground_striking_defense", 1.0 - (def_state["stamina"] / 100))
         durability = defender.get_effective_attribute("durability", 1.0 - (def_state["stamina"] / 100))
-        blocking = defender.get_effective_attribute("blocking", 1.0 - (def_state["stamina"] / 100))
 
         pos_power = {Position.GROUND_GUARD: 0.30, Position.GROUND_HALF_GUARD: 0.35,
                      Position.GROUND_SIDE: 0.45, Position.GROUND_NORTH_SOUTH: 0.50,
@@ -3353,8 +3318,6 @@ class Fight:
             return False
 
         # Jaw/temple hits are stun-prone
-        stun_threshold = 40 if target in ("jaw", "temple") else 55
-
         mental = defender.get_effective_attribute("mental_toughness", fatigue)
         durability = defender.get_effective_attribute("durability", fatigue)
         stun_chance = max(0, (damage * 0.8 - durability * 0.12 - mental * 0.08) * 1.2)
