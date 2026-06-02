@@ -980,6 +980,102 @@ async function init() {
 // Start the app
 init();
 
+function updateAllUI() {
+  if (!state || !state.fighter) return;
+  const f = state.fighter;
+  const p = state.promotion;
+  const t = state.training;
+  const fin = state.finance;
+  const car = state.career;
+  const fb = state.fight_booking;
+  const gd = state.game_date;
+  const isFA = state.free_agent || !p;
+  const faBanner = qs("#freeAgentBanner");
+  if (faBanner) faBanner.classList.toggle("hidden", !isFA);
+  const ac = qs("#advanceCard");
+  if (ac) ac.style.display = isFA ? "none" : "";
+  const hs = qs("#headerStatus");
+  if (hs) hs.textContent = f.name + " | " + f.record + " | #" + f.rank + " | " + (isFA ? "Free Agent" : (p ? p.name : "?"));
+
+  const setText = (id, val) => { const el = qs(id); if (el) el.textContent = val; };
+  const setHTML = (id, val) => { const el = qs(id); if (el) el.innerHTML = val; };
+
+  setText("#hRecord", f.record);
+  setText("#hRank", "#" + f.rank);
+  if (qs("#hPromoTag")) { qs("#hPromoTag").textContent = p ? p.tier : "FA";
+    qs("#hPromoTag").style.background = p && p.tier === "World" ? "#4a4a1a" : (p && p.tier === "National" ? "#2a2a4a" : "#2a3a2a"); }
+  setText("#hNet", "$" + (f.net_worth || 0).toLocaleString());
+  setText("#hRating", f.rating);
+  const streak = f.win_streak > 0 ? "W" + f.win_streak : (f.loss_streak > 0 ? "L" + f.loss_streak : "0");
+  setText("#hStreak", streak);
+  setText("#hStance", f.stance ? (f.stance.charAt(0).toUpperCase() + f.stance.slice(1)) : "--");
+  setText("#hInjuries", (f.injuries && f.injuries.length) ? f.injuries.map(function(i) { return i.type; }).join(", ") : "None");
+  setText("#hGym", fin ? fin.gym : "None");
+  setText("#hDate", gd || "--");
+
+  const fdb = qs("#btnFightDay");
+  if (fdb) fdb.classList.toggle("hidden", !(fb && fb.days_until <= 0));
+
+  if (qs("#hFatigueRow")) qs("#hFatigueRow").style.display = "";
+  const ft = t ? (t.fatigue || 0) : 0;
+  const ftColor = ft > 70 ? "#ff4a4a" : (ft > 40 ? "#ffd700" : "#4aff6a");
+  if (qs("#hFatigue")) qs("#hFatigue").innerHTML = ft > 0 ? '<span style="color:' + ftColor + ';font-weight:600">' + ft + '%</span>' : '<span style="color:#888">Rested</span>';
+
+  if (fb) {
+    setHTML("#hNextFight", "vs " + escHtml(fb.opponent.name) + " (" + fb.days_until + "d)");
+    if (fb.fight_week_day) setHTML("#hNextFight", qs("#hNextFight").textContent + '<br><span style="color:#ffd700;font-size:10px">&#x1F4C5; Fight Week: ' + escHtml(fb.fight_week_day) + "</span>");
+  } else {
+    setText("#hNextFight", "Not booked");
+  }
+
+  if (t && t.schedule) {
+    setText("#todayDay", t.schedule.current_day || "Monday");
+    var drill = t.schedule.schedule ? t.schedule.schedule[t.schedule.current_day] : null;
+    if (drill && drill !== "Rest") setText("#todayPreview", "Training: " + drill);
+    else if (t.schedule.schedule && Object.values(t.schedule.schedule).some(function(d) { return d && d !== "Rest"; })) setText("#todayPreview", "Rest day (fatigue recovery)");
+    else if (t.in_camp) setText("#todayPreview", "Rest day (fatigue recovery)");
+    else setText("#todayPreview", "Set up training in the Gym tab.");
+  } else {
+    setText("#todayPreview", "Set up training in the Gym tab.");
+  }
+
+  updateNextAction();
+  updatePromoOffer();
+  updateGymTab();
+  updateScheduleGrid();
+  updateNewsFeed();
+}
+
+function updateNextAction() {
+  const card = qs("#nextActionCard");
+  if (!card) return;
+  const f = state.fighter;
+  const t = state.training;
+  const fb = state.fight_booking;
+  let html = "";
+  if (fb && fb.days_until <= 0 && !state.fight_completed) {
+    html = '<div class="action-label">Next Action</div><div class="action-text">FIGHT DAY!</div><div style="margin-top:6px"><button class="btn btn-gold" onclick="switchTab(\'fight\')" style="font-size:14px">GO TO FIGHT</button></div>';
+  } else if (fb && fb.days_until > 0) {
+    html = '<div class="action-label">Next Action</div><div class="action-text">Fight in ' + fb.days_until + ' days — keep training!</div>';
+  } else if (t && t.in_camp) {
+    html = '<div class="action-label">Next Action</div><div class="action-text">Training camp active — advance days to train</div>';
+  } else if (t && t.in_training) {
+    html = '<div class="action-label">Next Action</div><div class="action-text">Base training active — advance days to train</div>';
+  } else {
+    html = '<div class="action-label">Next Action</div><div class="action-text">Start training, join a camp, or book a fight</div>';
+  }
+  card.innerHTML = html;
+  card.classList.remove("hidden");
+}
+
+async function forceRefresh() {
+  const resp = await api("/api/state?sid=" + encodeURIComponent(sid));
+  if (resp && resp.fighter) state = resp;
+  if (state && state.strategies) STRATS = state.strategies;
+  updateAllUI();
+  toast("Refreshed", "success");
+}
+
 async function initMainMenu() {
   qs("#screen-main-menu").classList.remove("hidden");
   qs("#screen-create").classList.add("hidden");
