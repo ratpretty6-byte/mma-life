@@ -956,8 +956,8 @@ async function init() {
       }
       // Poll until initialized
       qs("#headerStatus").textContent = "Generating fight world...";
-      for (let i = 0; i < 180; i++) {
-        await sleep(1000);
+      for (let i = 0; i < 60; i++) {
+        await sleep(2000);
         try {
           const hr = await api("/api/health");
           if (hr && hr.initialized) {
@@ -965,11 +965,13 @@ async function init() {
             initMainMenu();
             return;
           }
-          qs("#headerStatus").textContent = `Initializing world... (${i + 1}s)`;
+          qs("#headerStatus").textContent = `Initializing world... (${(i+1)*2}s)`;
         } catch(e) {
-          qs("#headerStatus").textContent = `Waiting for server... (${i + 1}s)`;
+          qs("#headerStatus").textContent = `Waiting for server... (${(i+1)*2}s)`;
         }
       }
+      qs("#headerStatus").textContent = "Server is taking longer than expected. Try refreshing the page.";
+      setTimeout(initMainMenu, 3000);
       qs("#headerStatus").textContent = "Server taking long. Try refreshing.";
       initMainMenu();
     } else {

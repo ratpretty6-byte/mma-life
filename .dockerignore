@@ -9,3 +9,10 @@ README.md
 start_server.sh
 nixpacks.toml
 railway.json
+*.db
+*.db-shm
+*.db-wal
+.session_cache/
+.playwright-mcp/
+.opencode/node_modules/
+templates/test.*

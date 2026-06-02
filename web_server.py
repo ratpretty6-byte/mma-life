@@ -96,7 +96,13 @@ def ensure_initialized():
             print(f"INIT FAILED: {e}")
             import traceback
             traceback.print_exc()
-            raise
+            print("Server will start without full world — some features may be limited.")
+            with _gs_lock:
+                gs["promotions"] = gs.get("promotions", [])
+                gs["all_fighters"] = gs.get("all_fighters", [])
+                gs["world_sim"] = gs.get("world_sim", None)
+                gs["world_news"] = gs.get("world_news", [])
+                gs["initialized"] = True
 
 def get_promotions_by_tier(tier_name=None):
     promos = _gs_get("promotions") or []
