@@ -379,10 +379,6 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
           <div>
             <label>Home Region</label>
             <select id="fRegion" name="region">
-              <option value="California">California</option>
-              <option value="Texas">Texas</option>
-              <option value="New York">New York</option>
-              <option value="Florida">Florida</option>
             </select>
           </div>
         </div>
@@ -2916,6 +2912,39 @@ document.getElementById("btnNewGame").addEventListener("click", function() {
   qs("#screen-create").classList.remove("hidden");
   showWizardStep(1);
   initWizard();
+
+  // Nationality → Region mapping
+  function updateRegions() {
+    const nat = qs("#fNationality").value;
+    const REGIONS = {
+      "American":["California","Texas","New York","Florida","Ohio","Colorado","Nevada","Arizona"],
+      "Brazilian":["Rio de Janeiro","Sao Paulo","Bahia","Minas Gerais","Ceara"],
+      "Russian":["Moscow","St. Petersburg","Dagestan","Chechnya","Siberia"],
+      "Japanese":["Tokyo","Osaka","Yokohama","Nagoya","Okinawa"],
+      "British":["London","Manchester","Liverpool","Birmingham","Scotland"],
+      "Canadian":["Ontario","Quebec","British Columbia","Alberta","Nova Scotia"],
+      "French":["Paris","Lyon","Marseille","Bordeaux","Toulouse"],
+      "Dutch":["Amsterdam","Rotterdam","Utrecht","The Hague","Eindhoven"],
+      "Australian":["Sydney","Melbourne","Brisbane","Perth","Gold Coast"],
+      "Polish":["Warsaw","Krakow","Gdansk","Wroclaw","Poznan"],
+      "Korean":["Seoul","Busan","Incheon","Daegu","Ulsan"],
+      "Mexican":["Mexico City","Guadalajara","Monterrey","Tijuana","Puebla"],
+      "German":["Berlin","Munich","Hamburg","Cologne","Frankfurt"],
+      "Italian":["Rome","Milan","Naples","Turin","Florence"],
+      "Spanish":["Madrid","Barcelona","Valencia","Seville","Bilbao"],
+    };
+    const regions = REGIONS[nat] || ["Capital City", "Major City", "Coastal City"];
+    const sel = qs("#fRegion");
+    sel.innerHTML = "";
+    regions.forEach(function(r) {
+      var o = document.createElement("option");
+      o.value = r;
+      o.textContent = r;
+      sel.appendChild(o);
+    });
+  }
+  qs("#fNationality").addEventListener("change", updateRegions);
+  updateRegions();
 
   // Populate weight classes (Step 2)
   const wcGrid = qs("#wcGrid");
