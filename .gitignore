@@ -21,13 +21,9 @@ coverage.svg
 .session_cache/
 *.png
 trace_*.py
-diagnose_*.py*.txt
+diagnose_*.py
 test_comprehensive.py
 tmp_*.py
-
-# Audit/test artifacts
 *_balance*.txt
-diagnose_*.py
-trace_*.py
-test_*.py
+06-balance-*.txt
 
