@@ -2943,12 +2943,13 @@ document.getElementById("btnNewGame").addEventListener("click", function() {
     };
     wcGrid.appendChild(card);
   });
-  updateHeightReachForWC(3);
 
   const heightSlider = qs("#fHeight");
   const reachSlider = qs("#fReach");
   heightSlider.oninput = () => { qs("#heightValue").textContent = heightSlider.value; updateHeightReachInfo(); };
   reachSlider.oninput = () => { qs("#reachValue").textContent = reachSlider.value; updateHeightReachInfo(); };
+  updateHeightReachForWC(3);
+
   function updateHeightReachInfo() {
     const h = parseInt(heightSlider.value);
     const r = parseInt(reachSlider.value);
