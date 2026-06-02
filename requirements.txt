@@ -6,5 +6,5 @@ pytest-cov>=7.0
 ruff>=0.15
 mypy>=2.0
 websockets>=16.0
-diskcache>=5.6
+diskcache>=5.6.3
 faker>=40.0
