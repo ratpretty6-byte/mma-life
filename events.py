@@ -64,17 +64,28 @@ class FightBooking:
         self.round = round
         self.fight_stats = fight_stats or {}
         if winner:
-            loser = self.fighter2 if winner == self.fighter1 else self.fighter1
-            winner.wins += 1
-            loser.losses += 1
-            winner.update_streaks(True)
-            loser.update_streaks(False)
-            if "KO" in method or "TKO" in method:
-                winner.knockouts += 1
-            elif "Submission" in method:
-                winner.submissions += 1
-            winner.shake_ring_rust()
-            loser.shake_ring_rust()
+            if winner == self.fighter1:
+                self.fighter1.wins += 1
+                self.fighter2.losses += 1
+                self.fighter1.update_streaks(True)
+                self.fighter2.update_streaks(False)
+                if "KO" in method or "TKO" in method:
+                    self.fighter1.knockouts += 1
+                elif "Submission" in method:
+                    self.fighter1.submissions += 1
+                self.fighter1.shake_ring_rust()
+                self.fighter2.shake_ring_rust()
+            elif winner == self.fighter2:
+                self.fighter2.wins += 1
+                self.fighter1.losses += 1
+                self.fighter2.update_streaks(True)
+                self.fighter1.update_streaks(False)
+                if "KO" in method or "TKO" in method:
+                    self.fighter2.knockouts += 1
+                elif "Submission" in method:
+                    self.fighter2.submissions += 1
+                self.fighter2.shake_ring_rust()
+                self.fighter1.shake_ring_rust()
         else:
             self.fighter1.draws += 1
             self.fighter2.draws += 1

@@ -1751,9 +1751,11 @@ class Handler(BaseHTTPRequestHandler):
                     for attr in ["wins", "losses", "draws", "knockouts", "submissions", "win_streak", "loss_streak"]:
                         setattr(original_opp, attr, getattr(opponent, attr))
                 # Update player fighter record directly (DiskCache deserialization may disconnect)
-                f.wins = fb.fighter1.wins if fb.fighter1 == f else (fb.fighter2.wins if fb.fighter2 == f else f.wins)
-                f.losses = fb.fighter1.losses if fb.fighter1 == f else (fb.fighter2.losses if fb.fighter2 == f else f.losses)
-                f.draws = fb.fighter1.draws if fb.fighter1 == f else (fb.fighter2.draws if fb.fighter2 == f else f.draws)
+                fb_fighter = fb.fighter1 if fb.fighter1 == f else (fb.fighter2 if fb.fighter2 == f else None)
+                if fb_fighter is not None:
+                    for attr in ["wins", "losses", "draws", "knockouts", "submissions", "win_streak", "loss_streak"]:
+                        setattr(f, attr, getattr(fb_fighter, attr))
+                f.career_fights = f.wins + f.losses + f.draws
                 if winner:
                     f.shake_ring_rust()
                     opponent.shake_ring_rust()

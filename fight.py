@@ -447,17 +447,19 @@ class Judge:
             f2_round = 10
             f1_round = max(7, 10 - self._score_diff_to_points(abs(diff)))
 
-        # 10-8 gate: rarely score 10-8 unless multiple knockdowns or massive domination
+        # 10-8 gate: only score 10-8/10-7 on clear dominance (2+ knockdowns or massive damage gap)
         if (10 - min(f1_round, f2_round)) >= 2:
             sig_f1 = rd.get("f1_sig_strikes", 0)
             sig_f2 = rd.get("f2_sig_strikes", 0)
             total_sig = max(sig_f1, sig_f2, 1)
             min_ratio = min(sig_f1, sig_f2) / total_sig
-            if abs(kd_diff) < 2 and min_ratio > 0.25:
-                loser_score = max(f1_round, f2_round)
-                if loser_score == 8:
-                    f1_round = 10 if f1_round > f2_round else 9
-                    f2_round = 9 if f1_round > f2_round else 10
+            has_real_kd = abs(kd_diff) >= 2
+            if not has_real_kd and min_ratio > 0.2:
+                f1_round, f2_round = 10, 9
+                if kd_diff > 0:
+                    f2_round = max(9, f2_round)
+                elif kd_diff < 0:
+                    f1_round = max(9, f1_round)
 
         self.scores.append([f1_round, f2_round])
         self.round_details.append(rd)
@@ -469,11 +471,11 @@ class Judge:
 
     @staticmethod
     def _score_diff_to_points(diff: float) -> int:
-        if diff < 0.5:
+        if diff < 1.5:
             return 1
-        elif diff < 2.5:
+        elif diff < 3.5:
             return 2
-        elif diff < 4.5:
+        elif diff < 5.5:
             return 3
         else:
             return 4
