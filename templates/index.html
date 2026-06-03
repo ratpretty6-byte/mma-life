@@ -90,13 +90,15 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-base
 .stat-group .group-title { font-size: var(--text-sm); color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: var(--space-2); }
 
 /* Header */
-.header { background: var(--bg-surface); border-bottom: 2px solid var(--accent); padding: 10px 0; margin-bottom: 12px; position: sticky; top: 0; z-index: 50; }
-.header h1 { font-size: 17px; color: var(--accent); }
+.header { background: var(--bg-surface); border-bottom: 1px solid var(--accent); padding: 8px 0; margin-bottom: 12px; position: sticky; top: 0; z-index: 50; box-shadow: 0 0 20px var(--accent-glow); }
+.header h1 { font-size: 15px; color: var(--accent); letter-spacing: 2px; }
 .header .sub { font-size: var(--text-xs); color: var(--text-muted); }
+.header-btn { font-size: 10px; padding: 4px 8px; min-height: 28px; }
 
 /* Tabs */
 .desktop-tabs { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 10px; }
-.tab { padding: 8px 14px; background: var(--bg-elevated); border-radius: 6px 6px 0 0; cursor: pointer; font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); border: 1px solid var(--border-subtle); border-bottom: none; -webkit-tap-highlight-color: transparent; user-select: none; transition: color var(--transition-fast), background var(--transition-fast); }
+.tab { padding: 8px 14px; background: var(--bg-elevated); border-radius: 6px 6px 0 0; cursor: pointer; font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); border: 1px solid var(--border-subtle); border-bottom: none; -webkit-tap-highlight-color: transparent; user-select: none; transition: color var(--transition-fast), background var(--transition-fast); display: inline-flex; align-items: center; gap: 5px; }
+.tab .tab-icon { font-size: 14px; line-height: 1; }
 .tab:hover { color: var(--text-primary); background: var(--bg-hover); }
 .tab.active { background: var(--bg-surface); color: var(--accent); border-color: var(--accent); border-bottom: 2px solid var(--accent); }
 
@@ -215,6 +217,9 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-base
 .diff-medium { background: var(--warn-bg); color: var(--gold); }
 .diff-hard { background: var(--danger-bg); color: var(--danger); }
 .diff-pick { background: var(--info-bg); color: var(--opponent-blue); }
+.diff-sacrifice { background: var(--danger-bg); color: var(--danger); }
+.diff-tough { background: var(--danger-bg); color: #ff9a4a; }
+.diff-gimme { background: var(--success-bg); color: var(--success); }
 
 /* Health bars */
 .health-bar-outer { height: 16px; background: var(--bg-elevated); border-radius: 8px; overflow: hidden; position: relative; }
@@ -243,10 +248,11 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
 /* Modals */
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(2px); }
-.modal-content { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); padding: var(--space-5); max-width: 560px; width: 92%; max-height: 85vh; overflow-y: auto; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); animation: fadeIn 150ms ease; }
+.modal-content { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); padding: var(--space-5); max-width: 560px; width: 92%; max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow-elevated), 0 0 40px rgba(0,0,0,0.5); }
 .modal-content h2 { color: var(--text-primary); margin-bottom: 10px; font-size: var(--text-lg); }
 .modal-content h3 { color: var(--accent); font-size: var(--text-md); margin: 8px 0 4px; }
+.modal-actions { display: flex; gap: 8px; margin-top: var(--space-4); justify-content: center; }
 
 /* Wizard (reworked below) */
 
@@ -256,10 +262,6 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 .list-item:active { background: var(--bg-pressed); }
 
 /* Attribute bars */
-/* Spinner */
-.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border-subtle); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 4px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
 .attr-bar { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 .attr-bar .label { width: 140px; font-size: var(--text-sm); color: #aaa; text-align: right; flex-shrink: 0; }
 .attr-bar .track { flex: 1; height: 14px; background: var(--bg-elevated); border-radius: 7px; overflow: hidden; }
@@ -286,7 +288,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 .speed-row { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
 .compare-grid { display: grid; gap: 12px; }
 .compare-grid-2 { grid-template-columns: 1fr 1fr; }
-.compare-grid-3 { grid-template-columns: 1fr auto 1fr; }
+.compare-grid-3 { grid-template-columns: 1fr auto 1fr; align-items: center; }
 .compare-col { background: var(--bg-elevated); border-radius: var(--radius-md); padding: 10px; }
 .compare-col h4 { color: var(--accent); font-size: var(--text-base); margin-bottom: 6px; }
 .flex-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -295,11 +297,15 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 .tag-win { background: var(--success-bg); color: var(--success); }
 .tag-loss { background: var(--danger-bg); color: var(--danger); }
 .tag-promo { background: var(--info-bg); color: var(--opponent-blue); }
-.tag-champ { background: #4a4a1a; color: var(--gold); }
+.tag-champ { background: var(--warn-bg); color: var(--gold); }
 
 /* Toast */
 .toast-container { position: fixed; top: 60px; right: 10px; z-index: 200; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
 .toast { background: var(--bg-surface); border: 1px solid var(--accent); color: var(--text-primary); padding: 10px 16px; border-radius: var(--radius-md); font-size: var(--text-base); animation: toastIn .3s ease, toastOut .3s ease 2.7s; max-width: 300px; text-align: center; pointer-events: auto; }
+.toast.success { border-color: var(--success); }
+.toast.error { border-color: var(--danger); }
+@keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
 
 /* Next action card */
 .next-action { background: linear-gradient(135deg, var(--success-bg), var(--bg-surface)); border: 1px solid var(--success); border-radius: var(--radius-md); padding: 12px; margin-bottom: 8px; text-align: center; }
@@ -322,13 +328,43 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 .wc-card .wc-name { font-size: var(--text-base); font-weight: 700; color: var(--text-primary); }
 .wc-card .wc-weight { font-size: var(--text-xs); color: var(--text-muted); }
 
-/* Fighter preview card */
-.fighter-preview { background: linear-gradient(135deg, var(--bg-elevated), var(--bg-surface)); border: 1px solid var(--accent); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; margin-bottom: var(--space-3); }
-.fighter-preview .fp-name { font-size: var(--text-xl); font-weight: 900; color: var(--text-primary); }
-.fighter-preview .fp-record { font-size: var(--text-lg); color: var(--gold); margin: 4px 0; }
-.fighter-preview .fp-meta { font-size: var(--text-sm); color: var(--text-muted); }
-.fighter-preview .fp-attr-label { font-size: var(--text-xs); color: var(--text-muted); margin-top: 6px; }
-.fighter-preview .fp-attr-bar { height: 6px; background: var(--bg-base); border-radius: 3px; overflow: hidden; margin: 2px 0; }
+/* Card variants */
+.card-success { border-color: var(--success); }
+.card-warning { border-color: var(--gold); }
+.card-danger { border-color: var(--danger); }
+.card-info { border-color: var(--opponent-blue); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.card-header .card-title { margin-bottom: 0; }
+
+/* Badge */
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-sm); font-size: var(--text-xs); font-weight: 600; line-height: 1.4; }
+.badge-accent { background: var(--accent-glow); color: var(--accent); }
+.badge-gold { background: var(--gold-glow); color: var(--gold); }
+.badge-success { background: var(--success-glow); color: var(--success); }
+
+/* Divider */
+.divider { height: 1px; background: var(--border-subtle); margin: var(--space-3) 0; }
+
+/* Text colors */
+.text-accent { color: var(--accent); }
+.text-gold { color: var(--gold); }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+.text-muted { color: var(--text-muted); }
+
+/* Gap utilities */
+.gap-xs { gap: 4px; }
+.gap-sm { gap: 8px; }
+.gap-md { gap: 12px; }
+.gap-lg { gap: 16px; }
+
+/* Stats grid */
+.stats-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+/* Offer card */
+.offer-card { padding: 8px; margin: 6px 0; background: var(--bg-elevated); border-radius: var(--radius-md); cursor: pointer; border-left: 3px solid var(--text-muted); transition: background var(--transition-fast); }
+.offer-card:hover { background: var(--bg-hover); }
+.offer-card:active { background: var(--bg-pressed); }
 
 /* Mobile */
 @media (max-width: 768px) {
@@ -357,12 +393,14 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 </noscript>
 <div class="header">
   <div class="container">
-    <h1>MMA LIFE SIMULATOR</h1>
-    <div class="flex-row" style="justify-content:space-between">
-      <div class="sub" id="headerStatus">Initializing...</div>
-      <div class="flex-row" style="gap:4px">
-        <button class="btn btn-ghost btn-small hidden" id="btnSettings" onclick="showSettingsModal()" style="font-size:10px;padding:3px 8px" title="Settings">&#x2699;</button>
-        <button class="btn btn-ghost btn-small hidden" id="btnRefresh" onclick="forceRefresh()" style="font-size:10px;padding:3px 8px" title="Refresh state from server">&#x21bb;</button>
+    <div class="flex-between">
+      <div>
+        <h1>MMA LIFE SIMULATOR</h1>
+        <div class="sub" id="headerStatus">Initializing...</div>
+      </div>
+      <div class="flex-row gap-xs">
+        <button class="btn btn-ghost header-btn hidden" id="btnSettings" onclick="showSettingsModal()" title="Settings">&#x2699;</button>
+        <button class="btn btn-ghost header-btn hidden" id="btnRefresh" onclick="forceRefresh()" title="Refresh state from server">&#x21bb;</button>
       </div>
     </div>
   </div>
@@ -547,29 +585,29 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 
   <div id="screen-game" class="hidden screen">
     <div class="desktop-tabs" id="mainTabs">
-      <div class="tab active" data-tab="home" onclick="switchTab('home')">Home</div>
-      <div class="tab" data-tab="gym" onclick="switchTab('gym')">Gym</div>
-      <div class="tab" data-tab="fight" onclick="switchTab('fight')">Fight</div>
-      <div class="tab" data-tab="career" onclick="switchTab('career')">Career</div>
-      <div class="tab" data-tab="finance" onclick="switchTab('finance')">Finance</div>
+      <div class="tab active" data-tab="home" onclick="switchTab('home')"><span class="tab-icon">&#x1F3E0;</span> Home</div>
+      <div class="tab" data-tab="gym" onclick="switchTab('gym')"><span class="tab-icon">&#x1F4AA;</span> Gym</div>
+      <div class="tab" data-tab="fight" onclick="switchTab('fight')"><span class="tab-icon">&#x1F94A;</span> Fight</div>
+      <div class="tab" data-tab="career" onclick="switchTab('career')"><span class="tab-icon">&#x1F3C6;</span> Career</div>
+      <div class="tab" data-tab="finance" onclick="switchTab('finance')"><span class="tab-icon">&#x1F4B0;</span> Finance</div>
     </div>
 
     <!-- HOME TAB -->
     <div id="tab-home" class="tab-content fade-in">
-      <div id="freeAgentBanner" class="hidden card card-highlight" style="text-align:center;border-color:var(--gold)">
-        <div class="card-title" style="color:var(--gold)">FREE AGENT</div>
-        <p style="font-size:13px;color:#ccc;margin-bottom:6px">You are not signed with any promotion. Sign a contract to start your career!</p>
+      <div id="freeAgentBanner" class="hidden card card-warning" style="text-align:center">
+        <div class="card-title text-gold">FREE AGENT</div>
+        <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:6px">You are not signed with any promotion. Sign a contract to start your career!</p>
         <button class="btn btn-gold" onclick="showContractOffers()">VIEW CONTRACT OFFERS</button>
       </div>
       <div class="card">
         <div class="flex-between">
-          <div><span class="stat-label">Record</span> <span class="stat-value" id="hRecord" style="font-size:18px">0-0-0</span></div>
+          <div><span class="stat-label">Record</span> <span class="stat-value" style="font-size:18px" id="hRecord">0-0-0</span></div>
           <div><span class="tag tag-promo" id="hPromoTag">Regional</span></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
-          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rank</span><br><span class="stat-value" id="hRank" style="font-size:16px">#--</span></div>
-          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rating</span><br><span class="stat-value" id="hRating" style="font-size:16px">--</span></div>
-          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Net Worth</span><br><span class="stat-value" id="hNet" style="font-size:14px">$0</span></div>
+        <div class="stats-grid-3" style="margin-top:8px">
+          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rank</span><br><span class="stat-value" style="font-size:16px" id="hRank">#--</span></div>
+          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Rating</span><br><span class="stat-value" style="font-size:16px" id="hRating">--</span></div>
+          <div class="stat-row" style="display:block;border:none;text-align:center"><span class="stat-label">Net Worth</span><br><span class="stat-value" style="font-size:14px" id="hNet">$0</span></div>
         </div>
         <div class="stat-row"><span class="stat-label">Streak</span><span class="stat-value" id="hStreak">--</span></div>
         <div class="stat-row"><span class="stat-label">Stance</span><span class="stat-value" id="hStance">--</span></div>
@@ -584,18 +622,18 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
 
       <div class="card" id="advanceCard">
         <div class="card-title" id="advanceTitle">Today: <span id="todayDay">Monday</span></div>
-        <div id="todayPreview" style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:6px"></div>
+        <div id="todayPreview" class="text-muted" style="font-size:var(--text-sm);margin-bottom:6px"></div>
         <div class="flex-row">
           <button class="btn btn-primary btn-lg" onclick="advanceDay()" id="btnAdvanceDay">ADVANCE DAY</button>
           <button class="btn btn-ghost btn-sm" onclick="advanceSkip(7)">+1 Week</button>
           <button class="btn btn-ghost btn-sm" onclick="advanceSkip(30)">+1 Month</button>
           <button class="btn btn-gold btn-sm hidden" id="btnFightDay" onclick="switchTab('fight')">GO TO FIGHT</button>
         </div>
-        <div id="dayResult" class="hidden" style="margin-top:8px;font-size:var(--text-base)"></div>
+        <div id="dayResult" class="hidden text-muted" style="margin-top:8px;font-size:var(--text-base)"></div>
       </div>
 
-      <div id="promoOffer" class="hidden card card-highlight" style="border-color:var(--gold)">
-        <div class="card-title" style="color:var(--gold)">Promotion Offer!</div>
+      <div id="promoOffer" class="hidden card card-warning">
+        <div class="card-title text-gold">Promotion Offer!</div>
         <div id="promoOfferText"></div>
         <button class="btn btn-gold btn-sm" style="margin-top:6px" onclick="acceptPromotion()">Accept</button>
       </div>
@@ -617,28 +655,28 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       </div>
 
       <div class="card">
-        <div class="card-title">Training <span id="trainingStatus" style="font-size:var(--text-xs);color:var(--text-muted);font-weight:400"></span></div>
-        <div id="fatigueBar" style="margin:6px 0;height:8px;background:var(--bg-elevated);border-radius:var(--radius-sm);overflow:hidden">
-          <div id="fatigueFill" style="height:100%;width:0%;border-radius:var(--radius-sm);transition:width .3s"></div>
+        <div class="card-title">Training <span id="trainingStatus" class="text-muted" style="font-size:var(--text-xs);font-weight:400"></span></div>
+        <div id="fatigueBar" class="stamina-bar-outer" style="margin:6px 0">
+          <div id="fatigueFill" style="height:100%;width:0%;border-radius:5px;transition:width .3s"></div>
         </div>
-        <div id="selectedDrillInfo" style="font-size:var(--text-xs);color:var(--text-muted)"></div>
+        <div id="selectedDrillInfo" class="text-muted" style="font-size:var(--text-xs)"></div>
       </div>
 
       <div class="card" id="scheduleCard">
-        <div class="card-title">Weekly Schedule <button class="btn btn-ghost btn-small" onclick="clearAllDrills()" style="float:right;font-size:10px">Clear All</button></div>
+        <div class="card-header"><div class="card-title">Weekly Schedule</div><button class="btn btn-ghost btn-small" onclick="clearAllDrills()">Clear All</button></div>
         <div id="scheduleGrid" class="schedule-grid"></div>
-        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px">Select a drill below, then click a day to assign it.</div>
+        <div class="text-muted" style="font-size:var(--text-xs);margin-top:4px">Select a drill below, then click a day to assign it.</div>
       </div>
 
       <div class="card">
         <div class="card-title">Drill Categories</div>
-        <div class="flex-row" id="drillCatButtons" style="gap:3px;flex-wrap:wrap"></div>
+        <div class="flex-row gap-xs" id="drillCatButtons"></div>
         <div id="drillList" style="margin-top:6px;max-height:220px;overflow-y:auto"></div>
       </div>
 
       <div class="card">
-        <div class="card-title">Recovery <span id="filmStudyStatus" style="font-size:var(--text-xs);color:var(--text-muted);font-weight:400"></span></div>
-        <div class="flex-row" style="gap:4px;flex-wrap:wrap">
+        <div class="card-title">Recovery <span id="filmStudyStatus" class="text-muted" style="font-size:var(--text-xs);font-weight:400"></span></div>
+        <div class="flex-row gap-xs">
           <button class="btn btn-ghost btn-sm" onclick="doRecovery('ice_bath')">&#x2744; Ice</button>
           <button class="btn btn-ghost btn-sm" onclick="doRecovery('sports_massage')">&#x1F4AA; Massage</button>
           <button class="btn btn-ghost btn-sm" onclick="doRecovery('nutrition_plan')">&#x1F966; Nutrition</button>
@@ -648,9 +686,9 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       </div>
 
       <div class="card" id="weightManagement">
-        <div class="card-title">&#x2696; Weight Management</div>
-        <div id="weightInfo" style="font-size:var(--text-sm);color:var(--text-muted)"></div>
-        <div class="flex-row" id="weightCutButtons" style="gap:4px;margin-top:4px">
+        <div class="card-title">Weight Management</div>
+        <div id="weightInfo" class="text-muted" style="font-size:var(--text-sm)"></div>
+        <div class="flex-row gap-xs" id="weightCutButtons" style="margin-top:4px">
           <button class="btn btn-ghost btn-small" onclick="doWeightCut('safe', this)">Safe Cut</button>
           <button class="btn btn-ghost btn-small" onclick="doWeightCut('standard', this)">Standard</button>
           <button class="btn btn-ghost btn-small" onclick="doWeightCut('aggressive', this)">Aggressive</button>
@@ -658,11 +696,11 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       </div>
 
       <div class="card" id="gymFightersCard" style="display:none">
-        <div class="card-title">Training Partners <span id="gymFighterCount" style="font-size:var(--text-xs);color:var(--text-muted);font-weight:400"></span></div>
+        <div class="card-title">Training Partners <span id="gymFighterCount" class="text-muted" style="font-size:var(--text-xs);font-weight:400"></span></div>
         <div id="gymFighterList" style="max-height:160px;overflow-y:auto;font-size:var(--text-sm)"></div>
       </div>
 
-      <div id="trainResult" class="hidden card card-highlight" style="border-color:var(--success)"></div>
+      <div id="trainResult" class="hidden card card-success"></div>
     </div>
 
     <!-- FIGHT TAB -->
@@ -672,21 +710,21 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
         <div id="opponentList"></div>
         <div id="noOpponents" class="hidden" style="color:var(--text-muted);font-size:var(--text-base);text-align:center;padding:12px">No fight offers available right now.</div>
       </div>
-      <div id="scoutSection" class="card hidden card-highlight" style="border-color:#4a9eff">
-        <div class="flex-between"><div class="card-title">Scouting Report</div><span id="scoutLevel" style="font-size:var(--text-xs);color:var(--text-muted)"></span></div>
-        <div id="scoutBody" style="font-size:var(--text-sm);color:#ccc"></div>
+      <div id="scoutSection" class="card hidden card-info">
+        <div class="card-header"><div class="card-title">Scouting Report</div><span id="scoutLevel" class="text-muted" style="font-size:var(--text-xs)"></span></div>
+        <div id="scoutBody" style="font-size:var(--text-sm);color:var(--text-secondary)"></div>
         <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="scoutOpponent()">Spy on Next Opponent</button>
       </div>
 
-      <div id="fightReady" class="hidden card card-highlight">
-        <div class="card-title" style="color:var(--gold)">Fight Week</div>
+      <div id="fightReady" class="hidden card card-warning">
+        <div class="card-title text-gold">Fight Week</div>
         <div id="fightMatchup"></div>
-        <div id="fightWeekTimeline" style="margin-top:6px;padding:6px;background:#0d0d1a;border-radius:6px"></div>
+        <div id="fightWeekTimeline" style="margin-top:6px;padding:6px;background:var(--bg-elevated);border-radius:var(--radius-md)"></div>
         <div id="fightWeekActions" style="margin-top:6px"></div>
-        <div id="weightCutSection" class="hidden" style="margin-top:6px;padding:6px;background:#1a1a2a;border-radius:6px">
-          <div class="card-title" style="font-size:12px">⚖️ Weight Cut</div>
-          <div id="weightCutInfo" style="font-size:11px;color:#aaa"></div>
-          <div class="flex-row" style="margin-top:4px;gap:4px">
+        <div id="weightCutSection" class="hidden" style="margin-top:6px;padding:8px;background:var(--bg-elevated);border-radius:var(--radius-md)">
+          <div class="card-title" style="font-size:12px">&#x2696; Weight Cut</div>
+          <div id="weightCutInfo" style="font-size:11px;color:var(--text-muted)"></div>
+          <div class="flex-row gap-xs" style="margin-top:4px">
             <button class="btn btn-ghost btn-small" onclick="doWeightCut('safe', this)" style="font-size:10px">Safe Cut</button>
             <button class="btn btn-ghost btn-small" onclick="doWeightCut('standard', this)" style="font-size:10px">Standard</button>
             <button class="btn btn-ghost btn-small" onclick="doWeightCut('aggressive', this)" style="font-size:10px">Aggressive</button>
@@ -703,42 +741,42 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       </div>
 
       <div id="fightLive" class="hidden">
-        <div id="fightHealthBars" class="card" style="margin-bottom:6px;padding:10px">
+        <div id="fightHealthBars" class="card" style="padding:10px">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div>
-              <div class="flex-between"><span id="f1NameBar" style="font-weight:700;font-size:var(--text-md);color:var(--text-primary)"></span><span id="f1StateBar" style="font-size:var(--text-xs)"></span></div>
-              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f1HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,#ff9a4a,#4aff6a)"></div></div></div>
-              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f1StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,#4a9eff)"></div></div></div>
+              <div class="flex-between"><span id="f1NameBar" style="font-weight:700;font-size:var(--text-md)"></span><span id="f1StateBar" style="font-size:var(--text-xs)"></span></div>
+              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f1HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,#ff9a4a,var(--success))"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f1StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,#ff4a4a,var(--opponent-blue))"></div></div></div>
               <div style="margin-top:3px"><div class="hp-label">Blood</div><div class="blood-bar-outer"><div id="f1BloodBar" class="blood-bar-inner" style="width:0%"></div></div></div>
-              <div class="flex-row" style="margin-top:3px;gap:4px">
-                <span style="font-size:9px;color:var(--text-muted)">H:<span id="f1HeadBar" style="color:var(--accent)">100</span></span>
-                <span style="font-size:9px;color:var(--text-muted)">B:<span id="f1BodyBar" style="color:var(--accent)">100</span></span>
-                <span style="font-size:9px;color:var(--text-muted)">L:<span id="f1LegBar" style="color:var(--accent)">100</span></span>
-                <span style="font-size:9px;color:var(--text-muted)">Br:<span id="f1BreathBar" style="color:#e6e600">100</span></span>
+              <div class="flex-row gap-xs" style="margin-top:3px">
+                <span class="text-muted" style="font-size:9px">H:<span id="f1HeadBar" style="color:var(--accent)">100</span></span>
+                <span class="text-muted" style="font-size:9px">B:<span id="f1BodyBar" style="color:var(--accent)">100</span></span>
+                <span class="text-muted" style="font-size:9px">L:<span id="f1LegBar" style="color:var(--accent)">100</span></span>
+                <span class="text-muted" style="font-size:9px">Br:<span id="f1BreathBar" style="color:#e6e600">100</span></span>
                 <span id="f1CardioZone" style="font-size:9px">Aerobic</span>
               </div>
             </div>
             <div>
-              <div class="flex-between"><span id="f2NameBar" style="font-weight:700;font-size:var(--text-md);color:var(--text-primary)"></span><span id="f2StateBar" style="font-size:var(--text-xs)"></span></div>
-              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f2HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,#4aff6a,#ff9a4a,#ff4a4a);float:right"></div></div></div>
-              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f2StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,#4a9eff,#ff4a4a);float:right"></div></div></div>
+              <div class="flex-between"><span id="f2NameBar" style="font-weight:700;font-size:var(--text-md)"></span><span id="f2StateBar" style="font-size:var(--text-xs)"></span></div>
+              <div style="margin-top:4px"><div class="hp-label">Health</div><div class="health-bar-outer"><div id="f2HpBar" class="health-bar-inner" style="width:100%;background:linear-gradient(90deg,var(--success),#ff9a4a,#ff4a4a);float:right"></div></div></div>
+              <div style="margin-top:3px"><div class="hp-label">Stamina</div><div class="stamina-bar-outer"><div id="f2StamBar" class="stamina-bar-inner" style="width:100%;background:linear-gradient(90deg,var(--opponent-blue),#ff4a4a);float:right"></div></div></div>
               <div style="margin-top:3px"><div class="hp-label">Blood</div><div class="blood-bar-outer"><div id="f2BloodBar" class="blood-bar-inner" style="width:0%;float:right"></div></div></div>
-              <div class="flex-row" style="margin-top:3px;gap:4px;justify-content:flex-end">
-                <span style="font-size:9px;color:var(--text-muted)">H:<span id="f2HeadBar" style="color:var(--accent)">100</span></span>
-                <span style="font-size:9px;color:var(--text-muted)">B:<span id="f2BodyBar" style="color:var(--accent)">100</span></span>
-                <span style="font-size:9px;color:var(--text-muted)">L:<span id="f2LegBar" style="color:var(--accent)">100</span></span>
-                <span style="font-size:9px;color:var(--text-muted)">Br:<span id="f2BreathBar" style="color:#e6e600">100</span></span>
+              <div class="flex-row gap-xs" style="margin-top:3px;justify-content:flex-end">
+                <span class="text-muted" style="font-size:9px">H:<span id="f2HeadBar" style="color:var(--accent)">100</span></span>
+                <span class="text-muted" style="font-size:9px">B:<span id="f2BodyBar" style="color:var(--accent)">100</span></span>
+                <span class="text-muted" style="font-size:9px">L:<span id="f2LegBar" style="color:var(--accent)">100</span></span>
+                <span class="text-muted" style="font-size:9px">Br:<span id="f2BreathBar" style="color:#e6e600">100</span></span>
                 <span id="f2CardioZone" style="font-size:9px">Aerobic</span>
               </div>
             </div>
           </div>
           <div id="fightScoreBars" style="margin-top:8px;display:none">
             <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px">
-              <div id="f1ScoreBar" style="flex:1;height:10px;background:#1a2a1a;border-radius:3px;overflow:hidden">
+              <div id="f1ScoreBar" style="flex:1;height:10px;background:var(--bg-elevated);border-radius:3px;overflow:hidden">
                 <div id="f1ScoreFill" style="height:100%;width:50%;background:var(--gold);border-radius:3px;transition:width .3s"></div>
               </div>
-              <span id="scoreText" style="font-size:var(--text-xs);color:var(--gold);min-width:30px;text-align:center;font-weight:700">0-0</span>
-              <div id="f2ScoreBar" style="flex:1;height:10px;background:#2a1a1a;border-radius:3px;overflow:hidden">
+              <span id="scoreText" class="text-gold" style="font-size:var(--text-xs);min-width:30px;text-align:center;font-weight:700">0-0</span>
+              <div id="f2ScoreBar" style="flex:1;height:10px;background:var(--bg-elevated);border-radius:3px;overflow:hidden">
                 <div id="f2ScoreFill" style="height:100%;width:50%;background:var(--gold);border-radius:3px;transition:width .3s;float:right"></div>
               </div>
             </div>
@@ -751,7 +789,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
               </div>
               <span style="width:20px;text-align:center">&#x26A1;</span>
               <div style="flex:2;height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden">
-                <div id="f2MomentumFill" style="height:100%;width:50%;background:linear-gradient(90deg,var(--gold),#4a9eff);border-radius:3px;transition:width .3s;float:right"></div>
+                <div id="f2MomentumFill" style="height:100%;width:50%;background:linear-gradient(90deg,var(--gold),var(--opponent-blue));border-radius:3px;transition:width .3s;float:right"></div>
               </div>
               <span id="f2MomentumLabel" style="flex:1;text-align:left"></span>
             </div>
@@ -759,10 +797,10 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
           </div>
         </div>
         <div class="card">
-          <div class="flex-between">
-            <div class="card-title" style="margin-bottom:0">LIVE FIGHT</div>
-            <div class="speed-row" id="speedControls">
-              <span style="font-size:var(--text-xs);color:var(--text-muted)">Speed:</span>
+          <div class="card-header">
+            <div class="card-title">LIVE FIGHT</div>
+            <div class="speed-row" id="speedControls" style="margin:0">
+              <span class="text-muted" style="font-size:var(--text-xs)">Speed:</span>
               <button class="speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5x</button>
               <button class="speed-btn active" data-speed="1" onclick="setSpeed(1)">1x</button>
               <button class="speed-btn" data-speed="2" onclick="setSpeed(2)">2x</button>
@@ -770,11 +808,11 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
               <button class="speed-btn" data-speed="0" onclick="setSpeed(0)">Skip</button>
             </div>
           </div>
-          <div id="fightHeader" style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:4px;text-align:center"></div>
+          <div id="fightHeader" class="text-muted" style="font-size:var(--text-sm);margin-bottom:4px;text-align:center"></div>
         </div>
         <div class="fight-log" id="fightLog"></div>
-        <div id="fightRoundReports" class="card hidden" style="margin-top:6px;background:#0d0d1a">
-          <div class="card-title" style="font-size:var(--text-sm);color:#aaa">Round Reports</div>
+        <div id="fightRoundReports" class="card hidden" style="margin-top:6px">
+          <div class="card-title" style="font-size:var(--text-sm)">Round Reports</div>
           <div id="roundReports"></div>
         </div>
         <div id="fightStratPrompt" class="hidden card" style="margin-top:6px">
@@ -807,7 +845,7 @@ label { display: block; color: var(--text-muted); font-size: var(--text-sm); mar
       </div>
 
       <div class="card">
-        <div class="flex-between"><div class="card-title">Physical Attributes</div><span style="font-size:var(--text-xs);color:var(--text-muted)">Rating: <span id="cRating">--</span></span></div>
+        <div class="card-header"><div class="card-title">Physical Attributes</div><span class="text-muted" style="font-size:var(--text-xs)">Rating: <span id="cRating">--</span></span></div>
         <div id="physAttrs"></div>
       </div>
       <div class="card">
@@ -938,20 +976,20 @@ async function showContractOffers() {
   const resp = await api("/api/free_agent_offers" + (f ? "?sid=" + encodeURIComponent(sid) : ""));
   if (!resp.promotions) return;
   let html = '<div class="card-title" style="font-size:16px">Available Promotions</div>';
-  html += '<div style="font-size:12px;color:#888;margin-bottom:8px">Review the offers below and sign with a promotion to begin your career.</div>';
+  html += '<div class="text-muted" style="font-size:12px;margin-bottom:8px">Review the offers below and sign with a promotion to begin your career.</div>';
   resp.promotions.forEach(p => {
-    const mmColors = {aggressive: "#ff4a4a", protective: "#4aff6a", balanced: "#ffd700"};
-    html += `<div style="margin-bottom:8px;padding:10px;background:#1a1a2a;border-radius:6px">
+    const mmColors = {aggressive: "var(--accent)", protective: "var(--success)", balanced: "var(--gold)"};
+    html += `<div style="margin-bottom:8px;padding:10px;background:var(--bg-elevated);border-radius:var(--radius-md)">
       <div class="flex-between">
         <strong style="font-size:15px">${escHtml(p.name)}</strong>
         <span class="tag tag-promo">${escHtml(p.tier)}</span>
       </div>
-      <div style="font-size:11px;color:#888;margin:4px 0">${escHtml(p.personality || '')}</div>
-      <div style="display:flex;gap:8px;font-size:11px;color:#aaa;margin:4px 0">
+      <div class="text-muted" style="font-size:11px;margin:4px 0">${escHtml(p.personality || '')}</div>
+      <div style="display:flex;gap:8px;font-size:11px;color:var(--text-muted);margin:4px 0">
         <span>💰 $${p.base_pay.toLocaleString()}</span>
         <span>🏆 Win: $${p.win_bonus.toLocaleString()}</span>
         <span>🌟 Perf: $${p.perf_bonus.toLocaleString()}</span>
-        <span style="color:${mmColors[p.matchmaking] || '#888'}">🎯 ${p.matchmaking}</span>
+        <span style="color:${mmColors[p.matchmaking] || 'var(--text-muted)'}">🎯 ${p.matchmaking}</span>
         <span>📊 ${'⭐'.repeat(p.prestige || 1)}</span>
       </div>
       <button class="btn btn-primary btn-small" style="margin-top:4px" onclick="signFreeAgent('${escHtml(p.tier)}', '${escHtml(p.name)}')">Sign Contract</button></div>`;
@@ -1002,7 +1040,7 @@ function showModal(html) {
   closeModal(null);
   const overlay = qs("#modalOverlay");
   const content = qs("#modalContent");
-  content.innerHTML = '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-ghost btn-small" onclick="closeModal(null)" style="font-size:11px;min-height:28px;padding:2px 8px">✕ CLOSE</button></div>' + html;
+  content.innerHTML = '<div class="flex-between" style="margin-bottom:var(--space-3)"><div></div><button class="btn btn-ghost header-btn" onclick="closeModal(null)" title="Close">&#x2715;</button></div>' + html;
   overlay.classList.remove("hidden");
   document.body.style.overflow = "hidden";
 }
@@ -1078,7 +1116,7 @@ function updateAllUI() {
   setText("#hRecord", f.record);
   setText("#hRank", "#" + f.rank);
   if (qs("#hPromoTag")) { qs("#hPromoTag").textContent = p ? p.tier : "FA";
-    qs("#hPromoTag").style.background = p && p.tier === "World" ? "#4a4a1a" : (p && p.tier === "National" ? "#2a2a4a" : "#2a3a2a"); }
+    qs("#hPromoTag").style.background = p && p.tier === "World" ? "var(--warn-bg)" : (p && p.tier === "National" ? "var(--info-bg)" : "var(--success-bg)"); }
   setText("#hNet", "$" + (f.net_worth || 0).toLocaleString());
   setText("#hRating", f.rating);
   const streak = f.win_streak > 0 ? "W" + f.win_streak : (f.loss_streak > 0 ? "L" + f.loss_streak : "0");
@@ -1093,8 +1131,8 @@ function updateAllUI() {
 
   if (qs("#hFatigueRow")) qs("#hFatigueRow").style.display = "";
   const ft = t ? (t.fatigue || 0) : 0;
-  const ftColor = ft > 70 ? "#ff4a4a" : (ft > 40 ? "#ffd700" : "#4aff6a");
-  if (qs("#hFatigue")) qs("#hFatigue").innerHTML = ft > 0 ? '<span style="color:' + ftColor + ';font-weight:600">' + ft + '%</span>' : '<span style="color:#888">Rested</span>';
+  const ftColor = ft > 70 ? "var(--danger)" : (ft > 40 ? "var(--gold)" : "var(--success)");
+  if (qs("#hFatigue")) qs("#hFatigue").innerHTML = ft > 0 ? '<span style="color:' + ftColor + ';font-weight:600">' + ft + '%</span>' : '<span class="text-muted">Rested</span>';
 
   if (fb) {
     setHTML("#hNextFight", "vs " + escHtml(fb.opponent.name) + " (" + fb.days_until + "d)");
@@ -1228,7 +1266,7 @@ function showOptionsModal() {
   const html = `
     <div class="card-title" style="font-size:16px">&#x2699; Options</div>
     <div style="margin-bottom:var(--space-3)">
-      <div style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-2)">Game Settings</div>
+      <div class="text-muted" style="font-size:var(--text-sm);margin-bottom:var(--space-2)">Game Settings</div>
       <div class="stat-row" style="cursor:pointer" onclick="localStorage.setItem('mma_compact', localStorage.getItem('mma_compact') === '1' ? '0' : '1'); toast('Compact mode ' + (localStorage.getItem('mma_compact') === '1' ? 'ON' : 'OFF'), 'success'); showOptionsModal()">
         <span class="stat-label">Compact Mode</span>
         <span class="stat-value" id="optCompact">${localStorage.getItem('mma_compact') === '1' ? 'ON' : 'OFF'}</span>
@@ -1238,8 +1276,9 @@ function showOptionsModal() {
         <span class="stat-value">1.0 Alpha</span>
       </div>
     </div>
-    <div style="border-top:1px solid var(--border-subtle);padding-top:var(--space-3);margin-top:var(--space-2)">
-      <div style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-2)">Danger Zone</div>
+    <div class="divider"></div>
+    <div>
+      <div class="text-muted" style="font-size:var(--text-sm);margin-bottom:var(--space-2)">Danger Zone</div>
       <button class="btn btn-danger btn-sm" onclick="if(confirm('Reset all data? This cannot be undone.')) { localStorage.clear(); fetch('/api/reset', {method:'POST'}).then(() => { sid=''; location.reload(); }); }" style="width:100%">Reset All Data</button>
     </div>`;
   showModal(html);
@@ -1264,7 +1303,52 @@ async function showSaveLoadModal(mode) {
   try {
     const resp = await api("/api/list_saves?sid=" + encodeURIComponent(sid));
     if (resp && resp.saves) saves = resp.saves;
-  } catch(e) { console.warn("news API failed:", e); }
+  } catch(e) { console.warn("list saves API failed:", e); }
+  
+  if (!saves.length) {
+    html += '<div class="text-muted" style="text-align:center;padding:var(--space-4)">No saves found.</div>';
+    if (mode === 'save' && state && state.fighter) {
+      html += '<button class="btn btn-primary" onclick="closeModal(null);doSave(-1)" style="width:100%;margin-top:8px">Save to Slot 1</button>';
+    }
+    showModal(html);
+    return;
+  }
+  
+  saves.forEach((s, i) => {
+    const date = s.updated_at ? new Date(s.updated_at).toLocaleString() : 'Unknown date';
+    const onclick = mode === 'save' ? `closeModal(null);doSave(${i})` : `closeModal(null);doLoad(${i})`;
+    html += `<div class="list-item" onclick="${onclick}" style="margin-bottom:4px">
+      <strong>Slot ${i + 1}</strong>
+      <div class="text-muted" style="font-size:11px">${escHtml(s.fighter_name || 'Unknown')} | ${escHtml(s.record || '?')} | ${date}</div>
+    </div>`;
+  });
+  
+  if (mode === 'save' && state && state.fighter) {
+    html += '<button class="btn btn-primary" onclick="closeModal(null);doSave(-1)" style="width:100%;margin-top:8px">Save to New Slot</button>';
+  }
+  
+  showModal(html);
+}
+
+async function doSave(slotIdx) {
+  if (state && state.has_fight) { toast("Cannot save during an active fight", "error"); return; }
+  const idx = slotIdx >= 0 ? slotIdx : null;
+  const resp = await api("/api/save_game", { sid, slot: idx });
+  if (resp.success) { toast("Game saved!", "success"); }
+  else { toast(resp.error || "Failed to save", "error"); }
+}
+
+async function doLoad(slotIdx) {
+  const resp = await api("/api/load_game", { sid, slot: slotIdx });
+  if (resp.success) {
+    state = resp.state;
+    if (state && state.strategies) STRATS = state.strategies;
+    showGameScreen();
+    updateAllUI();
+    toast("Game loaded!", "success");
+  } else {
+    toast(resp.error || "Failed to load", "error");
+  }
 }
 
 let newsCache = [];
@@ -1303,21 +1387,21 @@ async function advanceDay() {
       if (r.status === "fight_week" && r.fight_week_event) {
         const fwe = r.fight_week_event;
         const evName = (fwe.event || "rest").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-        div.innerHTML = `<span style="color:#ffd700">&#x1F4C5; Fight Week — ${evName}</span><br><span style="color:#aaa;font-size:12px">${escHtml(fwe.text || "")}</span>`;
+        div.innerHTML = `<span class="text-gold">&#x1F4C5; Fight Week — ${evName}</span><br><span class="text-muted" style="font-size:12px">${escHtml(fwe.text || "")}</span>`;
         state = resp.state;
         refreshFightTab();
       } else if ((r.status === "training" || r.status === "in_camp") && r.gains) {
         let g = Object.entries(r.gains).filter(([k,v]) => v > 0).map(([k,v]) => k.replace(/_/g," ")+" +"+v.toFixed(1));
-        div.innerHTML = `<span style="color:#4aff6a">${r.day}</span>: ${g.join(", ") || "No gains"}`;
-        if (r.injury) div.innerHTML += ` <span style="color:#e62400">| INJURY: ${r.injury.type}</span>`;
-        if (r.camp_over) div.innerHTML += ` <span style="color:#ffd700">| CAMP COMPLETE: ${escHtml(r.camp_name || '')}</span>`;
+        div.innerHTML = `<span class="text-success">${r.day}</span>: ${g.join(", ") || "No gains"}`;
+        if (r.injury) div.innerHTML += ` <span class="text-accent">| INJURY: ${r.injury.type}</span>`;
+        if (r.camp_over) div.innerHTML += ` <span class="text-gold">| CAMP COMPLETE: ${escHtml(r.camp_name || '')}</span>`;
       } else if (r.status === "rest") {
-        div.innerHTML = `<span style="color:#4a9eff">${r.day}</span>: Rest day — fatigue recovering`;
+        div.innerHTML = `<span style="color:var(--opponent-blue)">${r.day}</span>: Rest day — fatigue recovering`;
       } else if (r.status === "idle") {
-        div.innerHTML = `<span style="color:#888">${r.day}</span>: Not training — go to the Gym tab to start`;
+        div.innerHTML = `<span class="text-muted">${r.day}</span>: Not training — go to the Gym tab to start`;
       }
       if (resp.fight_today) {
-        div.innerHTML += '<br><span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>';
+        div.innerHTML += '<br><span class="text-gold" style="font-weight:700">FIGHT DAY!</span>';
       }
     } else {
       toast(resp.error || "Failed to advance day", "error");
@@ -1405,9 +1489,9 @@ function updateGymTab() {
     qs("#gymFighterCount").textContent = `(${ga.count} fighters)`;
     let html = "";
     ga.fighters.slice(0, 10).forEach(fg => {
-      html += `<div style="padding:3px 0;border-bottom:1px solid #1a1a2a">
-        <span style="color:#e0e0e0">${escHtml(fg.name)}</span>
-        <span style="color:#888;font-size:11px"> ${fg.record} | #${fg.rank} | ${fg.weight_class}</span>
+      html += `<div style="padding:3px 0;border-bottom:1px solid var(--border-subtle)">
+        <span>${escHtml(fg.name)}</span>
+        <span class="text-muted" style="font-size:11px"> ${fg.record} | #${fg.rank} | ${fg.weight_class}</span>
       </div>`;
     });
     gl.innerHTML = html;
@@ -1419,9 +1503,9 @@ function updateGymTab() {
     const fatigue = t.fatigue || 0;
     const fill = qs("#fatigueFill");
     fill.style.width = fatigue + "%";
-    if (fatigue > 70) fill.style.background = "#ff4a4a";
-    else if (fatigue > 40) fill.style.background = "#ffd700";
-    else fill.style.background = "#4aff6a";
+    if (fatigue > 70) fill.style.background = "var(--danger)";
+    else if (fatigue > 40) fill.style.background = "var(--gold)";
+    else fill.style.background = "var(--success)";
 
     const schedDay = t.schedule?.current_day || '';
     if (t.drill_name) {
@@ -1441,14 +1525,14 @@ function updateGymTab() {
   const fss = qs("#filmStudyStatus");
   if (t && t.film_study_available) {
     fss.textContent = "Film: available";
-    fss.style.color = "#4aff6a";
+    fss.style.color = "var(--success)";
   } else if (t) {
     fss.textContent = "Film: used";
-    fss.style.color = "#ffd700";
+    fss.style.color = "var(--gold)";
   }
   if (t && t.recovery_active) {
     fss.textContent = "Recovery active";
-    fss.style.color = "#4a9eff";
+    fss.style.color = "var(--opponent-blue)";
   }
 }
 
@@ -1579,16 +1663,16 @@ function updateNewsFeed() {
   const list = qs("#newsList");
   if (!list) return;
   if (!newsCache || newsCache.length === 0) {
-    list.innerHTML = '<div style="color:#888;text-align:center;padding:8px">No recent news</div>';
+    list.innerHTML = '<div class="text-muted" style="text-align:center;padding:8px">No recent news</div>';
     return;
   }
   let html = "";
   newsCache.forEach(n => {
-    const sevColor = n.severity === "major" ? "#ffd700" : (n.severity === "upset" ? "#ff6a4a" : "#888");
+    const sevColor = n.severity === "major" ? "var(--gold)" : (n.severity === "upset" ? "#ff6a4a" : "var(--text-muted)");
     const typeIcon = {"fight_result":"&#x1F94A;","retirement":"&#x1F550;","fighter_signing":"&#x270D;","rivalry":"&#x26A1;","title_change":"&#x1F3C6;","injury_report":"&#x1F915;","scandal":"&#x26A0;","award":"&#x2B50;","comeback":"&#x1F504;","title_stripped":"&#x26A0;","prospect":"&#x1F4A5;"}[n.type] || "&#x1F4F0;";
-    html += `<div style="padding:6px 0;border-bottom:1px solid #1a1a2a">
+    html += `<div style="padding:6px 0;border-bottom:1px solid var(--border-subtle)">
       <div style="color:${sevColor};font-weight:600;font-size:12px">${typeIcon} ${escHtml(n.headline)}</div>
-      <div style="color:#999;font-size:11px">${escHtml(n.body)}</div>
+      <div class="text-muted" style="font-size:11px">${escHtml(n.body)}</div>
     </div>`;
   });
   list.innerHTML = html;
@@ -1658,7 +1742,7 @@ async function showStartTraining() {
     toast("No drills available", "error");
     return;
   }
-  let html = '<div class="card-title" style="font-size:16px">Start Base Training</div><div style="font-size:12px;color:#888;margin-bottom:8px">Free, no camp cost. Slower gains than camp, but keeps you active.</div>';
+  let html = '<div class="card-title" style="font-size:16px">Start Base Training</div><div class="text-muted" style="font-size:12px;margin-bottom:8px">Free, no camp cost. Slower gains than camp, but keeps you active.</div>';
   html += '<select id="trainDrillSel" style="margin-bottom:6px">';
   t.available_drills.forEach((d, di) => {
     html += `<option value="${di}">${escHtml(d.name)} (${d.duration}d, ${d.type})</option>`;
@@ -1760,7 +1844,7 @@ async function refreshFightTab() {
     qs("#fightLive").classList.add("hidden");
     const canFight = fb.days_until <= 0;
     qs("#fightMatchup").innerHTML = `<strong>${escHtml(state.fighter.name)}</strong> vs <strong>${escHtml(fb.opponent.name)}</strong><br>
-      <span style="color:#888">${escHtml(fb.opponent.record)} | #${fb.opponent.rank}${canFight ? ' | <span style="color:#ffd700;font-weight:700">FIGHT DAY!</span>' : ` | ${fb.days_until} days until fight`}</span>`;
+      <span class="text-muted">${escHtml(fb.opponent.record)} | #${fb.opponent.rank}${canFight ? ' | <span class="text-gold" style="font-weight:700">FIGHT DAY!</span>' : ` | ${fb.days_until} days until fight`}</span>`;
     qs("#btnStartFight").style.display = canFight ? "inline-block" : "none";
 
     // Show fight week timeline + interactive events
@@ -1770,14 +1854,14 @@ async function refreshFightTab() {
     const daysUntil = fb.days_until;
     const fwp = fb.fight_week_progress || {};
     if (!canFight && daysUntil > 0 && daysUntil <= 6) {
-      let tlHtml = '<div style="font-size:11px;color:#aaa;margin-bottom:4px">Fight Week Timeline:</div><div style="display:flex;gap:2px;font-size:10px">';
+      let tlHtml = '<div class="text-muted" style="font-size:11px;margin-bottom:4px">Fight Week Timeline:</div><div style="display:flex;gap:2px;font-size:10px">';
       for (let i = 0; i < 6; i++) {
         const eventDay = daysUntil - (5 - i);
         const isPast = eventDay < 0;
         const isNow = eventDay === 0;
         const eid = weekEventIds[i];
         const done = fwp[eid];
-        tlHtml += `<div style="flex:1;text-align:center;padding:3px 2px;border-radius:3px;${isNow ? 'background:var(--gold-glow);color:var(--gold);font-weight:700' : done ? 'background:var(--bg-elevated);color:#4aff6a' : isPast ? 'color:#555' : 'color:#888'}">
+        tlHtml += `<div style="flex:1;text-align:center;padding:3px 2px;border-radius:3px;${isNow ? 'background:var(--gold-glow);color:var(--gold);font-weight:700' : done ? 'background:var(--bg-elevated);color:var(--success)' : isPast ? 'color:var(--text-dim)' : 'color:var(--text-muted)'}">
           <div>${weekEvents[i]}</div><div style="font-size:8px">${done ? '✓' : isNow ? 'NOW' : eventDay > 0 ? `T-${eventDay}` : ''}</div>
         </div>`;
       }
@@ -1787,9 +1871,9 @@ async function refreshFightTab() {
       // Show interactive fight week event card
       let fwHtml = '';
       if (daysUntil === 5 && !fwp.press_conference) {
-        fwHtml = '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+        fwHtml = '<div style="margin-top:6px;padding:8px;background:var(--bg-elevated);border-radius:var(--radius-md)">' +
           '<div class="card-title" style="font-size:12px">🎤 Press Conference</div>' +
-          '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Choose your approach:</div>' +
+          '<div class="text-muted" style="font-size:11px;margin-bottom:6px">Choose your approach:</div>' +
           '<div class="flex-row" style="gap:4px">' +
       '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'respectful\', this)">Respectful</button>' +
       '<button class="btn btn-ghost btn-small" onclick="doPressConf(\'trash_talk\', this)">Trash Talk</button>' +
@@ -1797,64 +1881,64 @@ async function refreshFightTab() {
           '</div></div>';
       } else if (fwp.press_conference) {
         const r = fwp.press_conference;
-        fwHtml = '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
-          '<div style="font-size:11px;color:#4aff6a">✓ Press Conference Complete</div>' +
-          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+        fwHtml = '<div style="margin-top:6px;padding:8px;background:var(--bg-surface);border:1px solid var(--success);border-radius:var(--radius-md)">' +
+          '<div class="text-success" style="font-size:11px">✓ Press Conference Complete</div>' +
+          '<div class="text-muted" style="font-size:10px">' + escHtml(r.text) + '</div></div>';
       }
       if (daysUntil === 4 && !fwp.open_workout) {
-        fwHtml += '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:var(--bg-elevated);border-radius:var(--radius-md)">' +
           '<div class="card-title" style="font-size:12px">🏋️ Open Workout</div>' +
-          '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Showcase your skills:</div>' +
-          '<div class="flex-row" style="gap:4px">' +
+          '<div class="text-muted" style="font-size:11px;margin-bottom:6px">Showcase your skills:</div>' +
+          '<div class="flex-row gap-xs">' +
       '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'technical\', this)">Technical</button>' +
       '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'power\', this)">Power</button>' +
       '<button class="btn btn-ghost btn-small" onclick="doOpenWorkout(\'showboat\', this)">Showboat</button>' +
           '</div></div>';
       } else if (fwp.open_workout) {
         const r = fwp.open_workout;
-        fwHtml += '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
-          '<div style="font-size:11px;color:#4aff6a">✓ Open Workout Complete</div>' +
-          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:var(--bg-surface);border:1px solid var(--success);border-radius:var(--radius-md)">' +
+          '<div class="text-success" style="font-size:11px">✓ Open Workout Complete</div>' +
+          '<div class="text-muted" style="font-size:10px">' + escHtml(r.text) + '</div></div>';
       }
       if (daysUntil === 3 && !fwp.weigh_in) {
         const w = state.fighter.weight;
         const wcName = state.fighter.weight_class;
         const maxWeight = {"Flyweight":125,"Bantamweight":135,"Featherweight":145,"Lightweight":155,"Welterweight":170,"Middleweight":185,"Light Heavyweight":205,"Heavyweight":265}[wcName] || 170;
-        fwHtml += '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:var(--bg-elevated);border-radius:var(--radius-md)">' +
           '<div class="card-title" style="font-size:12px">⚖️ Weigh-In</div>' +
-          '<div style="font-size:11px;color:#aaa">Current: ' + w + ' lbs | Target: ' + maxWeight + ' lbs | Cut: ' + Math.max(0, w - maxWeight) + ' lbs</div>' +
-          '<div class="flex-row" style="margin-top:4px;gap:4px">' +
+          '<div class="text-muted" style="font-size:11px">Current: ' + w + ' lbs | Target: ' + maxWeight + ' lbs | Cut: ' + Math.max(0, w - maxWeight) + ' lbs</div>' +
+          '<div class="flex-row gap-xs" style="margin-top:4px">' +
           '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'safe\', this)" style="font-size:10px">Safe Cut</button>' +
           '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'standard\', this)" style="font-size:10px">Standard</button>' +
           '<button class="btn btn-ghost btn-small" onclick="doWeightCut(\'aggressive\', this)" style="font-size:10px">Aggressive</button>' +
           '</div></div>';
       } else if (fwp.weigh_in) {
         const r = fwp.weigh_in;
-        const passed = r.passed ? '<span style="color:#4aff6a">PASSED</span>' : '<span style="color:#e62400">FAILED</span>';
-        fwHtml += '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
+        const passed = r.passed ? '<span class="text-success">PASSED</span>' : '<span class="text-accent">FAILED</span>';
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:var(--bg-surface);border:1px solid var(--success);border-radius:var(--radius-md)">' +
           '<div style="font-size:11px">✓ Weigh-In ' + passed + '</div>' +
-          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+          '<div class="text-muted" style="font-size:10px">' + escHtml(r.text) + '</div></div>';
       }
       if (daysUntil === 2 && !fwp.faceoff) {
-        fwHtml += '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:var(--bg-elevated);border-radius:var(--radius-md)">' +
           '<div class="card-title" style="font-size:12px">👀 Faceoff</div>' +
-          '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Choose your demeanor:</div>' +
-          '<div class="flex-row" style="gap:4px">' +
+          '<div class="text-muted" style="font-size:11px;margin-bottom:6px">Choose your demeanor:</div>' +
+          '<div class="flex-row gap-xs">' +
       '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'intense\', this)">Intense Stare</button>' +
       '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'calm\', this)">Calm &amp; Collected</button>' +
       '<button class="btn btn-ghost btn-small" onclick="doFaceoff(\'dismissive\', this)">Dismissive</button>' +
           '</div></div>';
       } else if (fwp.faceoff) {
         const r = fwp.faceoff;
-        fwHtml += '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
-          '<div style="font-size:11px;color:#4aff6a">✓ Faceoff Complete</div>' +
-          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:var(--bg-surface);border:1px solid var(--success);border-radius:var(--radius-md)">' +
+          '<div class="text-success" style="font-size:11px">✓ Faceoff Complete</div>' +
+          '<div class="text-muted" style="font-size:10px">' + escHtml(r.text) + '</div></div>';
       }
       if (daysUntil === 1 && !fwp.rest_day) {
-        fwHtml += '<div style="margin-top:6px;padding:8px;background:#1a1a2a;border-radius:6px">' +
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:var(--bg-elevated);border-radius:var(--radius-md)">' +
           '<div class="card-title" style="font-size:12px">🧘 Rest Day</div>' +
-          '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Choose recovery:</div>' +
-          '<div class="flex-row" style="gap:4px">' +
+          '<div class="text-muted" style="font-size:11px;margin-bottom:6px">Choose recovery:</div>' +
+          '<div class="flex-row gap-xs">' +
       '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'ice_bath\', this)">Ice Bath</button>' +
       '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'massage\', this)">Massage</button>' +
       '<button class="btn btn-ghost btn-small" onclick="doRestDay(\'meditation\', this)">Meditation</button>' +
@@ -1862,9 +1946,9 @@ async function refreshFightTab() {
           '</div></div>';
       } else if (fwp.rest_day) {
         const r = fwp.rest_day;
-        fwHtml += '<div style="margin-top:6px;padding:8px;background:#0d1a0d;border:1px solid #4aff6a33;border-radius:6px">' +
-          '<div style="font-size:11px;color:#4aff6a">✓ Rest Day Complete</div>' +
-          '<div style="font-size:10px;color:#aaa">' + escHtml(r.text) + '</div></div>';
+        fwHtml += '<div style="margin-top:6px;padding:8px;background:var(--bg-surface);border:1px solid var(--success);border-radius:var(--radius-md)">' +
+          '<div class="text-success" style="font-size:11px">✓ Rest Day Complete</div>' +
+          '<div class="text-muted" style="font-size:10px">' + escHtml(r.text) + '</div></div>';
       }
       qs("#fightWeekActions").innerHTML = fwHtml;
     } else {
@@ -1875,7 +1959,7 @@ async function refreshFightTab() {
     qs("#weightCutSection").classList.add("hidden");
 
     if (!canFight) {
-      qs("#stratSelect").innerHTML = `<div style="text-align:center;padding:12px;color:#888">The fight hasn't arrived yet. Keep training!<br>Advance time in the Home tab.</div>`;
+      qs("#stratSelect").innerHTML = `<div class="text-muted" style="text-align:center;padding:12px">The fight hasn't arrived yet. Keep training!<br>Advance time in the Home tab.</div>`;
     } else {
       loadStrategySelect("stratSelect");
     }
@@ -1890,7 +1974,7 @@ async function refreshFightTab() {
     qs("#fightPre").classList.remove("hidden");
     qs("#fightReady").classList.add("hidden");
     qs("#fightLive").classList.add("hidden");
-    qs("#opponentList").innerHTML = '<div style="text-align:center;padding:12px;color:#888">Sign a contract first!<br>Check the Career tab for promotion offers.</div>';
+    qs("#opponentList").innerHTML = '<div class="text-muted" style="text-align:center;padding:12px">Sign a contract first!<br>Check the Career tab for promotion offers.</div>';
     qs("#noOpponents").classList.add("hidden");
   }
 }
@@ -1923,7 +2007,7 @@ async function loadFightOffers() {
     const risk = o.risk || "50-50";
     const div = document.createElement("div");
     div.className = "offer-card";
-    div.style.cssText = "border-left:3px solid " + (riskColors[risk] || "#888") + ";padding:8px;margin:6px 0;background:#12121e;border-radius:6px;cursor:pointer";
+    div.style.borderLeftColor = riskColors[risk] || "#888";
     div.innerHTML = `
       <div class="flex-between">
         <div><strong style="color:${riskColors[risk] || '#fff'}">${riskLabels[risk] || risk.toUpperCase()}</strong>
@@ -1955,7 +2039,7 @@ async function loadFightOffers() {
 async function loadEventCard() {
   const resp = await api("/api/event_card?sid=" + encodeURIComponent(sid));
   if (!resp.success || !resp.fights || !resp.fights.length) return;
-  let html = `<div style="margin-top:8px;padding:8px;background:#0d0d1a;border-radius:6px">
+  let html = `<div style="margin-top:8px;padding:8px;background:var(--bg-elevated);border-radius:var(--radius-md)">
     <div class="card-title" style="font-size:12px">${escHtml(resp.event_name)} — Full Card</div>`;
   const posClasses = {prelim: "prelim", main_card: "maincard", co_main: "comain", main_event: "mainevent"};
   resp.fights.forEach(f => {
@@ -1967,7 +2051,7 @@ async function loadEventCard() {
       <span style="flex:1;text-align:center;${isPlayer ? 'color:var(--gold);font-weight:700' : ''}">
         ${escHtml(f.fighter1)} vs ${escHtml(f.fighter2)}${f.is_title ? ' 👑' : ''}
       </span>
-      <span style="color:#888;font-size:11px">${hasWinner ? escHtml(f.winner) + ' by ' + escHtml(f.method) + ' R' + f.round : f.status}</span>
+      <span class="text-muted" style="font-size:11px">${hasWinner ? escHtml(f.winner) + ' by ' + escHtml(f.method) + ' R' + f.round : f.status}</span>
     </div>`;
   });
   html += `</div>`;
@@ -1979,29 +2063,30 @@ function showOfferModal(o, relationship) {
   const opp = o.opponent;
   const riskLabels = {sacrifice: "🔥 SACRIFICE", tough: "💪 TOUGH", "50-50": "⚖️ 50-50", gimme: "🎁 GIMME"};
   const riskColors = {sacrifice: "#ff4a4a", tough: "#ff9a4a", "50-50": "#ffd700", gimme: "#4aff6a"};
+  const riskLabelColors = {sacrifice: "text-danger", tough: "text-accent", "50-50": "text-gold", gimme: "text-success"};
   let html = `<div class="card-title" style="font-size:16px">Fight Offer</div>
     <div style="text-align:center">
-      <span style="color:${riskColors[o.risk] || '#fff'};font-weight:700;font-size:18px">${riskLabels[o.risk] || o.risk.toUpperCase()}</span>
-      <span style="font-size:12px;color:#888;margin-left:6px">— ${escHtml(o.card_position)}</span>
+      <span class="${riskLabelColors[o.risk] || ''}" style="font-weight:700;font-size:18px">${riskLabels[o.risk] || o.risk.toUpperCase()}</span>
+      <span class="text-muted" style="font-size:12px;margin-left:6px">— ${escHtml(o.card_position)}</span>
     </div>
     <div class="compare-grid compare-grid-3" style="margin-top:8px">
-      <div style="text-align:center"><strong style="color:var(--accent)">${escHtml(state.fighter.name)}</strong></div>
-      <div style="text-align:center;font-size:10px;color:var(--text-muted)">VS</div>
-      <div style="text-align:center"><strong style="color:#4a9eff">${escHtml(opp.name)}</strong></div>
+      <div style="text-align:center"><strong class="text-accent">${escHtml(state.fighter.name)}</strong></div>
+      <div class="text-muted" style="text-align:center;font-size:10px">VS</div>
+      <div style="text-align:center"><strong style="color:var(--opponent-blue)">${escHtml(opp.name)}</strong></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;font-size:11px;color:#aaa">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;font-size:11px;color:var(--text-muted)">
       <div>Record: ${escHtml(state.fighter.record)}</div><div>Record: ${escHtml(opp.record)}</div>
       <div>Rank: #${state.fighter.rank}</div><div>Rank: #${opp.rank}</div>
       <div>Rating: ${state.fighter.rating}</div><div>Rating: ${opp.rating}</div>
     </div>
-    <div style="margin-top:8px;padding:8px;background:#1a1a2a;border-radius:6px;font-size:12px">
-      <div class="flex-between"><span>Base Purse:</span><span style="color:#4aff6a">$${o.base_purse.toLocaleString()}</span></div>
-      <div class="flex-between"><span>Win Bonus:</span><span style="color:#ffd700">$${o.win_bonus.toLocaleString()}</span></div>
+    <div style="margin-top:8px;padding:8px;background:var(--bg-elevated);border-radius:var(--radius-md);font-size:12px">
+      <div class="flex-between"><span>Base Purse:</span><span class="text-success">$${o.base_purse.toLocaleString()}</span></div>
+      <div class="flex-between"><span>Win Bonus:</span><span class="text-gold">$${o.win_bonus.toLocaleString()}</span></div>
       <div class="flex-between"><span>Popularity Gain:</span><span style="color:${riskColors[o.risk]}">+${o.popularity_gain} on win</span></div>
-      <div class="flex-between"><span>Card Position:</span><span style="color:#4a9eff">${escHtml(o.card_position.replace('_', ' '))}</span></div>
+      <div class="flex-between"><span>Card Position:</span><span style="color:var(--opponent-blue)">${escHtml(o.card_position.replace('_', ' '))}</span></div>
     </div>`;
   // Accept/Decline buttons
-  html += `<div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+  html += `<div class="modal-actions">
     <button class="btn btn-primary" id="btnAcceptOfferModal">Accept Offer</button>
     <button class="btn btn-ghost" onclick="closeModal(null);declineOffer(this)">Decline</button>
   </div>`;
@@ -2058,9 +2143,9 @@ function showComparison(o) {
   const keyAttrs = f.stat_key || ["striking_power","striking_accuracy","hand_speed","cardio","durability","wrestling_defense","submission_defense","head_movement","fight_iq","mental_toughness","heart","composure"];
 
   function arrow(my, op) {
-    if (my > op) return '<span style="color:#4aff6a">▲</span>';
-    if (my < op) return '<span style="color:#e62400">▼</span>';
-    return '<span style="color:#666">=</span>';
+    if (my > op) return '<span class="text-success">▲</span>';
+    if (my < op) return '<span class="text-accent">▼</span>';
+    return '<span style="color:var(--text-dim)">=</span>';
   }
 
   function oppVal(attr) {
@@ -2086,9 +2171,9 @@ function showComparison(o) {
 
   // Tale of the Tape
   html += `<div class="compare-grid compare-grid-3" style="margin-bottom:8px">
-    <div class="compare-col"><h4 style="color:var(--accent);font-size:13px">${escHtml(f.name)}</h4></div>
+    <div class="compare-col"><h4 class="text-accent" style="font-size:13px">${escHtml(f.name)}</h4></div>
     <div class="compare-col" style="text-align:center;font-size:10px;color:var(--text-muted)">TALE OF THE TAPE</div>
-    <div class="compare-col"><h4 style="color:#4a9eff;font-size:13px;text-align:right">${escHtml(o.name)}</h4></div>
+    <div class="compare-col"><h4 style="color:var(--opponent-blue);font-size:13px;text-align:right">${escHtml(o.name)}</h4></div>
   </div>`;
 
   const tapeStats = [
@@ -2114,7 +2199,7 @@ function showComparison(o) {
   });
 
   // Key Stats side-by-side bars with scouting awareness
-  html += `<div style="margin-top:8px"><div class="card-title" style="font-size:12px">Key Stats ${scouted < 1 ? '<span style="color:#888;font-size:10px">— scout to see opponent stats</span>' : scouted < 3 ? '<span style="color:#ffd700;font-size:10px">— estimates (scout more for precision)</span>' : ''}</div>`;
+  html += `<div style="margin-top:8px"><div class="card-title" style="font-size:12px">Key Stats ${scouted < 1 ? '<span class="text-muted" style="font-size:10px">— scout to see opponent stats</span>' : scouted < 3 ? '<span class="text-gold" style="font-size:10px">— estimates (scout more for precision)</span>' : ''}</div>`;
   keyAttrs.forEach(attr => {
     const myVal = f.attributes ? f.attributes[attr] || 50 : 50;
     const opDisplay = oppVal(attr);
@@ -2124,34 +2209,34 @@ function showComparison(o) {
     const barOp = Math.min(100, opBar);
     const isPhys = f.physical_attrs && f.physical_attrs.includes(attr);
     html += `<div style="display:flex;align-items:center;gap:4px;margin:3px 0">
-      <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-        <div style="float:right;height:100%;width:${barMy}%;background:${isPhys ? 'linear-gradient(90deg,#4a9eff,var(--accent))' : 'linear-gradient(90deg,#8a4aff,#ff6a4a)'};border-radius:3px"></div>
+      <div style="flex:1;height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden">
+        <div style="float:right;height:100%;width:${barMy}%;background:${isPhys ? 'linear-gradient(90deg,var(--opponent-blue),var(--accent))' : 'linear-gradient(90deg,#8a4aff,#ff6a4a)'};border-radius:3px"></div>
       </div>
-      <span style="width:110px;font-size:10px;color:#aaa;text-align:center">${escHtml(attr.replace(/_/g,' '))} ${adv}</span>
-      <div style="flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden">
-        <div style="float:left;height:100%;width:${opDisplay === '???' ? 0 : barOp}%;background:${isPhys ? 'linear-gradient(90deg,var(--accent),#4a9eff)' : 'linear-gradient(90deg,#ff6a4a,#8a4aff)'};border-radius:3px"></div>
+      <span style="width:110px;font-size:10px;color:var(--text-muted);text-align:center">${escHtml(attr.replace(/_/g,' '))} ${adv}</span>
+      <div style="flex:1;height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden">
+        <div style="float:left;height:100%;width:${opDisplay === '???' ? 0 : barOp}%;background:${isPhys ? 'linear-gradient(90deg,var(--accent),var(--opponent-blue))' : 'linear-gradient(90deg,#ff6a4a,#8a4aff)'};border-radius:3px"></div>
       </div>
-      <span style="width:28px;font-size:9px;color:#888;text-align:center">${opDisplay}</span>
+      <span style="width:28px;font-size:9px;color:var(--text-muted);text-align:center">${opDisplay}</span>
     </div>`;
   });
   html += `</div>`;
 
   // All Attributes (collapsible grouped) with scouting
   html += `<div style="margin-top:8px">
-    <div class="card-title" style="font-size:12px;cursor:pointer" onclick="const e=this.nextElementSibling;e.style.display=e.style.display==='none'?'block':'none'">All Attributes <span style="font-size:10px;color:var(--text-muted)">▼</span></div>
+    <div class="card-title" style="font-size:12px;cursor:pointer" onclick="const e=this.nextElementSibling;e.style.display=e.style.display==='none'?'block':'none'">All Attributes <span class="text-muted" style="font-size:10px">▼</span></div>
     <div style="display:none">`;
   Object.entries(groups).forEach(([groupName, attrs]) => {
     if (!attrs || !attrs.length) return;
-    html += `<div style="margin:4px 0"><span style="font-size:10px;color:var(--text-muted);text-transform:uppercase">${escHtml(groupName)}</span>`;
+    html += `<div style="margin:4px 0"><span class="text-muted" style="font-size:10px;text-transform:uppercase">${escHtml(groupName)}</span>`;
     attrs.forEach(attr => {
       const myVal = f.attributes ? f.attributes[attr] || 50 : 50;
       const opDisp = oppVal(attr);
       const opNum = oppValNum(attr);
-      const color = opDisp === "???" ? "#888" : (myVal > opNum ? "#4aff6a" : (myVal < opNum ? "#e62400" : "#888"));
+      const color = opDisp === "???" ? "var(--text-muted)" : (myVal > opNum ? "var(--success)" : (myVal < opNum ? "var(--accent)" : "var(--text-muted)"));
       html += `<div style="display:flex;font-size:10px;padding:1px 0">
-        <span style="flex:1;color:#aaa">${escHtml(attr.replace(/_/g,' '))}</span>
-        <span style="width:30px;text-align:right;color:${myVal > opNum ? '#4aff6a' : '#ccc'}">${myVal.toFixed(0)}</span>
-        <span style="width:20px;text-align:center;color:#666">vs</span>
+        <span style="flex:1;color:var(--text-muted)">${escHtml(attr.replace(/_/g,' '))}</span>
+        <span style="width:30px;text-align:right;color:${myVal > opNum ? 'var(--success)' : 'var(--text-secondary)'}">${myVal.toFixed(0)}</span>
+        <span style="width:20px;text-align:center;color:var(--text-dim)">vs</span>
         <span style="width:30px;color:${color}">${opDisp}</span>
       </div>`;
     });
@@ -2160,17 +2245,17 @@ function showComparison(o) {
   html += `</div></div>`;
 
   const st = o.win_streak > 0 ? `W${o.win_streak}` : (o.loss_streak > 0 ? `L${Math.abs(o.loss_streak)}` : "");
-  const streakHtml = st ? `<span style="color:${o.win_streak > 0 ? '#4aff6a' : '#e62400'};font-weight:700">${st}</span>` : "";
+  const streakHtml = st ? `<span style="color:${o.win_streak > 0 ? 'var(--success)' : 'var(--accent)'};font-weight:700">${st}</span>` : "";
 
   const diffLookup = {sacrifice:"Step Up", tough:"Tough Fight", "50-50":"Pick 'Em", gimme:"Should Win"};
   const diff = o.risk ? diffLookup[o.risk] || "Pick 'Em" : (o.difficulty || "Unknown");
   const diffClass = diff.includes("Step Up") || diff.includes("Tough") ? "diff-hard" : diff.includes("Should Win") ? "diff-easy" : diff.includes("Pick") ? "diff-pick" : "diff-medium";
 
-  html += `<div style="margin-top:10px;padding:8px;background:#1a1a2a;border-radius:6px;font-size:12px">
+  html += `<div style="margin-top:10px;padding:8px;background:var(--bg-elevated);border-radius:var(--radius-md);font-size:12px">
     <div class="flex-row" style="justify-content:center">
       <span class="tag ${diffClass}">${escHtml(diff)}</span>
       ${streakHtml}
-      <span>${escHtml(o.nationality)} | ${escHtml(o.archetype)}</span>
+      <span class="text-muted">${escHtml(o.nationality)} | ${escHtml(o.archetype)}</span>
     </div>`;
 
   loadFightOfferDetails(o, html);
@@ -2183,9 +2268,9 @@ async function loadFightOfferDetails(o, baseHtml) {
     if (resp.success && resp.offer) {
       const of = resp.offer;
       if (of.contract_pay) {
-        html += `<div style="margin-top:6px;padding:6px;background:#0a0a15;border-radius:4px">
+        html += `<div style="margin-top:6px;padding:6px;background:var(--bg-base);border-radius:var(--radius-sm)">
           <strong>Fight Purse:</strong> Base: $${of.contract_pay.base_pay.toLocaleString()} + Win Bonus: $${of.contract_pay.win_bonus.toLocaleString()}
-          <span style="color:#ffd700"> = $${of.contract_pay.total.toLocaleString()} if you win</span></div>`;
+          <span class="text-gold"> = $${of.contract_pay.total.toLocaleString()} if you win</span></div>`;
       }
       if (of.rivalry) {
         html += `<div style="margin-top:4px"><span class="tag tag-champ">RIVALRY</span> Intensity: ${(of.rivalry.intensity*100).toFixed(0)}% | Fights: ${of.rivalry.fights}${of.rivalry.trilogy ? ' | TRILOGY!' : ''}</div>`;
@@ -2195,7 +2280,7 @@ async function loadFightOfferDetails(o, baseHtml) {
         const opHist = of.fight_history[1];
         html += `<div style="margin-top:4px;display:flex;gap:12px;justify-content:center;font-size:11px">
           <span>Recent: ${myHist.recent.join(" ")}</span>
-          <span style="color:#888">|</span>
+          <span class="text-muted">|</span>
           <span>${escHtml(opHist.name)} recent: ${opHist.recent.join(" ")}</span>
         </div>`;
       }
@@ -2212,9 +2297,9 @@ async function loadFightOfferDetails(o, baseHtml) {
       <option value="12">12 weeks</option>
     </select>
   </div>
-  <div style="text-align:center">
+  <div class="modal-actions">
     <button class="btn btn-primary" id="btnBookFightModal">Book This Fight</button>
-    <button class="btn btn-secondary" onclick="closeModal(null)" style="margin-left:6px">Cancel</button></div>`;
+    <button class="btn btn-secondary" onclick="closeModal(null)">Cancel</button></div>`;
   showModal(html);
   qs("#btnBookFightModal").onclick = async () => {
     const btn = qs("#btnBookFightModal");
@@ -2231,7 +2316,7 @@ async function scoutOpponent() {
     const s = resp.scouting;
     qs("#scoutSection").classList.remove("hidden");
     qs("#scoutLevel").textContent = s.level.toUpperCase();
-    const levelColor = s.level === "full" ? "#4aff6a" : (s.level === "partial" ? "#ffd700" : "#888");
+    const levelColor = s.level === "full" ? "var(--success)" : (s.level === "partial" ? "var(--gold)" : "var(--text-muted)");
     qs("#scoutLevel").style.color = levelColor;
     let bodyHtml = `<span style="color:${levelColor}">Scouting: ${s.sessions} session(s)</span><br>`;
     bodyHtml += `Archetype: ${escHtml(s.opponent_archetype)} | Background: ${escHtml(s.opponent_background)}<br>`;
@@ -2563,13 +2648,13 @@ function updateFighterState(nameBar, stateBar, state) {
     stateBar.style.color = "";
   } else if (state === "HURT") {
     stateBar.textContent = "★ HURT";
-    stateBar.style.color = "#ffd700";
+    stateBar.style.color = "var(--gold)";
   } else if (state === "ROCKED") {
     stateBar.textContent = "★ ROCKED";
     stateBar.style.color = "#ff9a4a";
   } else if (state === "STUNNED") {
     stateBar.textContent = "★ STUNNED";
-    stateBar.style.color = "#ff4a4a";
+    stateBar.style.color = "var(--accent)";
   } else if (state === "DOWN") {
     stateBar.textContent = "★ DOWN";
     stateBar.style.color = "#ff0000";
@@ -2746,39 +2831,39 @@ async function completeFight() {
 
     const fd = resp.fight_details;
     if (fd && fd.f1_details) {
-      extraHtml += `<div style="margin-top:8px;padding:8px;background:#14141f;border-radius:6px;font-size:12px">
-        <span style="color:#fff;font-weight:600">Fight Statistics</span>
+      extraHtml += `<div style="margin-top:8px;padding:8px;background:var(--bg-surface);border-radius:var(--radius-md);font-size:12px">
+        <span style="font-weight:600">Fight Statistics</span>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px">
-          <div style="color:#888">Strikes</div>
-          <div style="color:#e62400;text-align:center">${fd.f1_details.sig_strikes}/${fd.f1_details.strikes_thrown}</div>
-          <div style="color:#4a9eff;text-align:center">${fd.f2_details.sig_strikes}/${fd.f2_details.strikes_thrown}</div>
-          <div style="color:#888">Takedowns</div>
-          <div style="color:#e62400;text-align:center">${fd.f1_details.takedowns}/${fd.f1_details.takedowns_attempted}</div>
-          <div style="color:#4a9eff;text-align:center">${fd.f2_details.takedowns}/${fd.f2_details.takedowns_attempted}</div>
-          <div style="color:#888">Sub Attempts</div>
-          <div style="color:#e62400;text-align:center">${fd.f1_details.submissions}</div>
-          <div style="color:#4a9eff;text-align:center">${fd.f2_details.submissions}</div>
-          <div style="color:#888">Knockdowns</div>
-          <div style="color:#e62400;text-align:center">${fd.f1_details.knockdowns}</div>
-          <div style="color:#4a9eff;text-align:center">${fd.f2_details.knockdowns}</div>
+          <div class="text-muted">Strikes</div>
+          <div class="text-accent" style="text-align:center">${fd.f1_details.sig_strikes}/${fd.f1_details.strikes_thrown}</div>
+          <div style="color:var(--opponent-blue);text-align:center">${fd.f2_details.sig_strikes}/${fd.f2_details.strikes_thrown}</div>
+          <div class="text-muted">Takedowns</div>
+          <div class="text-accent" style="text-align:center">${fd.f1_details.takedowns}/${fd.f1_details.takedowns_attempted}</div>
+          <div style="color:var(--opponent-blue);text-align:center">${fd.f2_details.takedowns}/${fd.f2_details.takedowns_attempted}</div>
+          <div class="text-muted">Sub Attempts</div>
+          <div class="text-accent" style="text-align:center">${fd.f1_details.submissions}</div>
+          <div style="color:var(--opponent-blue);text-align:center">${fd.f2_details.submissions}</div>
+          <div class="text-muted">Knockdowns</div>
+          <div class="text-accent" style="text-align:center">${fd.f1_details.knockdowns}</div>
+          <div style="color:var(--opponent-blue);text-align:center">${fd.f2_details.knockdowns}</div>
         </div>
       </div>`;
     }
 
     const milestones = resp.milestones || [];
     if (milestones.length) {
-      extraHtml += `<div style="margin-top:8px;padding:8px;background:#1a2a1a;border-radius:6px;font-size:12px">
-        <span style="color:#ffd700;font-weight:600">Milestones Unlocked:</span>`;
-      milestones.forEach(m => { extraHtml += `<div style="color:#4aff6a;margin-top:2px">★ ${escHtml(m)}</div>`; });
+      extraHtml += `<div style="margin-top:8px;padding:8px;background:var(--bg-surface);border:1px solid var(--success);border-radius:var(--radius-md);font-size:12px">
+        <span class="text-gold" style="font-weight:600">Milestones Unlocked:</span>`;
+      milestones.forEach(m => { extraHtml += `<div class="text-success" style="margin-top:2px">★ ${escHtml(m)}</div>`; });
       extraHtml += `</div>`;
     }
 
     const bonuses = resp.bonuses;
     if (bonuses) {
-      extraHtml += `<div style="margin-top:8px;padding:8px;background:#2a2a1a;border-radius:6px;font-size:12px">
-        <span style="color:#ffd700;font-weight:600">Post-Fight Bonuses</span>`;
-      if (bonuses.fight_of_night) extraHtml += `<div style="color:#daa520;margin-top:2px">🏆 Fight of the Night: ${escHtml(bonuses.fight_of_night)}</div>`;
-      if (bonuses.perf_of_night) extraHtml += `<div style="color:#daa520;margin-top:2px">💥 Performance of the Night: ${escHtml(bonuses.perf_of_night)}</div>`;
+      extraHtml += `<div style="margin-top:8px;padding:8px;background:var(--bg-surface);border:1px solid var(--gold);border-radius:var(--radius-md);font-size:12px">
+        <span class="text-gold" style="font-weight:600">Post-Fight Bonuses</span>`;
+      if (bonuses.fight_of_night) extraHtml += `<div style="color:var(--gold-hover);margin-top:2px">🏆 Fight of the Night: ${escHtml(bonuses.fight_of_night)}</div>`;
+      if (bonuses.perf_of_night) extraHtml += `<div style="color:var(--gold-hover);margin-top:2px">💥 Performance of the Night: ${escHtml(bonuses.perf_of_night)}</div>`;
       extraHtml += `</div>`;
     }
 
@@ -2788,7 +2873,7 @@ async function completeFight() {
       extraHtml += `<div style="margin-top:8px">${rrDiv.innerHTML}</div>`;
     }
 
-    resultDiv.innerHTML = `<div class="card-title" style="font-size:18px;color:${resp.won ? '#4aff6a' : '#e62400'}">${resp.won ? "VICTORY!" : "DEFEAT"}</div>
+    resultDiv.innerHTML = `<div class="card-title" style="font-size:18px;color:${resp.won ? 'var(--success)' : 'var(--accent)'}">${resp.won ? "VICTORY!" : "DEFEAT"}</div>
       <div>New Record: ${f.record} | Rank: #${f.rank}</div>
       ${extraHtml}
       <div style="margin-top:8px"><button class="btn btn-primary" onclick="endFightSession()">Continue</button></div>`;
@@ -2834,10 +2919,10 @@ async function refreshCareerTab() {
   qs("#cPersonality").textContent = persName;
   qs("#cRating").textContent = f.rating;
   const pop = f.popularity || 0;
-  const popColor = pop >= 70 ? "#ffd700" : (pop >= 40 ? "#4aff6a" : "#888");
+  const popColor = pop >= 70 ? "var(--gold)" : (pop >= 40 ? "var(--success)" : "var(--text-muted)");
   qs("#cPopularity").innerHTML = `<span style="color:${popColor}">${pop} / 100</span>`;
   const primeStatus = f.prime_status || "unknown";
-  const primeColor = primeStatus === "prime" ? "#4aff6a" : (primeStatus === "developing" ? "#4a9eff" : "#ff9a4a");
+  const primeColor = primeStatus === "prime" ? "var(--success)" : (primeStatus === "developing" ? "var(--opponent-blue)" : "#ff9a4a");
   qs("#cPrime").innerHTML = `<span style="color:${primeColor}">${primeStatus.charAt(0).toUpperCase() + primeStatus.slice(1)}</span>`;
   qs("#cSignature").textContent = f.signature_strike || "None yet";
 
@@ -2939,10 +3024,10 @@ async function showGymList() {
     return;
   }
   const resp = await api("/api/gyms");
-  let html = '<div class="card-title">Available Gyms</div><div style="font-size:12px;color:#888;margin-bottom:6px">Monthly fees apply</div>';
+  let html = '<div class="card-title">Available Gyms</div><div class="text-muted" style="font-size:12px;margin-bottom:6px">Monthly fees apply</div>';
   resp.gyms.forEach(g => {
     html += `<div class="list-item" onclick="joinGym('${escHtml(g.name)}')">
-      <strong>${escHtml(g.name)}</strong> — $${g.monthly_fee}/mo<br><small>${escHtml(g.specialties.join(", "))} | Bonus: +${(g.coach_bonus*100).toFixed(0)}%</small></div>`;
+      <strong>${escHtml(g.name)}</strong> — $${g.monthly_fee}/mo<br><small class="text-muted">${escHtml(g.specialties.join(", "))} | Bonus: +${(g.coach_bonus*100).toFixed(0)}%</small></div>`;
   });
   showModal(html);
 }
@@ -2972,7 +3057,7 @@ async function showAgentList() {
   let html = '<div class="card-title">Available Agents</div>';
   resp.agents.forEach(a => {
     html += `<div class="list-item" onclick="hireAgent('${escHtml(a.name)}')">
-      <strong>${escHtml(a.name)}</strong> — ${(a.cut*100).toFixed(0)}% cut, +${(a.negotiation_bonus*100).toFixed(0)}% contracts<br><small>${escHtml(a.perks)}</small></div>`;
+      <strong>${escHtml(a.name)}</strong> — ${(a.cut*100).toFixed(0)}% cut, +${(a.negotiation_bonus*100).toFixed(0)}% contracts<br><small class="text-muted">${escHtml(a.perks)}</small></div>`;
   });
   showModal(html);
 }
@@ -3031,7 +3116,7 @@ async function createFighter() {
       toast(resp.error || "Failed to create fighter", "error");
     }
   } catch(e) {
-    console.error("createFighter error:", e);
+    console.warn("createFighter error:", e);
     toast("Error creating fighter: " + e.message, "error");
   }
   setLoading(btn, false);
